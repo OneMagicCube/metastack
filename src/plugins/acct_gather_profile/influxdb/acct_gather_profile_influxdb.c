@@ -72,6 +72,9 @@
 #include "src/interfaces/proctrack.h"
 
 #define DEFAULT_INFLUXDB_TIMEOUT 10
+#ifdef __METASTACK_OPT_INFLUXDB_FREQUENCY
+#define DEFAULT_INFLUXDB_FREQUENCY 30
+#endif
 
 /*
  * These variables are required by the generic plugin interface.  If they
@@ -115,6 +118,9 @@ typedef struct {
 #endif	
 #ifdef __METASTACK_OPT_INFLUXDB_PERFORMANCE
 	char* series_reduce;
+#endif
+#ifdef __METASTACK_OPT_INFLUXDB_FREQUENCY
+	uint32_t frequency;
 #endif
 } slurm_influxdb_conf_t;
 
@@ -163,6 +169,9 @@ static int datastrlen = 0;
 static table_t *tables = NULL;
 static size_t tables_max_len = 0;
 static size_t tables_cur_len = 0;
+#ifdef __METASTACK_OPT_INFLUXDB_FREQUENCY
+static time_t last_send = 0;
+#endif
 
 #ifdef __METASTACK_OPT_INFLUXDB_PERFORMANCE
 static char *stepd_datastr = NULL;  /* Save the data to send to the Stepd retention policy */
@@ -711,6 +720,10 @@ static int _send_data(const char *data, retention_policy_t type)
 	static int error_cnt = 0;
 	char *url = NULL;
 	size_t length;
+#ifdef __METASTACK_OPT_INFLUXDB_FREQUENCY
+	time_t now = time(NULL);
+	bool send_now = false;
+#endif
 #ifdef __METASTACK_OPT_INFLUXDB_PERFORMANCE
 	char* rt_policy = NULL;
 #endif
@@ -720,6 +733,17 @@ static int _send_data(const char *data, retention_policy_t type)
 #endif
 	debug3("%s %s called", plugin_type, __func__);
 
+#ifdef __METASTACK_OPT_INFLUXDB_FREQUENCY
+	/*
+	 * Send data to InfluxDB immediately if buffering is disabled, the send
+	 * interval has elapsed, or a job step has ended (indicated by data ==
+	 * NULL).
+	 */
+	if ((!influxdb_conf.frequency) ||
+	    ((now - last_send) >= (time_t) influxdb_conf.frequency) || (!data))
+		send_now = true;
+#endif
+
 	/*
 	 * Every compute node which is sampling data will try to establish a
 	 * different connection to the influxdb server. In order to reduce the
@@ -728,7 +752,11 @@ static int _send_data(const char *data, retention_policy_t type)
 	 * try to open the connection and send this buffer, instead of opening
 	 * one per sample.
 	 */
+#ifdef __METASTACK_OPT_INFLUXDB_FREQUENCY
+	if ((!send_now) && ((datastrlen + strlen(data)) <= BUF_SIZE)) {
+#else
 	if (data && ((datastrlen + strlen(data)) <= BUF_SIZE)) {
+#endif
 		xstrcat(datastr, data);
 		length = strlen(data);
 		datastrlen += length;
@@ -837,7 +865,9 @@ cleanup_easy_init:
 		datastr[0] = '\0';
 		datastrlen = 0;
 	}
-
+#ifdef __METASTACK_OPT_INFLUXDB_FREQUENCY
+	last_send = now;
+#endif
 	return rc;
 }
 
@@ -868,6 +898,9 @@ extern int init(void)
 #ifdef __METASTACK_OPT_INFLUXDB_PERFORMANCE
 	influxdb_conf.series_reduce = NULL;
 	influxdb_conf.workdir = NULL;
+#endif
+#ifdef __METASTACK_OPT_INFLUXDB_FREQUENCY
+	last_send = time(NULL);
 #endif
 	return SLURM_SUCCESS;
 }
@@ -922,6 +955,9 @@ extern void acct_gather_profile_p_conf_options(s_p_options_t **full_options,
 #ifdef __METASTACK_OPT_INFLUXDB_PERFORMANCE
 		{"ProfileInfluxDBSeriesReduce", S_P_STRING},
 #endif
+#ifdef __METASTACK_OPT_INFLUXDB_FREQUENCY
+		{"ProfileInfluxDBFrequency", S_P_UINT32},
+#endif
 		{NULL} };
 
 	transfer_s_p_options(full_options, options, full_options_cnt);
@@ -963,6 +999,11 @@ extern void acct_gather_profile_p_conf_set(s_p_hashtbl_t *tbl)
 #ifdef __METASTACK_OPT_INFLUXDB_PERFORMANCE
 		s_p_get_string(&influxdb_conf.series_reduce,
 			       "ProfileInfluxDBSeriesReduce", tbl);
+#endif
+#ifdef __METASTACK_OPT_INFLUXDB_FREQUENCY
+		if (!s_p_get_uint32(&influxdb_conf.frequency,
+				    "ProfileInfluxDBFrequency", tbl))
+			influxdb_conf.frequency = DEFAULT_INFLUXDB_FREQUENCY;
 #endif
 	}
 
@@ -1439,6 +1480,10 @@ extern void acct_gather_profile_p_conf_values(List *data)
 #ifdef __METASTACK_OPT_INFLUXDB_PERFORMANCE
 	add_key_pair(*data, "ProfileInfluxDBSeriesReduce", "%s",
 			 influxdb_conf.series_reduce);
+#endif
+#ifdef __METASTACK_OPT_INFLUXDB_FREQUENCY
+	add_key_pair(*data, "ProfileInfluxDBFrequency", "%u",
+		     influxdb_conf.frequency);
 #endif
 	/* skip over ProfileInfluxDBUser for security reasons */
 }

@@ -537,6 +537,10 @@ typedef struct sbcast_cred sbcast_cred_t;		/* opaque data type */
 #define __METASTACK_BUG_NULL_GS_PART_LIST
 #endif
 
+#ifndef __METASTACK_OPT_INFLUXDB_FREQUENCY
+#define __METASTACK_OPT_INFLUXDB_FREQUENCY
+#endif
+
 /*****************************************************************************\
  *	DEFINITIONS FOR POSIX VALUES
 \*****************************************************************************/
