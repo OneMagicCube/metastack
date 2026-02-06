@@ -1449,6 +1449,15 @@ static int _spawn_job_container(stepd_step_rec_t *step)
 		;	       /* Wait until above process exits from signal */
 	}
 
+#ifdef __METASTACK_BUG_EXTERN_THREAD_FINISH
+	slurm_mutex_lock(&step->state_mutex);
+	while ((step->state < SLURMSTEPD_STEP_CANCELLED)) {
+		slurm_cond_wait(&step->state_cond, &step->state_mutex);
+	}
+	join_extern_threads();
+	slurm_mutex_unlock(&step->state_mutex);
+#endif
+
 	/* Wait for all steps other than extern (this one) to complete */
 	if (!pause_for_job_completion(jobid, MAX(slurm_conf.kill_wait, 5),
 				      true)) {
