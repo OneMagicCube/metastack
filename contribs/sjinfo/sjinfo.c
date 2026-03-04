@@ -89,6 +89,9 @@
 #ifdef __METASTACK_NOHEAD
 #define LONG_OPT_NOHEAD 0x100
 #endif
+#ifdef __METASTACK_DELIMITER
+#define OPT_LONG_DELIMITER 0x1000
+#endif
 
 #define NOT_FIND -1
 //struct tm *localtime_r(const time_t *timep, struct tm *result);
@@ -2580,6 +2583,12 @@ void print_sjinfo_help(void)
 "        Output will be '|' delimited without a '|' at the end.               \n"  
 "        Data will not be truncated.                                        \n"
 #endif
+#ifdef __METASTACK_DELIMITER
+"     --delimiter:                                                          \n"  
+"        ASCII characters used to separate the fields when specifying       \n"  
+"        the -p option. The default delimiter is a '|'. This option         \n"  
+"        is ignored if the -p option is not specified.                      \n"
+#endif
 "     -o, --format:                                                        \n"
 "        Print a list of fields that can be specified with the            \n"
 "        '--format' option                                                 \n"
@@ -3805,6 +3814,9 @@ int parse_command_and_query(int argc, char **argv, slurm_influxdb *data)
                 {"parsable",    no_argument,        0,      'p'},
                 {"parsable2",    no_argument,        0,      'P'},
 #endif
+#ifdef __METASTACK_DELIMITER
+                {"delimiter",   required_argument,  0,      OPT_LONG_DELIMITER},
+#endif
                 {0,             0,                  0,      0}};
     
     optind = 0;
@@ -3918,7 +3930,12 @@ int parse_command_and_query(int argc, char **argv, slurm_influxdb *data)
             case 'P':  
                 print_fields_parsable_print = PRINT_FIELDS_PARSABLE_NO_ENDING;  
                 break;
-#endif          
+#endif
+#ifdef __METASTACK_DELIMITER
+            case OPT_LONG_DELIMITER:  
+                fields_delimiter = optarg;  
+                break;
+#endif       
     		case '?':	/* getopt() has explained it */
 			    exit(1);
             default:
