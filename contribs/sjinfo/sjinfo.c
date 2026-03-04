@@ -2576,6 +2576,9 @@ void print_sjinfo_help(void)
 "     -p, --parsable:                                                       \n"  
 "        Output will be '|' delimited with a '|' at the end.               \n"  
 "        Data will not be truncated.                                        \n"
+"     -P, --parsable2:                                                       \n"  
+"        Output will be '|' delimited without a '|' at the end.               \n"  
+"        Data will not be truncated.                                        \n"
 #endif
 "     -o, --format:                                                        \n"
 "        Print a list of fields that can be specified with the            \n"
@@ -3800,13 +3803,14 @@ int parse_command_and_query(int argc, char **argv, slurm_influxdb *data)
 #endif
 #ifdef __METASTACK_PARSABLE
                 {"parsable",    no_argument,        0,      'p'},
+                {"parsable2",    no_argument,        0,      'P'},
 #endif
                 {0,             0,                  0,      0}};
     
     optind = 0;
     while ((c = getopt_long(argc, argv,
 #ifdef __METASTACK_PARSABLE
-                       "dt:e:E:j:s:lo:prS:u:VOmgaAhqD",
+                       "dt:e:E:j:s:lo:PprS:u:VOmgaAhqD",
 #else
 				       "dt:e:E:j:s:lo:rS:u:VOmgaAhqD",
 #endif
@@ -3910,6 +3914,9 @@ int parse_command_and_query(int argc, char **argv, slurm_influxdb *data)
 #ifdef __METASTACK_PARSABLE
             case 'p':  
                 print_fields_parsable_print = PRINT_FIELDS_PARSABLE_ENDING;  
+                break;
+            case 'P':  
+                print_fields_parsable_print = PRINT_FIELDS_PARSABLE_NO_ENDING;  
                 break;
 #endif          
     		case '?':	/* getopt() has explained it */
