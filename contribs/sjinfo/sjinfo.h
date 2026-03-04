@@ -26,7 +26,7 @@
 
 #define __METASTACK_APPTYPE_PROPERTIES
 #define __METASTACK_NOHEAD
-
+#define __METASTACK_PARSABLE
 
 #define CPU_ABNORMAL_FLAG "cpu"
 #define PROCESS_ABNORMAL_FLAG "process"

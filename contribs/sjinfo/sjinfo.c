@@ -2572,6 +2572,11 @@ void print_sjinfo_help(void)
 "     --nohead:                                                            \n"  
 "        Do not print the header (title) line in the output.               \n"
 #endif
+#ifdef __METASTACK_PARSABLE
+"     -p, --parsable:                                                       \n"  
+"        Output will be '|' delimited with a '|' at the end.               \n"  
+"        Data will not be truncated.                                        \n"
+#endif
 "     -o, --format:                                                        \n"
 "        Print a list of fields that can be specified with the            \n"
 "        '--format' option                                                 \n"
@@ -3793,11 +3798,18 @@ int parse_command_and_query(int argc, char **argv, slurm_influxdb *data)
 #ifdef __METASTACK_NOHEAD
                 {"nohead",      no_argument,        0,      LONG_OPT_NOHEAD},
 #endif
+#ifdef __METASTACK_PARSABLE
+                {"parsable",    no_argument,        0,      'p'},
+#endif
                 {0,             0,                  0,      0}};
     
     optind = 0;
     while ((c = getopt_long(argc, argv,
+#ifdef __METASTACK_PARSABLE
+                       "dt:e:E:j:s:lo:prS:u:VOmgaAhqD",
+#else
 				       "dt:e:E:j:s:lo:rS:u:VOmgaAhqD",
+#endif
 				       long_options, &optionIndex)) != -1) {   
         if (c == -1) {
             no_jobid = true;
@@ -3894,7 +3906,12 @@ int parse_command_and_query(int argc, char **argv, slurm_influxdb *data)
             case LONG_OPT_NOHEAD:  
                 print_fields_have_header = 0;  
                 break;    
-#endif             
+#endif
+#ifdef __METASTACK_PARSABLE
+            case 'p':  
+                print_fields_parsable_print = PRINT_FIELDS_PARSABLE_ENDING;  
+                break;
+#endif          
     		case '?':	/* getopt() has explained it */
 			    exit(1);
             default:
