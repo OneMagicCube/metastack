@@ -24,7 +24,7 @@
 #ifndef _SJINFO_H
 #define _SJINFO_H
 
-
+#define __METASTACK_APPTYPE_PROPERTIES
 
 #define CPU_ABNORMAL_FLAG "cpu"
 #define PROCESS_ABNORMAL_FLAG "process"

@@ -56,6 +56,9 @@
 #include <errno.h>
 #include <math.h> 
 #include "sjinfo.h"
+#ifdef __METASTACK_APPTYPE_PROPERTIES
+#include "uthash.h"
+#endif
 
 /* Names for the values of the `has_arg' field of `struct option'.  */
 #define no_argument		0
@@ -222,6 +225,16 @@ typedef struct {
    long long int req_mem;
    long long int alloc_cpu;
 } interface_sjinfo_t;
+
+
+#ifdef __METASTACK_APPTYPE_PROPERTIES
+typedef struct apptype_map_entry {  
+    char key[256];           /* hash key: lowercase keyword from properties file */  
+    char value[256];         /* mapped apptype name */  
+    UT_hash_handle hh;  
+} apptype_map_entry_t;
+#endif
+
 
 /* Log out of memory without message buffering */
 void log_oom(const char *file, int line)
@@ -1759,6 +1772,141 @@ static size_t write_callback(void *contents, size_t size, size_t nmemb,
 	return realsize;
 }
 
+#ifdef __METASTACK_APPTYPE_PROPERTIES
+/* Load apptype.properties into uthash hash table.  
+ * File format: key=value per line, # for comments, blank lines skipped.  
+ * Keys are stored in lowercase for case-insensitive lookup.  
+ */  
+static void load_apptype_properties(void)  
+{  
+    char *conf_path = NULL;  
+    char tmp[] = "/etc/apptype.properties";  
+    FILE *file = NULL;  
+    char line[512];  
+  
+    if (xstrcmp(KEYDIR, "NONE") == 0) {  
+        conf_path = my_strdup("/etc/slurm/apptype.properties");  
+    } else {  
+        conf_path = xmalloc(strlen(KEYDIR) + strlen(tmp) + 2);  
+        sprintf(conf_path, "%s%s", KEYDIR, tmp);  
+    }  
+    printf("HJL--TEST conf_path = %s\n", conf_path);
+    file = fopen(conf_path, "r");  
+    if (!file) {  
+        /* Properties file not found; no mapping will be applied */  
+        xfree(conf_path);  
+        return;  
+    }  
+  
+    while (fgets(line, sizeof(line), file)) {  
+        /* Skip comments and blank lines */  
+        if (line[0] == '#' || line[0] == '\n' || line[0] == '\0')  
+            continue;  
+        /* Remove trailing newline */  
+        line[strcspn(line, "\n")] = '\0';  
+  
+        char *eq = strchr(line, '=');  
+        if (!eq) continue;  
+        *eq = '\0';  
+        char *key = line;  
+        char *value = eq + 1;  
+  
+        /* Skip if key or value is empty */  
+        if (*key == '\0' || *value == '\0') continue;  
+  
+        /* Convert key to lowercase */  
+        apptype_map_entry_t *entry = NULL;  
+        entry = calloc(1, sizeof(apptype_map_entry_t));  
+        size_t i;  
+        for (i = 0; key[i] && i < sizeof(entry->key) - 1; i++)  
+            entry->key[i] = tolower((unsigned char)key[i]);  
+        entry->key[i] = '\0';  
+        snprintf(entry->value, sizeof(entry->value), "%s", value);  
+  
+        /* Only add if not already present (first occurrence wins) */  
+        apptype_map_entry_t *existing = NULL;  
+        HASH_FIND_STR(apptype_map, entry->key, existing);  
+        if (existing) {  
+            free(entry);  
+        } else {  
+            HASH_ADD_STR(apptype_map, key, entry);  
+        }  
+    }  
+    fclose(file);  
+    xfree(conf_path);  
+}  
+
+/* Free all entries in the apptype hash table */  
+static void free_apptype_properties(void)  
+{  
+    apptype_map_entry_t *cur, *tmp;  
+    HASH_ITER(hh, apptype_map, cur, tmp) {  
+        HASH_DEL(apptype_map, cur);  
+        free(cur);  
+    }  
+    apptype_map = NULL;  
+}
+
+/*  
+ * Match an apptype string against the hash table using tokenization.  
+ * Same logic as apptype_recognition() in jobacct_gather.c:  
+ *   1. Tokenize by " /" delimiters  
+ *   2. For each token, look up in hash (case-insensitive)  
+ *   3. If not found, further tokenize by ".-=_+" and look up each sub-token  
+ * Returns the mapped value if found, NULL otherwise.  
+ */  
+static const char *match_apptype(const char *raw_apptype)  
+{  
+    if (!raw_apptype || !apptype_map) return NULL;  
+  
+    char *input_copy = strdup(raw_apptype);  
+    if (!input_copy) return NULL;  
+  
+    const char *result = NULL;  
+    char *saveptr1 = NULL, *saveptr2 = NULL;  
+    char *token1 = NULL, *token2 = NULL;  
+  
+    for (token1 = strtok_r(input_copy, " /", &saveptr1);  
+         token1 && !result;  
+         token1 = strtok_r(NULL, " /", &saveptr1)) {  
+        /* Look up the whole token (case-insensitive) */  
+        char lower[256];  
+        size_t i;  
+        for (i = 0; token1[i] && i < sizeof(lower) - 1; i++)  
+            lower[i] = tolower((unsigned char)token1[i]);  
+        lower[i] = '\0';  
+  
+        apptype_map_entry_t *entry = NULL;  
+        HASH_FIND_STR(apptype_map, lower, entry);  
+        if (entry) {  
+            result = entry->value;  
+            break;  
+        }  
+  
+        /* Further tokenize by ".-=_+" */  
+        /* Need a copy since strtok_r modifies the string */  
+        char *token1_copy = strdup(token1);  
+        if (!token1_copy) continue;  
+        for (token2 = strtok_r(token1_copy, ".-=_+", &saveptr2);  
+             token2 && !result;  
+             token2 = strtok_r(NULL, ".-=_+", &saveptr2)) {  
+            for (i = 0; token2[i] && i < sizeof(lower) - 1; i++)  
+                lower[i] = tolower((unsigned char)token2[i]);  
+            lower[i] = '\0';  
+  
+            HASH_FIND_STR(apptype_map, lower, entry);  
+            if (entry) {  
+                result = entry->value;  
+            }  
+        }  
+        free(token1_copy);  
+    }  
+  
+    free(input_copy);  
+    return result;  
+}
+
+#endif
 
 char* influxdb_connect(slurm_influxdb *data, const char* sql, int type)
 {
@@ -2140,7 +2288,9 @@ void parse_json(const char *response,  char *username, int flag, time_t current_
                 size_t i = 0, j = 0, num_rows = json_array_size(values);
                 uint64_t max_cputime = 0; /* Keep the maximum value of cputime */
                 char* max_username = NULL, *max_apptype = NULL, *apptype_cli = NULL;  /* The process name and user name corresponding to the maximum value of cputime */
-
+#ifdef __METASTACK_APPTYPE_PROPERTIES
+                char *mapped_apptype = NULL, *mapped_username = NULL;
+#endif
                 interface_sjinfo_t *iinfo_job = xmalloc(sizeof(*iinfo_job));
                 iinfo_job->username = xmalloc(strlen(username) + 1);
 
@@ -2180,22 +2330,57 @@ void parse_json(const char *response,  char *username, int flag, time_t current_
                             iinfo->username = xstrdup(json_string_value(value));
                         }
                     }
-                    if (iinfo && iinfo->cputime >= max_cputime) {
-                        max_cputime = iinfo->cputime;
-                        xfree(max_apptype);
-                        max_apptype = xstrdup(iinfo->apptype_step);
-                        xfree(max_username);
-                        max_username = xstrdup(iinfo->username);
-                    }
-                    if ((params.level & INFLUXDB_APPTYPE) && params.show_jobstep_apptype) {
-                        list_append(print_apptype_value_list, iinfo);
-                    } else {
-                        free_interface_sjinfo(iinfo);
-                    }
+                    #ifdef __METASTACK_APPTYPE_PROPERTIES
+                    if (!mapped_apptype && iinfo->apptype_step) {  
+                        const char *mapped = match_apptype(iinfo->apptype_step);  
+                        if (mapped) {  
+                            mapped_apptype = xstrdup(mapped);  
+                            mapped_username = xstrdup(iinfo->username);  
+                        }  
+                    }  
+                    if (!mapped_apptype && iinfo->apptype_cli) {  
+                        const char *mapped = match_apptype(iinfo->apptype_cli);  
+                        if (mapped) {  
+                            mapped_apptype = xstrdup(mapped);  
+                            mapped_username = xstrdup(iinfo->username);  
+                        }  
+                    }  
+  
+                    /* Existing max_cputime logic (used as fallback) */  
+                    if (iinfo && iinfo->cputime >= max_cputime) {  
+                        max_cputime = iinfo->cputime;  
+                        xfree(max_apptype);  
+                        max_apptype = xstrdup(iinfo->apptype_step);  
+                        xfree(max_username);  
+                        max_username = xstrdup(iinfo->username);  
+                    }  
+                    if ((params.level & INFLUXDB_APPTYPE) && params.show_jobstep_apptype) {  
+                        list_append(print_apptype_value_list, iinfo);  
+                    } else {  
+                        free_interface_sjinfo(iinfo);  
+                    }  
+#endif
                     (params.desc_set ? --i : ++i);
                 }
                 if (!params.show_jobstep_apptype && params.level & INFLUXDB_APPTYPE) {
                     xfree(iinfo_job->apptype); 
+#ifdef __METASTACK_APPTYPE_PROPERTIES
+                    if (mapped_apptype) {  
+                        /* NEW: mapping succeeded, use it directly */  
+                        iinfo_job->apptype = xstrdup(mapped_apptype);  
+                        xfree(iinfo_job->username);  
+                        iinfo_job->username = xstrdup(mapped_username);  
+                    } else if (max_apptype == NULL || xstrcmp(max_apptype, "(null)") == 0) {  
+                        iinfo_job->apptype = xstrdup(apptype_cli);  
+                        xfree(iinfo_job->username);  
+                        iinfo_job->username = xstrdup(max_username);  
+                    } else {  
+                        iinfo_job->apptype = xstrdup(max_apptype);  
+                        xfree(iinfo_job->username);  
+                        iinfo_job->username = xstrdup(max_username);  
+                    }  
+                    list_append(print_apptype_job_value_list, iinfo_job);
+#else
                     if (max_apptype == NULL || xstrcmp(max_apptype, "(null)") == 0) {
                         iinfo_job->apptype = xstrdup(apptype_cli);
                     } else
@@ -2203,12 +2388,17 @@ void parse_json(const char *response,  char *username, int flag, time_t current_
                     xfree(iinfo_job->username);
                     iinfo_job->username = xstrdup(max_username);
                     list_append(print_apptype_job_value_list, iinfo_job);
+#endif
                 } else {
                     free_interface_sjinfo(iinfo_job);
                 }
                 xfree(max_apptype);
                 xfree(max_username);
                 xfree(apptype_cli);
+#ifdef __METASTACK_APPTYPE_PROPERTIES
+                xfree(mapped_apptype);
+                xfree(mapped_username);
+#endif
             } else if (flag == UNIT_EVENT) {
                 /* Analyze the data of Event measurement */
                 size_t i = 0, j = 0, num_rows = json_array_size(values);
@@ -5108,7 +5298,9 @@ int main(int argc ,char** argv) {
     const uint8_t key[]="fcad715bd73b5cb0";
     
     sjinfo_init(influxdb_data);
-
+#ifdef __METASTACK_APPTYPE_PROPERTIES
+    load_apptype_properties(); 
+#endif
     rc = read_hex_bytes_from_file(configpath, key, influxdb_data);
     if(rc == -1)
          goto file_fail;
@@ -5121,11 +5313,18 @@ int main(int argc ,char** argv) {
     else
         print_query();
     sjinfo_fini(influxdb_data);
+#ifdef __METASTACK_APPTYPE_PROPERTIES
+    free_apptype_properties();
+#endif
 file_fail:
     if (configpath)
         xfree(configpath);
-    if(rc == -1 )
+    if(rc == -1 ) {
          sjinfo_fini(influxdb_data);
+#ifdef __METASTACK_APPTYPE_PROPERTIES
+         free_apptype_properties();
+#endif
+    }
     xfree(influxdb_data);
     if(params.opt_field_list)
         xfree(params.opt_field_list);
