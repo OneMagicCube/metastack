@@ -86,6 +86,10 @@
 #define list_iterator_alloc() xmalloc(sizeof(struct listIterator))
 #define LINE_WIDTH 128
 
+#ifdef __METASTACK_NOHEAD
+#define LONG_OPT_NOHEAD 0x100
+#endif
+
 #define NOT_FIND -1
 //struct tm *localtime_r(const time_t *timep, struct tm *result);
 
@@ -2564,6 +2568,10 @@ void print_sjinfo_help(void)
 "        Specify the job ID.                                               \n"
 "     -l, --load:                                                           \n"
 "        Displays load information during job run time          \n"
+#ifdef __METASTACK_NOHEAD
+"     --nohead:                                                            \n"  
+"        Do not print the header (title) line in the output.               \n"
+#endif
 "     -o, --format:                                                        \n"
 "        Print a list of fields that can be specified with the            \n"
 "        '--format' option                                                 \n"
@@ -3782,6 +3790,9 @@ int parse_command_and_query(int argc, char **argv, slurm_influxdb *data)
                 {"query",       no_argument,        0,      'q'},         
                 {"version",     no_argument,        0,      'V'},
                 {"overall",     no_argument,        0,      'O'},
+#ifdef __METASTACK_NOHEAD
+                {"nohead",      no_argument,        0,      LONG_OPT_NOHEAD},
+#endif
                 {0,             0,                  0,      0}};
     
     optind = 0;
@@ -3878,7 +3889,12 @@ int parse_command_and_query(int argc, char **argv, slurm_influxdb *data)
                 break;
             case 'q':
                 qurey_label = true;    
-                break;                 
+                break;    
+#ifdef __METASTACK_NOHEAD
+            case LONG_OPT_NOHEAD:  
+                print_fields_have_header = 0;  
+                break;    
+#endif             
     		case '?':	/* getopt() has explained it */
 			    exit(1);
             default:
@@ -5222,44 +5238,63 @@ void print_field(uint64_t level)
 
 
     if(list_count(print_fields_list) > 0){
-        printf("***************************************************************************** \n");
-        printf("******       Display resource consumption information of job steps    *******\n");
-        printf("***************************************************************************** \n");
-        printf("\n");
+#ifdef __METASTACK_NOHEAD
+        if (print_fields_have_header != 0) {
+            printf("***************************************************************************** \n");
+            printf("******       Display resource consumption information of job steps    *******\n");
+            printf("***************************************************************************** \n");
+            printf("\n");
+        }
+#endif
         print_options(print_fields_list, print_value_list ,print_fields_itr);
-        printf("\n");
     }
 
 
     if(list_count(print_events_list) > 0) {
-        printf("***************************************************************************** \n");
-        printf("******       Display job step exception event information            ******** \n");
-        printf("***************************************************************************** \n");
-        printf("\n");
+#ifdef __METASTACK_NOHEAD
+        if (print_fields_have_header != 0) {
+            printf("***************************************************************************** \n");
+            printf("******       Display job step exception event information            ******** \n");
+            printf("***************************************************************************** \n");
+            printf("\n");
+        }
+#endif
         print_options(print_events_list, print_events_value_list, print_events_itr);
     }
        
     if(list_count(print_overall_list) > 0) {
-        printf("***************************************************************************** \n");
-        printf("*******     Display job step exception event overall information      ******* \n");
-        printf("***************************************************************************** \n");
-        printf("\n");
+#ifdef __METASTACK_NOHEAD
+        if (print_fields_have_header != 0) {
+            printf("***************************************************************************** \n");
+            printf("*******     Display job step exception event overall information      ******* \n");
+            printf("***************************************************************************** \n");
+            printf("\n");
+        }
+#endif
         print_options(print_overall_list, print_overall_value_list, print_overall_itr);
     }
 
     if(list_count(print_apptype_list) > 0) {
-        printf("***************************************************************************** \n");
-        printf("*******             Display job step apptype information              ******* \n");
-        printf("***************************************************************************** \n");
-        printf("\n");
+#ifdef __METASTACK_NOHEAD
+        if (print_fields_have_header != 0) {
+            printf("***************************************************************************** \n");
+            printf("*******             Display job step apptype information              ******* \n");
+            printf("***************************************************************************** \n");
+            printf("\n");
+        }
+#endif
         print_options(print_apptype_list, print_apptype_value_list, print_apptype_itr);
     }
 
     if(list_count(print_apptype_job_list) > 0) {
-        printf("***************************************************************************** \n");
-        printf("*******                Display job apptype information                ******* \n");
-        printf("***************************************************************************** \n");
-        printf("\n");
+#ifdef __METASTACK_NOHEAD
+        if (print_fields_have_header != 0) {
+            printf("***************************************************************************** \n");
+            printf("*******                Display job apptype information                ******* \n");
+            printf("***************************************************************************** \n");
+            printf("\n");
+        }
+#endif
         print_options(print_apptype_job_list, print_apptype_job_value_list, print_apptype_job_itr);
     }
 endit:
