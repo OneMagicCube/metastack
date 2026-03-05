@@ -12892,6 +12892,7 @@ static void _pack_default_job_details(job_record_t *job_ptr, buf_t *buffer,
 			else
 				packnull(buffer);
 #endif			
+		}
 	} else if (protocol_version >= SLURM_23_02_PROTOCOL_VERSION) {
 		if (detail_ptr) {
 			if (!IS_JOB_PENDING(job_ptr)) {
