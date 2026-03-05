@@ -2200,6 +2200,22 @@ extern void print_fields(type_t type, void *object)
 					     tmp_char,
 					     (curr_inx == field_count));
 			break;
+#ifdef __METASTACK_OPT_APPTYPE
+		case PRINT_APPTYPE:  
+			switch(type) {  
+			case JOB:  
+				tmp_char = job->apptype;  
+				break;  
+			case JOBSTEP:  
+				tmp_char = NULL;
+				break;  
+			default:  
+				tmp_char = NULL;  
+				break;  
+			}  
+			field->print_routine(field, tmp_char, (curr_inx == field_count));  
+			break;  
+#endif
 #ifdef __METASTACK_OPT_RESC_NODEDETAIL
 		case PRINT_RESCNODEDETAIL:
 			switch(type) {

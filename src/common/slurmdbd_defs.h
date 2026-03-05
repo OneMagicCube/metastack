@@ -327,6 +327,9 @@ typedef struct dbd_job_start_msg {
 	char    *tres_req_str;  /* Simple comma separated list of TRES */
 	char *   wckey;		/* wckey name */
 	char    *work_dir;      /* work dir of job */
+#ifdef __METASTACK_OPT_APPTYPE
+	char	*apptype;
+#endif
 } dbd_job_start_msg_t;
 
 /* returns a uint32_t along with a return code */

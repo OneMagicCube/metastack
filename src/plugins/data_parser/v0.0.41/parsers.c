@@ -7510,6 +7510,9 @@ static const flag_bit_t PARSER_FLAG_ARRAY(JOB_FLAGS)[] = {
 	add_flag_bit(GRES_ENFORCE_BIND, "GRES_BINDING_ENFORCED"),
 	add_flag_bit(TEST_NOW_ONLY, "TEST_NOW_ONLY"),
 	add_flag_bit(JOB_SEND_ENV, "SEND_JOB_ENVIRONMENT"),
+#ifdef __METASTACK_OPT_APPTYPE
+	add_flag_bit(JOB_SEND_APPTYPE, "SEND_JOB_APPTYPE"),
+#endif
 	add_flag_bit(SPREAD_JOB, "SPREAD_JOB"),
 	add_flag_bit(USE_MIN_NODES, "PREFER_MINIMUM_NODE_COUNT"),
 	add_flag_bit(JOB_KILL_HURRY, "JOB_KILL_HURRY"),

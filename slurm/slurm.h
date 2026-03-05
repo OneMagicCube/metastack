@@ -541,6 +541,10 @@ typedef struct sbcast_cred sbcast_cred_t;		/* opaque data type */
 #define __METASTACK_BUG_EXTERN_THREAD_FINISH
 #endif
 
+#ifndef __METASTACK_OPT_APPTYPE
+#define __METASTACK_OPT_APPTYPE
+#endif
+
 /*****************************************************************************\
  *	DEFINITIONS FOR POSIX VALUES
 \*****************************************************************************/
@@ -2434,6 +2438,9 @@ typedef struct job_info {
 	char *work_dir;		/* pathname of working directory */
 #ifdef __METASTACK_NEW_PENDING_ORDER
 	uint32_t pending_order;
+#endif
+#ifdef __METASTACK_OPT_APPTYPE
+	char *apptype;
 #endif
 } slurm_job_info_t;
 

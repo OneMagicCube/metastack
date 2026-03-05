@@ -171,6 +171,9 @@ char *resv_view = "resv_view";
 char *resv_ext_view = "resv_ext_view";
 char *step_view = "step_view";
 char *step_ext_view = "step_ext_view";
+#ifdef __METASTACK_OPT_APPTYPE
+char *job_apptype_table = "job_apptype_table";
+#endif
 
 bool backup_dbd = 0;
 //typedef char *KINGBASE_ROW;
@@ -2049,6 +2052,9 @@ extern int remove_cluster_tables(kingbase_conn_t *kingbase_conn, char *cluster_n
 #ifdef __METASTACK_NEW_AUTO_SUPPLEMENT_AVAIL_NODES
 		   "`%s_%s`, "
 #endif
+#ifdef __METASTACK_OPT_APPTYPE
+		   "\"%s_%s\", "
+#endif
 		   "`%s_%s`, `%s_%s`, `%s_%s`, `%s_%s`;",
 		   cluster_name, assoc_table,
 		   cluster_name, assoc_day_table,
@@ -2062,12 +2068,15 @@ extern int remove_cluster_tables(kingbase_conn_t *kingbase_conn, char *cluster_n
 		   cluster_name, job_script_table,
 		   cluster_name, job_table,
 		   cluster_name, last_ran_table,
-#ifdef __METASTACK_NEW_AUTO_SUPPLEMENT_AVAIL_NODES
-		   cluster_name, node_borrow_table,
-#endif
 		   cluster_name, resv_table,
 		   cluster_name, step_table,
 		   cluster_name, suspend_table,
+#ifdef __METASTACK_NEW_AUTO_SUPPLEMENT_AVAIL_NODES
+		   cluster_name, node_borrow_table,
+#endif
+#ifdef __METASTACK_OPT_APPTYPE
+		   cluster_name, job_apptype_table,
+#endif
 		   cluster_name, wckey_table,
 		   cluster_name, wckey_day_table,
 		   cluster_name, wckey_hour_table,

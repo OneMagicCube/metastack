@@ -1015,6 +1015,9 @@ typedef struct {
 #ifdef __METASTACK_OPT_RESC_NODEDETAIL
 	char	*resource_node_detail;
 #endif
+#ifdef __METASTACK_OPT_APPTYPE
+	char	*apptype;
+#endif
 } slurmdb_job_rec_t;
 
 typedef struct {

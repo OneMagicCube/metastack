@@ -1029,6 +1029,9 @@ extern void slurmdb_destroy_job_rec(void *object)
 #ifdef __METASTACK_OPT_RESC_NODEDETAIL
 		xfree(job->resource_node_detail);
 #endif
+#ifdef __METASTACK_OPT_APPTYPE
+		xfree(job->apptype);
+#endif
 		xfree(job);
 	}
 }

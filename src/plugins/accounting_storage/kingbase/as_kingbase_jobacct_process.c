@@ -108,6 +108,9 @@ char *job_req_inx[] = {
 #endif
 	"t1.mcs_label",
 	"t4.batch_script",
+#ifdef __METASTACK_OPT_APPTYPE
+	"t5.apptype",
+#endif
 	"t1.std_err",
 	"t1.std_in",
 	"t1.std_out",
@@ -178,6 +181,9 @@ enum {
 #endif
 	JOB_REQ_MCS_LABEL,
 	JOB_REQ_SCRIPT,
+#ifdef __METASTACK_OPT_APPTYPE
+	JOB_REQ_APPTYPE,
+#endif
 	JOB_REQ_STDERR,
 	JOB_REQ_STDIN,
 	JOB_REQ_STDOUT,
@@ -580,7 +586,12 @@ static int _cluster_get_jobs(kingbase_conn_t *kingbase_conn,
 			   " left join `%s_%s` as t4 "
 			   "on t1.env_hash_inx=t4.hash_inx",
 			   cluster_name, job_env_table);
-
+#ifdef __METASTACK_OPT_APPTYPE
+	xstrfmtcat(query,
+			" left join \"%s_%s\" as t5 "
+			"on t1.job_db_inx=t5.job_db_inx ",
+			cluster_name, job_apptype_table);
+#endif
 	if (job_cond->flags & JOBCOND_FLAG_RUNAWAY) {
 		if (extra)
 			xstrcat(extra, " and (t1.time_end=0)");

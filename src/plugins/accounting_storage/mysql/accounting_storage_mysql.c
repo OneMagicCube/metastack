@@ -172,6 +172,9 @@ char *resv_view = "resv_view";
 char *resv_ext_view = "resv_ext_view";
 char *step_view = "step_view";
 char *step_ext_view = "step_ext_view";
+#ifdef __METASTACK_OPT_APPTYPE
+char *job_apptype_table = "job_apptype_table";
+#endif
 
 bool backup_dbd = 0;
 
@@ -1547,6 +1550,18 @@ extern int create_cluster_tables(mysql_conn_t *mysql_conn, char *cluster_name)
 		{ NULL, NULL}
 	};
 
+#ifdef __METASTACK_OPT_APPTYPE
+	storage_field_t job_apptype_table_fields[] = {  
+		{ "job_db_inx", "bigint unsigned not null" },  
+		{ "apptype", "varchar(255) not null default ''" },  
+		{ "apptype_runtime", "varchar(255) not null default ''" },  
+		{ "source", "tinyint default 0 not null" },  
+		{ "extra", "text not null default ''" },  
+		{ "deleted", "tinyint default 0 not null" },  
+		{ NULL, NULL}  
+	};
+#endif
+
 	char table_name[200];
 
 	if (create_cluster_assoc_table(mysql_conn, cluster_name)
@@ -1765,7 +1780,19 @@ extern int create_cluster_tables(mysql_conn_t *mysql_conn, char *cluster_name)
 				  "key archive_purge (mod_time))")
 	    == SLURM_ERROR)
 		return SLURM_ERROR;
+#ifdef __METASTACK_OPT_APPTYPE
+	snprintf(table_name, sizeof(table_name), "\"%s_%s\"",  
+		cluster_name, job_apptype_table);  
 
+	if (mysql_db_create_table(mysql_conn, table_name,  
+							job_apptype_table_fields,  
+							", primary key (job_db_inx), "  
+							"key idx_apptype (apptype), "  
+							"key idx_source (source), "  
+							"key idx_deleted (deleted))")  
+	== SLURM_ERROR)  
+	return SLURM_ERROR;
+#endif
 	return SLURM_SUCCESS;
 }
 
@@ -1800,6 +1827,9 @@ extern int remove_cluster_tables(mysql_conn_t *mysql_conn, char *cluster_name)
 #ifdef __METASTACK_NEW_AUTO_SUPPLEMENT_AVAIL_NODES
 		   "\"%s_%s\", "
 #endif
+#ifdef __METASTACK_OPT_APPTYPE
+		   "\"%s_%s\", "
+#endif
 		   "\"%s_%s\", \"%s_%s\", \"%s_%s\", \"%s_%s\";",
 		   cluster_name, assoc_table,
 		   cluster_name, assoc_day_table,
@@ -1813,12 +1843,15 @@ extern int remove_cluster_tables(mysql_conn_t *mysql_conn, char *cluster_name)
 		   cluster_name, job_script_table,
 		   cluster_name, job_table,
 		   cluster_name, last_ran_table,
-#ifdef __METASTACK_NEW_AUTO_SUPPLEMENT_AVAIL_NODES
-		   cluster_name, node_borrow_table,
-#endif
 		   cluster_name, resv_table,
 		   cluster_name, step_table,
 		   cluster_name, suspend_table,
+#ifdef __METASTACK_NEW_AUTO_SUPPLEMENT_AVAIL_NODES
+		   cluster_name, node_borrow_table,
+#endif
+#ifdef __METASTACK_OPT_APPTYPE
+		   cluster_name, job_apptype_table,
+#endif
 		   cluster_name, wckey_table,
 		   cluster_name, wckey_day_table,
 		   cluster_name, wckey_hour_table,

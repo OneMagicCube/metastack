@@ -2627,6 +2627,9 @@ static void _process_job_start(slurmdbd_conn_t *slurmdbd_conn,
 	job.db_flags = job_start_msg->db_flags;
 	details.features = _replace_double_quotes(job_start_msg->constraints);
 	job.state_reason_prev_db = job_start_msg->state_reason_prev;
+#ifdef __METASTACK_OPT_APPTYPE
+	details.apptype = job_start_msg->apptype;
+#endif
 
 	job.array_recs = &array_recs;
 	job.details = &details;

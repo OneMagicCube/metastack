@@ -2516,6 +2516,26 @@ int _print_job_mcs_label(job_info_t * job, int width,
 	return SLURM_SUCCESS;
 }
 
+#ifdef __METASTACK_OPT_APPTYPE
+int _print_job_application(job_info_t * job, int width, bool right_justify,  
+              char* suffix)  
+{  
+    if (job == NULL) {
+		_print_str("APPLICATION", width, right_justify, true);
+	} else {
+		if (job->apptype)
+			_print_str(job->apptype, width, right_justify, true);
+		else 
+			_print_str("N/A", width, right_justify, true);
+	}
+
+	if (suffix)
+		printf("%s", suffix);
+	return SLURM_SUCCESS;
+}
+#endif
+
+
 /*****************************************************************************
  * Job Step Print Functions
  *****************************************************************************/

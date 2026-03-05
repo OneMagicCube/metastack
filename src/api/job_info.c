@@ -1098,7 +1098,13 @@ slurm_sprint_job_info ( job_info_t * job_ptr, int one_liner )
 		xstrcat(out, line_end);
 		xstrfmtcat(out, "ResvPorts=%s", job_ptr->resv_ports);
 	}
-
+#ifdef __METASTACK_OPT_APPTYPE
+	/****** Line (optional) ******/
+	if (job_ptr->apptype) {
+		xstrcat(out, line_end);
+		xstrfmtcat(out, "Application=%s", job_ptr->apptype);
+	}
+#endif
 	xstrcat(out, line_end);
 
 	/****** END OF JOB RECORD ******/

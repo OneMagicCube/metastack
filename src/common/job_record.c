@@ -2405,6 +2405,9 @@ unpack_error:
 	xfree(watch_dog);
 	xfree(watch_dog_script);
 #endif
+#ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
+	xfree(apptype);
+#endif
 	return SLURM_ERROR;
 }
 

@@ -212,6 +212,9 @@ typedef enum {
 #ifdef __METASTACK_OPT_SACCT_COMMAND
 		PRINT_COMMAND,
 #endif
+#ifdef __METASTACK_OPT_APPTYPE
+		PRINT_APPTYPE,
+#endif
 		PRINT_WCKEYID,
 		PRINT_WORK_DIR
 } sacct_print_types_t;

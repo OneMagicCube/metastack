@@ -1902,6 +1902,9 @@ extern void slurm_free_job_info_members(job_info_t * job)
 		xfree(job->user_name);
 		xfree(job->wckey);
 		xfree(job->work_dir);
+#ifdef __METASTACK_OPT_APPTYPE
+		xfree(job->apptype);
+#endif
 	}
 }
 

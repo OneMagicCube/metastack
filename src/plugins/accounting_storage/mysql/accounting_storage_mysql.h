@@ -109,7 +109,9 @@ extern char *wckey_day_table;
 extern char *wckey_hour_table;
 extern char *wckey_month_table;
 extern char *wckey_table;
-
+#ifdef __METASTACK_OPT_APPTYPE
+extern char *job_apptype_table;
+#endif
 /* Since tables are cluster centric we have a global cluster list to
  * go off of.
  */
