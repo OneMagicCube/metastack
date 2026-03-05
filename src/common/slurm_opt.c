@@ -1009,44 +1009,16 @@ static slurm_cli_opt_t slurm_opt_comment = {
 	.get_func = arg_get_comment,
 	.reset_func = arg_reset_comment,
 };
-
-#ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
-/*
-	The apptype configuration entry is not open to the user and 
-	the value is initialized to -1 when the JobAcctGatherFrequency 
-	does not configure the apptype
-*/
-static int arg_set_apptype(slurm_opt_t *opt, const char *arg)
-{
-	xfree(opt->apptype);
-	char *acctg_freq = xstrdup(slurm_conf.job_acct_gather_freq);
-	if (acct_gather_parse_freq(PROFILE_APPTYPE, acctg_freq) == -1){
-		opt->apptype = xstrdup("unset");
-	} else {
-		opt->apptype = xstrdup(arg);
-	}
-	xfree(acctg_freq);
-	return SLURM_SUCCESS;
-}
-COMMON_STRING_OPTION_GET(apptype);
-static void arg_reset_apptype(slurm_opt_t *opt)
-{
-	if (opt->apptype) xfree(opt->apptype);
-	char *acctg_freq = xstrdup(slurm_conf.job_acct_gather_freq);
-	if (acct_gather_parse_freq(PROFILE_APPTYPE, acctg_freq) == -1){
-		opt->apptype = xstrdup("unset");
-	}
-	xfree(acctg_freq);
-}
-COMMON_STRING_OPTION_SET_DATA(apptype);
-static slurm_cli_opt_t slurm_opt_apptype = {
-	.name = "apptype",
-	.has_arg = required_argument,
-	.val = LONG_OPT_APPTYPE,
-	.set_func = arg_set_apptype,
+#if defined(__METASTACK_NEW_APPTYPE_RECOGNITION) && defined(__METASTACK_OPT_APPTYPE)
+COMMON_STRING_OPTION(apptype);  
+static slurm_cli_opt_t slurm_opt_apptype = {  
+    .name = "apptype",  
+    .has_arg = required_argument,  
+    .val = LONG_OPT_APPTYPE,  
+    .set_func = arg_set_apptype,  
+    .get_func = arg_get_apptype, 
 	.set_func_data = arg_set_data_apptype,
-	.get_func = arg_get_apptype,
-	.reset_func = arg_reset_apptype,
+    .reset_func = arg_reset_apptype,  
 };
 #endif
 

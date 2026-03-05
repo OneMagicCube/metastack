@@ -5297,7 +5297,9 @@ _unpack_job_info_members(job_info_t * job, buf_t *buffer,
 		safe_unpack32(&job->cpu_freq_gov, buffer);
 
 		safe_unpackstr(&job->cronspec, buffer);
-
+#ifdef __METASTACK_OPT_APPTYPE
+		safe_unpackstr(&job->apptype, buffer);
+#endif
 		/*** unpack pending job details ***/
 		safe_unpack16(&job->contiguous, buffer);
 		safe_unpack16(&job->core_spec, buffer);
@@ -5363,9 +5365,6 @@ _unpack_job_info_members(job_info_t * job, buf_t *buffer,
 #endif
 #ifdef __METASTACK_NEW_TIME_PREDICT
 		safe_unpack16(&job->predict_job, buffer);
-#endif
-#ifdef __METASTACK_OPT_APPTYPE
-		safe_unpackstr(&job->apptype, buffer);
 #endif
 	} else if (protocol_version >= META_3_0_PROTOCOL_VERSION ) {
 		uint8_t uint8_tmp;

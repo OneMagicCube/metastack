@@ -167,6 +167,9 @@ print_field_t fields[] = {
 #ifdef __METASTACK_OPT_SACCT_COMMAND
 	{32, "Command", print_fields_str, PRINT_COMMAND, 0},
 #endif
+#ifdef __METASTACK_OPT_APPTYPE
+	{10, "Apptype", print_fields_str, PRINT_APPTYPE, 0},  
+#endif
 	{0,  NULL, NULL, 0, 0}
 };
 #else
