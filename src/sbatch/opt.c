@@ -71,6 +71,9 @@
 #include "src/common/xstring.h"
 #include "src/common/util-net.h"
 
+#ifdef __METASTACK_NEW_APP_TEMPLATE
+#include "src/common/app_template.h"
+#endif
 #include "src/sbatch/opt.h"
 
 /* generic OPT_ definitions -- mainly for use with env vars  */
@@ -350,6 +353,9 @@ env_vars_t env_vars[] = {
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
   { "SBATCH_JOB_APPTYPE", LONG_OPT_APPTYPE},
 #endif
+#ifdef __METASTACK_NEW_APP_TEMPLATE
+  { "SBATCH_APP", LONG_OPT_APP},
+#endif
   { NULL }
 };
 
@@ -526,6 +532,11 @@ extern void process_options_second_pass(int argc, char **argv, int *argc_off,
 
 #ifdef __METASTACK_NEW_TIME_PREDICT
 	opt.uid = ori_uid;
+#endif
+
+#ifdef __METASTACK_NEW_APP_TEMPLATE
+	if (opt.app)
+		app_template_apply(&opt);
 #endif
 
 	if (!_opt_verify())

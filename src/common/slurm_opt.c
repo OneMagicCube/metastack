@@ -1010,6 +1010,19 @@ static slurm_cli_opt_t slurm_opt_comment = {
 	.reset_func = arg_reset_comment,
 };
 
+#ifdef __METASTACK_NEW_APP_TEMPLATE
+COMMON_STRING_OPTION(app);
+static slurm_cli_opt_t slurm_opt_app = {
+	.name = "app",
+	.has_arg = required_argument,
+	.val = LONG_OPT_APP,
+	.set_func = arg_set_app,
+	.set_func_data = arg_set_data_app,
+	.get_func = arg_get_app,
+	.reset_func = arg_reset_app,
+};
+#endif
+
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
 /*
 	The apptype configuration entry is not open to the user and 
@@ -6101,6 +6114,9 @@ static const slurm_cli_opt_t *common_options[] = {
 	&slurm_opt_submit_line,
 	&slurm_opt_apptype,
 #endif
+#ifdef __METASTACK_NEW_APP_TEMPLATE
+	&slurm_opt_app,
+#endif
 	NULL /* END */
 };
 
@@ -7773,6 +7789,9 @@ extern job_desc_msg_t *slurm_opt_create_job_desc(slurm_opt_t *opt_local,
 	job_desc->acctg_freq = xstrdup(opt_local->acctg_freq);
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
 	job_desc->apptype = xstrdup(opt_local->apptype);
+#endif
+#ifdef __METASTACK_NEW_APP_TEMPLATE
+	job_desc->app = xstrdup(opt_local->app);
 #endif
 	/* admin_comment not filled in here */
 	/* alloc_node not filled in here */

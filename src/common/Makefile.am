@@ -9,6 +9,8 @@ noinst_PROGRAMS = libcommon.o
 noinst_LTLIBRARIES = libcommon.la
 
 libcommon_la_SOURCES =				\
+	app_template.c				\
+	app_template.h				\
 	assoc_mgr.c				\
 	assoc_mgr.h				\
 	bitstring.c				\

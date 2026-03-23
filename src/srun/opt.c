@@ -75,6 +75,10 @@
 
 #include "src/api/pmi_server.h"
 
+#ifdef __METASTACK_NEW_APP_TEMPLATE
+#include "src/common/app_template.h"
+#endif
+
 #include "debugger.h"
 #include "launch.h"
 #include "multi_prog.h"
@@ -589,6 +593,11 @@ extern int initialize_and_process_args(int argc, char **argv, int *argc_off)
 		opt.uid = ori_uid;
 #endif
 
+#ifdef __METASTACK_NEW_APP_TEMPLATE
+		if (opt.app)
+			app_template_apply(&opt);
+#endif
+
 		if (!_opt_verify())
 			exit(error_exit);
 #ifdef __METASTACK_NEW_LOAD_ABNORMAL
@@ -821,6 +830,9 @@ env_vars_t env_vars[] = {
 #endif
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
   { "SLURM_JOB_APPTYPE", LONG_OPT_APPTYPE },
+#endif
+#ifdef __METASTACK_NEW_APP_TEMPLATE
+  { "SLURM_APP", LONG_OPT_APP },
 #endif
   { NULL }
 };

@@ -411,6 +411,15 @@ typedef struct sbcast_cred sbcast_cred_t;		/* opaque data type */
 #define __METASTACK_NEW_APPTYPE_RECOGNITION
 #endif
 
+/*
+	Support --app parameter and application template configuration.
+	Users can specify --app=<type> to automatically apply pre-configured
+	environment variables and default job parameters from app_template.conf.
+*/
+#ifndef __METASTACK_NEW_APP_TEMPLATE
+#define __METASTACK_NEW_APP_TEMPLATE
+#endif
+
 #ifndef __METASTACK_NEW_CUSTOM_EXCEPTION
 #define __METASTACK_NEW_CUSTOM_EXCEPTION
 #endif
@@ -2260,6 +2269,9 @@ typedef struct job_descriptor {	/* For submit, allocate, and update requests */
 #endif
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
 	char *apptype;
+#endif
+#ifdef __METASTACK_NEW_APP_TEMPLATE
+	char *app;		/* --app, application template name */
 #endif
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
 	uint32_t style_step;
