@@ -194,6 +194,12 @@ bitstr_t **para_epilog_idle_node_bitmap = NULL; /* A collection of bitmaps for i
 bool disable_change_proc_dist = false;
 #endif
 
+#ifdef __METASTACK_OPT_APPTYPE  
+List app_list = NULL;  
+time_t last_app_update = (time_t) 0;  
+char *default_app_name = NULL;  
+app_record_t *default_app_loc = NULL;  
+#endif
 
 
 /*
@@ -334,6 +340,15 @@ static void _init_watch_dog_record(watch_dog_record_t *watch_dog_ptr);
 void init_watch_dog_conf(void);
 static void _list_delete_watch_dog(void *watch_dog_entry);
 #endif
+
+#ifdef __METASTACK_OPT_APPTYPE  
+static void _init_app_record(app_record_t *app_ptr);  
+static void _list_delete_app(void *app_entry);  
+static int _build_single_appline_info(app_record_t *app);  
+static int _build_all_app_info(void);  
+int list_find_app(void *x, void *key);  
+#endif
+
 /*
  * Setup the global response_cluster_rec
  */
@@ -1048,6 +1063,188 @@ void init_watch_dog_conf(void)
 }
 #endif
 
+
+#ifdef __METASTACK_OPT_APPTYPE  
+static void _list_delete_app(void *app_entry)  
+{  
+	app_record_t *app_ptr = (app_record_t *)app_entry;  
+	xfree(app_ptr->app_name);  
+	xfree(app_ptr->version);  
+	xfree(app_ptr->description);  
+	xfree(app_ptr->watchdog);  
+	xfree(app_ptr);  
+}  
+  
+void init_app_conf(void)  
+{  
+	last_app_update = time(NULL);  
+	xfree(default_app_name);  
+	default_app_loc = NULL;  
+	if (app_list)  
+		list_flush(app_list);  
+	else  
+		app_list = list_create(_list_delete_app);  
+}  
+  
+void app_fini(void)  
+{  
+	FREE_NULL_LIST(app_list);  
+	xfree(default_app_name);  
+	default_app_loc = NULL;  
+}  
+  
+static void _init_app_record(app_record_t *app_ptr)  
+{  
+	app_ptr->app_name = NULL;  
+	app_ptr->version = NULL;  
+	app_ptr->description = NULL;  
+	app_ptr->watchdog = NULL;  
+	app_ptr->default_flag = false;  
+}  
+  
+/*  
+ * list_find_app - find an entry in the app list by composite key.  
+ * IN key - pointer to a two-element char* array: {app_name, version}  
+ * RET 1 if matches, 0 otherwise  
+ */  
+int list_find_app(void *x, void *key)  
+{  
+	app_record_t *app_ptr = (app_record_t *)x;  
+	char **find_key = (char **)key;  
+  
+	return (!xstrcmp(app_ptr->app_name, find_key[0]) &&  
+		!xstrcmp(app_ptr->version, find_key[1]));  
+}  
+  
+app_record_t *create_app_record(const char *name, const char *version)  
+{  
+	app_record_t *app_ptr = xmalloc(sizeof(*app_ptr));  
+  
+	last_app_update = time(NULL);  
+  
+	_init_app_record(app_ptr);  
+	app_ptr->app_name = xstrdup(name);  
+	app_ptr->version = xstrdup(version);  
+  
+	(void)list_append(app_list, app_ptr);  
+  
+	return app_ptr;  
+}  
+  
+app_record_t *find_app_record(const char *app_name, const char *version)  
+{  
+	char *find_key[2];  
+  
+	find_key[0] = (char *)app_name;  
+	find_key[1] = (char *)version;  
+  
+	return list_find_first(app_list, &list_find_app, find_key);  
+}  
+  
+/*  
+ * find_app_record_by_combined - find an app record by combined name.  
+ *   Iterates through app_list, for each record concatenates  
+ *   "app_name-version" and compares with combined_name.  
+ * IN combined_name - e.g. "vasp-5.7.1"  
+ * RET pointer to app record or NULL if not found  
+ */  
+static int _match_app_combined(void *x, void *key)  
+{  
+	app_record_t *app_ptr = (app_record_t *)x;  
+	char *combined_name = (char *)key;  
+	char *tmp = NULL;  
+	int match;  
+  
+	xstrfmtcat(tmp, "%s-%s", app_ptr->app_name, app_ptr->version);  
+	match = !xstrcmp(tmp, combined_name);  
+	xfree(tmp);  
+  
+	return match;  
+}  
+  
+app_record_t *find_app_record_by_combined(const char *combined_name)  
+{  
+	if (!combined_name || !app_list)  
+		return NULL;  
+  
+	return list_find_first(app_list, &_match_app_combined,  
+			       (void *)combined_name);  
+}  
+  
+static int _build_single_appline_info(app_record_t *app)  
+{  
+	app_record_t *app_ptr = NULL;  
+	char *find_key[2];  
+  
+	find_key[0] = app->app_name;  
+	find_key[1] = app->version;  
+  
+	if (list_find_first(app_list, &list_find_app, find_key)) {  
+		error("%s: AppName=%s Version=%s specified more than once, "  
+		      "latest value used",  
+		      __func__, app->app_name, app->version);  
+		list_delete_first(app_list, &list_find_app, find_key);  
+	}  
+  
+	app_ptr = create_app_record(app->app_name, app->version);  
+  
+	if (app->description)  
+		app_ptr->description = xstrdup(app->description);  
+  
+	if (app->watchdog) {  
+		app_ptr->watchdog = xstrdup(app->watchdog);  
+#ifdef __METASTACK_NEW_CUSTOM_EXCEPTION  
+		/* Validate watchdog reference */  
+		if (!list_find_first(watch_dog_list, &list_find_watch_dog,  
+				     app->watchdog)) {  
+			error("AppName=%s Version=%s references undefined "  
+			      "Watchdog '%s'",  
+			      app->app_name, app->version, app->watchdog);  
+		}  
+#endif  
+	}  
+  
+	app_ptr->default_flag = app->default_flag;  
+  
+	if (app->default_flag) {  
+		if (default_app_name &&  
+		    (xstrcmp(default_app_name, app->app_name) ||  
+		     xstrcmp(default_app_loc->version, app->version))) {  
+			info("%s: changing default app from %s-%s to %s-%s",  
+			     __func__,  
+			     default_app_loc->app_name,  
+			     default_app_loc->version,  
+			     app->app_name, app->version);  
+		}  
+		xfree(default_app_name);  
+		xstrfmtcat(default_app_name, "%s-%s",  
+			   app->app_name, app->version);  
+		default_app_loc = app_ptr;  
+	}  
+  
+	return 0;  
+}  
+  
+static int _build_all_app_info(void)  
+{  
+	app_record_t **app_array = NULL;  
+	int count = 0;  
+	int i;  
+  
+	count = slurm_conf_app_array(&app_array);  
+	if (count == 0) {  
+		debug("No AppName information available");  
+		return SLURM_ERROR;  
+	}  
+  
+	for (i = 0; i < count; i++)  
+		_build_single_appline_info(app_array[i]);  
+  
+	return SLURM_SUCCESS;  
+}  
+#endif
+
+
 /*
  * _init_all_slurm_conf - initialize or re-initialize the slurm
  *	configuration values.
@@ -1066,6 +1263,9 @@ static void _init_all_slurm_conf(void)
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
 	init_watch_dog_conf();
 #endif
+#ifdef __METASTACK_OPT_APPTYPE  
+	init_app_conf();  
+#endif 
 	init_job_conf();
 }
 
@@ -2215,6 +2415,9 @@ extern int read_slurm_conf(int recover)
 	_build_all_partitionline_info();
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
 	_build_all_watchdog_info();
+#endif
+#ifdef __METASTACK_OPT_APPTYPE  
+	_build_all_app_info();  
 #endif
 	restore_front_end_state(recover);
 

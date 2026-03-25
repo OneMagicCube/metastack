@@ -373,6 +373,12 @@ extern List part_list;			/* list of part_record entries */
 extern List watch_dog_list;			/* watch dog list */
 extern time_t last_watch_dog_update;	/* time of last update to watch_dog records */
 #endif
+#ifdef __METASTACK_OPT_APPTYPE  
+extern List app_list;                   /* app preset list */  
+extern time_t last_app_update;          /* time of last update to app records */  
+extern char *default_app_name;          /* combined name of default app, e.g. "general-1.0" */  
+extern app_record_t *default_app_loc;   /* pointer to default app record */  
+#endif
 #ifdef __METASTACK_OPT_HIGH_THROUGHPUT_SRUN_JOB_COM
 extern bool ignore_srun_job_complete;
 #endif
@@ -677,7 +683,36 @@ extern part_record_t *create_ctld_part_record(const char *name);
  */
 watch_dog_record_t *create_watch_dog_record(const char *name);
 #endif
-
+#ifdef __METASTACK_OPT_APPTYPE  
+/*  
+ * create_app_record - create an app record and add to app_list  
+ * IN name - app_name  
+ * IN version - version string  
+ * RET a pointer to the record or NULL if error  
+ */  
+extern app_record_t *create_app_record(const char *name, const char *version);  
+  
+/*  
+ * find_app_record - find an app record by app_name and version  
+ * IN app_name - application name  
+ * IN version - version string  
+ * RET pointer to app record or NULL if not found  
+ */  
+extern app_record_t *find_app_record(const char *app_name,  
+				     const char *version);  
+  
+/*  
+ * find_app_record_by_combined - find an app record by combined name  
+ *   (e.g. "vasp-5.7.1"). Iterates through app_list and compares  
+ *   "appname-version" concatenation against the input string.  
+ * IN combined_name - combined app name string  
+ * RET pointer to app record or NULL if not found  
+ */  
+extern app_record_t *find_app_record_by_combined(const char *combined_name);  
+  
+extern void init_app_conf(void);  
+extern void app_fini(void);  
+#endif
 /*
  * build_part_bitmap - update the total_cpus, total_nodes, and node_bitmap
  *	for the specified partition, also reset the partition pointers in
@@ -1983,7 +2018,11 @@ extern int pack_ctld_job_step_info_response_msg(
 	*/
 extern buf_t *pack_all_watch_dog(uid_t uid, uint16_t protocol_version);
 #endif
-
+#ifdef __METASTACK_OPT_APPTYPE  
+extern buf_t *pack_all_app(uid_t uid, uint16_t protocol_version);  
+void pack_app(app_record_t *app_ptr, buf_t *buffer,  
+	      uint16_t protocol_version);  
+#endif
 /*
  * pack_all_part - dump all partition information for all partitions in
  *	machine independent form (for network transmission)
@@ -2090,7 +2129,9 @@ extern part_record_t **build_visible_parts_user(slurmdb_user_rec_t *user_ret,
 //extern watch_dog_record_t **build_visible_watch_dogs(uid_t uid, bool skip) ;
 extern void watch_dog_fini (void);
 #endif
-
+#ifdef __METASTACK_OPT_APPTYPE  
+extern void app_fini(void);  
+#endif
 /*
  * build_visible_parts - returns an array with pointers to partitions visible
  * to user based on partition Hidden and AllowedGroups properties.

@@ -540,6 +540,10 @@ typedef struct sbcast_cred sbcast_cred_t;		/* opaque data type */
 #ifndef __METASTACK_BUG_EXTERN_THREAD_FINISH
 #define __METASTACK_BUG_EXTERN_THREAD_FINISH
 #endif
+  
+#ifndef __METASTACK_OPT_APPTYPE  
+#define __METASTACK_OPT_APPTYPE  
+#endif
 
 /*****************************************************************************\
  *	DEFINITIONS FOR POSIX VALUES
@@ -3133,7 +3137,15 @@ typedef struct {
 
 } watch_dog_record_t;
 #endif
-
+#ifdef __METASTACK_OPT_APPTYPE  
+typedef struct {  
+	char    *app_name;      /* application name, required */  
+	char    *version;       /* version string, required */  
+	char    *description;   /* description */  
+	char    *watchdog;      /* bound watchdog name */  
+	bool     default_flag;  /* is this the default app */  
+} app_record_t;  
+#endif
 typedef struct delete_partition_msg {
 	char *name;		/* name of partition to be delete */
 } delete_part_msg_t;
@@ -3195,7 +3207,13 @@ typedef struct slurm_ctl_conf_info_msg_watch_dog {
 	watch_dog_record_t * watch_dog_array;	/* the watch dog records */
 } slurm_ctl_conf_info_msg_watch_dog_t;
 #endif
-
+#ifdef __METASTACK_OPT_APPTYPE  
+typedef struct slurm_ctl_conf_info_msg_app {  
+	time_t last_update;  
+	uint32_t record_count;  
+	app_record_t *app_array;  
+} slurm_ctl_conf_info_msg_app_t;  
+#endif
 typedef struct will_run_response_msg {
 	uint32_t job_id;	/* ID of job to start */
 	char *job_submit_user_msg; /* job submit plugin user_msg */
@@ -3450,7 +3468,9 @@ typedef struct reservation_name_msg {
 #define RECONFIG_KEEP_PART_INFO SLURM_BIT(0) /* keep dynamic partition info on scontrol reconfig */
 #define RECONFIG_KEEP_PART_STAT SLURM_BIT(1) /* keep dynamic partition state on scontrol reconfig */
 #define RECONFIG_KEEP_POWER_SAVE_SETTINGS SLURM_BIT(2) /* keep dynamic power save settings on scontrol reconfig */
-
+#ifdef __METASTACK_OPT_APPTYPE  
+#define RECONFIG_KEEP_APPTYPE_INFO SLURM_BIT(3)  
+#endif
 #define HEALTH_CHECK_NODE_IDLE	0x0001	/* execute on idle nodes */
 #define HEALTH_CHECK_NODE_ALLOC	0x0002	/* execute on fully allocated nodes */
 #define HEALTH_CHECK_NODE_MIXED	0x0004	/* execute on partially allocated nodes */
