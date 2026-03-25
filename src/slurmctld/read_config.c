@@ -194,7 +194,7 @@ bitstr_t **para_epilog_idle_node_bitmap = NULL; /* A collection of bitmaps for i
 bool disable_change_proc_dist = false;
 #endif
 
-#ifdef __METASTACK_OPT_APPTYPE  
+#ifdef __METASTACK_OPT_APPTYPE_1  
 List app_list = NULL;  
 time_t last_app_update = (time_t) 0;  
 char *default_app_name = NULL;  
@@ -341,7 +341,7 @@ void init_watch_dog_conf(void);
 static void _list_delete_watch_dog(void *watch_dog_entry);
 #endif
 
-#ifdef __METASTACK_OPT_APPTYPE  
+#ifdef __METASTACK_OPT_APPTYPE_1  
 static void _init_app_record(app_record_t *app_ptr);  
 static void _list_delete_app(void *app_entry);  
 static int _build_single_appline_info(app_record_t *app);  
@@ -1064,7 +1064,7 @@ void init_watch_dog_conf(void)
 #endif
 
 
-#ifdef __METASTACK_OPT_APPTYPE  
+#ifdef __METASTACK_OPT_APPTYPE_1  
 static void _list_delete_app(void *app_entry)  
 {  
 	app_record_t *app_ptr = (app_record_t *)app_entry;  
@@ -1263,7 +1263,7 @@ static void _init_all_slurm_conf(void)
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
 	init_watch_dog_conf();
 #endif
-#ifdef __METASTACK_OPT_APPTYPE  
+#ifdef __METASTACK_OPT_APPTYPE_1  
 	init_app_conf();  
 #endif 
 	init_job_conf();
@@ -2416,7 +2416,7 @@ extern int read_slurm_conf(int recover)
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
 	_build_all_watchdog_info();
 #endif
-#ifdef __METASTACK_OPT_APPTYPE  
+#ifdef __METASTACK_OPT_APPTYPE_1  
 	_build_all_app_info();  
 #endif
 	restore_front_end_state(recover);

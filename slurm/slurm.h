@@ -542,7 +542,7 @@ typedef struct sbcast_cred sbcast_cred_t;		/* opaque data type */
 #endif
   
 #ifndef __METASTACK_OPT_APPTYPE  
-#define __METASTACK_OPT_APPTYPE  
+#define __METASTACK_OPT_APPTYPE_1 // slurmctld reads the app conf
 #endif
 
 /*****************************************************************************\
@@ -3137,7 +3137,7 @@ typedef struct {
 
 } watch_dog_record_t;
 #endif
-#ifdef __METASTACK_OPT_APPTYPE  
+#ifdef __METASTACK_OPT_APPTYPE_1  
 typedef struct {  
 	char    *app_name;      /* application name, required */  
 	char    *version;       /* version string, required */  
@@ -3207,7 +3207,7 @@ typedef struct slurm_ctl_conf_info_msg_watch_dog {
 	watch_dog_record_t * watch_dog_array;	/* the watch dog records */
 } slurm_ctl_conf_info_msg_watch_dog_t;
 #endif
-#ifdef __METASTACK_OPT_APPTYPE  
+#ifdef __METASTACK_OPT_APPTYPE_1  
 typedef struct slurm_ctl_conf_info_msg_app {  
 	time_t last_update;  
 	uint32_t record_count;  
@@ -3468,7 +3468,7 @@ typedef struct reservation_name_msg {
 #define RECONFIG_KEEP_PART_INFO SLURM_BIT(0) /* keep dynamic partition info on scontrol reconfig */
 #define RECONFIG_KEEP_PART_STAT SLURM_BIT(1) /* keep dynamic partition state on scontrol reconfig */
 #define RECONFIG_KEEP_POWER_SAVE_SETTINGS SLURM_BIT(2) /* keep dynamic power save settings on scontrol reconfig */
-#ifdef __METASTACK_OPT_APPTYPE  
+#ifdef __METASTACK_OPT_APPTYPE_1  
 #define RECONFIG_KEEP_APPTYPE_INFO SLURM_BIT(3)  
 #endif
 #define HEALTH_CHECK_NODE_IDLE	0x0001	/* execute on idle nodes */
