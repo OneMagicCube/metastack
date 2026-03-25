@@ -2036,46 +2036,44 @@ static int _parse_watch_dog_name(void **dest, slurm_parser_enum_t type,
 #endif
 #ifdef __METASTACK_OPT_APPTYPE  
 static int _parse_app_name(void **dest, slurm_parser_enum_t type,  
-			   const char *key, const char *value,  
-			   const char *line, char **leftover)  
+                           const char *key, const char *value,  
+                           const char *line, char **leftover)  
 {  
-	s_p_hashtbl_t *tbl = NULL;  
-	static s_p_options_t _app_options[] = {  
-		{"Version", S_P_STRING},  
-		{"Description", S_P_STRING},  
-		{"Watchdog", S_P_STRING},  
-		{"Default", S_P_BOOLEAN},  
-		{NULL}  
-	};  
+    s_p_hashtbl_t *tbl = NULL;  
+    static s_p_options_t _app_name_options[] = {  
+        {"Version", S_P_STRING},  
+        {"Description", S_P_STRING},  
+        {"Watchdog", S_P_STRING},  
+        {"Default", S_P_BOOLEAN},  
+        {NULL}  
+    };  
   
-	tbl = s_p_hashtbl_create(_app_options);  
-	s_p_parse_line(tbl, *leftover, leftover);  
+    tbl = s_p_hashtbl_create(_app_name_options);  
+    s_p_parse_line(tbl, *leftover, leftover);  
   
-	app_record_t *p = _create_conf_app();  
+    app_record_t *p = _create_conf_app();  
   
-	if (value != NULL) {  
-		p->app_name = xstrdup(value);  
+    if (value != NULL)  
+        p->app_name = xstrdup(value);  
   
-		if (!s_p_get_string(&p->version, "Version", tbl)) {  
-			error("AppName=%s missing required Version", value);  
-			s_p_hashtbl_destroy(tbl);  
-			_destroy_app_name(p);  
-			return -1;  
-		}  
+    if (!s_p_get_string(&p->version, "Version", tbl)) {  
+        error("AppName=%s missing required Version, ignoring",  
+              p->app_name ? p->app_name : "?");  
+        _destroy_app_name(p);  
+        s_p_hashtbl_destroy(tbl);  
+        return 0; 
+    }  
   
-		s_p_get_string(&p->description, "Description", tbl);  
-		s_p_get_string(&p->watchdog, "Watchdog", tbl);  
-		s_p_get_boolean(&p->default_flag, "Default", tbl);  
+    s_p_get_string(&p->description, "Description", tbl);  
+    s_p_get_string(&p->watchdog, "Watchdog", tbl);  
   
-		s_p_hashtbl_destroy(tbl);  
-		*dest = (void *)p;  
-		return 1;  
-	} else {  
-		s_p_hashtbl_destroy(tbl);  
-		_destroy_app_name(p);  
-		return 0;  
-	}  
-}  
+    if (!s_p_get_boolean(&p->default_flag, "Default", tbl))  
+        p->default_flag = false;  
+  
+    s_p_hashtbl_destroy(tbl);  
+    *dest = (void *)p;  
+    return 1;  
+}
   
 static void _init_conf_app(app_record_t *conf_app)  
 {  
