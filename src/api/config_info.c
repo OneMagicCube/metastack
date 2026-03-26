@@ -108,7 +108,7 @@ extern void slurm_write_ctl_conf(slurm_conf_t *slurm_ctl_conf_ptr,
                                  node_info_msg_t *node_info_ptr,  
                                  partition_info_msg_t *part_info_ptr,  
                                  slurm_ctl_conf_info_msg_watch_dog_t *slurm_watch_dog_ptr,  
-                                 slurm_ctl_conf_info_msg_app_t *slurm_app_ptr);
+                                 slurm_ctl_conf_info_msg_app_t *slurm_app_ptr)
 #elif defined(__METASTACK_NEW_CUSTOM_EXCEPTION)
 void slurm_write_ctl_conf ( slurm_ctl_conf_info_msg_t * slurm_ctl_conf_ptr,
 			    node_info_msg_t * node_info_ptr,
