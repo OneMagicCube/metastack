@@ -3856,7 +3856,11 @@ extern job_record_t *job_array_split(job_record_t *job_ptr)
 	job_ptr_pend->user_name = xstrdup(job_ptr->user_name);
 	job_ptr_pend->wckey = xstrdup(job_ptr->wckey);
 	job_ptr_pend->deadline = job_ptr->deadline;
-
+#ifdef __METASTACK_OPT_APPTYPE_3  
+	job_ptr_pend->app_name = xstrdup(job_ptr->app_name);  
+	job_ptr_pend->app_version = xstrdup(job_ptr->app_version);  
+	job_ptr_pend->app_source = job_ptr->app_source;  
+#endif
 	job_details = job_ptr->details;
 	details_new = job_ptr_pend->details;
 	memcpy(details_new, job_details, sizeof(job_details_t));
@@ -7788,6 +7792,58 @@ static int _job_create(job_desc_msg_t *job_desc, int allocate, int will_run,
 		goto cleanup_fail;
 
 #endif
+#ifdef __METASTACK_OPT_APPTYPE_3  
+	/* Validate --app and auto-fill app_name, app_version */  
+	if (job_desc->app && job_desc->app[0]) {  
+		app_record_t *app_ptr = find_app_record_by_combined(job_desc->app);  
+		if (!app_ptr) {  
+			info("%s: invalid app specified: %s",  
+			     __func__, job_desc->app);  
+			if (err_msg) {  
+				xfree(*err_msg);  
+				xstrfmtcat(*err_msg,  
+				           "invalid app specified: %s",  
+				           job_desc->app);  
+			}  
+			error_code = ESLURM_INVALID_APP_NAME;  
+			goto cleanup_fail;  
+		}  
+		/* Auto-fill app_name and app_version */  
+		xfree(job_desc->app_name);  
+		job_desc->app_name = xstrdup(app_ptr->app_name);  
+		xfree(job_desc->app_version);  
+		job_desc->app_version = xstrdup(app_ptr->version);  
+		job_desc->app_source = 0; /* user */  
+  
+		/* If the app has a bound watchdog and user didn't specify one,  
+		 * use the app's watchdog */  
+		if (app_ptr->watchdog && app_ptr->watchdog[0] &&  
+		    (!job_desc->watch_dog || !job_desc->watch_dog[0])) {  
+			xfree(job_desc->watch_dog);  
+			job_desc->watch_dog = xstrdup(app_ptr->watchdog);  
+			/* Re-validate the watchdog */  
+			watch_dog_ptr = NULL;  
+			error_code = _get_job_watch_dogs_and_check(  
+				job_desc->watch_dog, &watch_dog_ptr, err_msg);  
+			if (error_code != SLURM_SUCCESS)  
+				goto cleanup_fail;  
+		}  
+	} else if (default_app_loc && default_app_loc->watchdog &&  
+	           default_app_loc->watchdog[0]) {  
+		/* No --app specified, but default app exists with watchdog.  
+		 * Only apply the watchdog, don't set app_name/app_version.  
+		 * The auto-recognition flow will still run. */  
+		if (!job_desc->watch_dog || !job_desc->watch_dog[0]) {  
+			xfree(job_desc->watch_dog);  
+			job_desc->watch_dog = xstrdup(default_app_loc->watchdog);  
+			watch_dog_ptr = NULL;  
+			error_code = _get_job_watch_dogs_and_check(  
+				job_desc->watch_dog, &watch_dog_ptr, err_msg);  
+			if (error_code != SLURM_SUCCESS)  
+				goto cleanup_fail;  
+		}  
+	}  
+#endif
 	memset(&assoc_rec, 0, sizeof(assoc_rec));
 	assoc_rec.acct      = job_desc->account;
 	assoc_rec.partition = part_ptr->name;
@@ -9170,7 +9226,11 @@ static int _copy_job_desc_to_job_record(job_desc_msg_t *job_desc,
 	job_ptr->warn_flags  = job_desc->warn_flags;
 	job_ptr->warn_signal = job_desc->warn_signal;
 	job_ptr->warn_time   = job_desc->warn_time;
-
+#ifdef __METASTACK_OPT_APPTYPE_3  
+	job_ptr->app_name = xstrdup(job_desc->app_name);  
+	job_ptr->app_version = xstrdup(job_desc->app_version);  
+	job_ptr->app_source = job_desc->app_source;  
+#endif
 	detail_ptr = job_ptr->details;
 	detail_ptr->argc = job_desc->argc;
 	detail_ptr->argv = job_desc->argv;
@@ -11706,6 +11766,11 @@ void pack_job(job_record_t *dump_job_ptr, uint16_t show_flags, buf_t *buffer,
 #endif
 #ifdef __METASTACK_NEW_TIME_PREDICT
 		pack16(dump_job_ptr->predict_job, buffer);
+#endif
+#ifdef __METASTACK_OPT_APPTYPE_3  
+		packstr(dump_job_ptr->app_name, buffer);  
+		packstr(dump_job_ptr->app_version, buffer);  
+		pack8(dump_job_ptr->app_source, buffer);  
 #endif
 	} else if (protocol_version >= SLURM_24_05_PROTOCOL_VERSION) {
 		detail_ptr = dump_job_ptr->details;

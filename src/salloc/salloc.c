@@ -283,6 +283,30 @@ int main(int argc, char **argv)
 		if(desc)
 			desc->style_step = JOB_SUBMIT_ALLOC;
 #endif
+#ifdef __METASTACK_OPT_APPTYPE_3  
+		/* Handle --app=list */  
+		if (opt.app && !xstrcasecmp(opt.app, "list")) {  
+			slurm_ctl_conf_info_msg_app_t *app_info = NULL;  
+			if (slurm_load_app((time_t)0, &app_info) == SLURM_SUCCESS  
+			    && app_info) {  
+				printf("%-20s  %s\n", "NAME", "DESCRIPTION");  
+				printf("%-20s  %s\n", "----", "-----------");  
+				for (uint32_t j = 0; j < app_info->record_count; j++) {  
+					app_record_t *a = &app_info->app_array[j];  
+					char *combined = NULL;  
+					xstrfmtcat(combined, "%s-%s",  
+					           a->app_name, a->version);  
+					printf("%-20s  %s\n", combined,  
+					       a->description ? a->description : "");  
+					xfree(combined);  
+				}  
+				slurm_free_app_info_msg(app_info);  
+			} else {  
+				error("Unable to load app configuration");  
+			}  
+			exit(0);  
+		}  
+#endif
 		if (_fill_job_desc_from_opts(desc) == -1)
 			exit(error_exit);
 

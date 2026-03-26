@@ -1682,6 +1682,11 @@ extern void slurm_free_job_desc_msg(job_desc_msg_t *msg)
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
 		xfree(msg->apptype);
 #endif
+#ifdef __METASTACK_OPT_APPTYPE_3  
+		xfree(msg->app);  
+		xfree(msg->app_name);  
+		xfree(msg->app_version);  
+#endif
 		xfree(msg);
 	}
 }
@@ -1902,6 +1907,10 @@ extern void slurm_free_job_info_members(job_info_t * job)
 		xfree(job->user_name);
 		xfree(job->wckey);
 		xfree(job->work_dir);
+#ifdef __METASTACK_OPT_APPTYPE_3  
+		xfree(job->app_name);  
+		xfree(job->app_version);  
+#endif
 	}
 }
 

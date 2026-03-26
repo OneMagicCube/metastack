@@ -347,6 +347,10 @@ extern void job_record_delete(void *job_entry)
 #ifdef __METASTACK_OPT_MSG_OUTPUT
 	xfree(job_ptr->reason_detail);
 #endif
+#ifdef __METASTACK_OPT_APPTYPE_3  
+	xfree(job_entry->app_name);  
+	xfree(job_entry->app_version);  
+#endif
 	job_ptr->job_id = 0;
 	/* make sure we don't delete record twice */
 	job_ptr->magic = ~JOB_MAGIC;
@@ -942,6 +946,11 @@ extern int job_record_pack(job_record_t *dump_job_ptr,
 #endif
 #ifdef __METASTACK_NEW_TIME_PREDICT
 		pack16(dump_job_ptr->predict_job, buffer);
+#endif
+#ifdef __METASTACK_OPT_APPTYPE_3  
+		packstr(dump_job_ptr->app_name, buffer);  
+		packstr(dump_job_ptr->app_version, buffer);  
+		pack8(dump_job_ptr->app_source, buffer);  
 #endif
 	} else if (protocol_version >= SLURM_24_05_PROTOCOL_VERSION) {
 		/* Dump basic job info */
@@ -2713,6 +2722,11 @@ extern int job_record_unpack(job_record_t **out,
 #endif
 #ifdef __METASTACK_NEW_TIME_PREDICT
 		safe_unpack16(&job_ptr->predict_job, buffer);
+#endif
+#ifdef __METASTACK_OPT_APPTYPE_3  
+		safe_unpackstr(&job_ptr->app_name, buffer);  
+		safe_unpackstr(&job_ptr->app_version, buffer);  
+		safe_unpack8(&job_ptr->app_source, buffer);  
 #endif
 	} else if(protocol_version >= SLURM_24_05_PROTOCOL_VERSION){
 		safe_unpack32(&job_ptr->array_job_id, buffer);

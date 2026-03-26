@@ -5364,6 +5364,11 @@ _unpack_job_info_members(job_info_t * job, buf_t *buffer,
 #ifdef __METASTACK_NEW_TIME_PREDICT
 		safe_unpack16(&job->predict_job, buffer);
 #endif
+#ifdef __METASTACK_OPT_APPTYPE_3  
+		safe_unpackstr(&job->app_name, buffer);  
+		safe_unpackstr(&job->app_version, buffer);  
+		safe_unpack8(&job->app_source, buffer);  
+#endif
 	} else if (protocol_version >= SLURM_24_05_PROTOCOL_VERSION) {
 		uint8_t uint8_tmp;
 		safe_unpack32(&job->array_job_id, buffer);
@@ -12113,6 +12118,12 @@ static void _pack_job_desc_msg(job_desc_msg_t *job_desc_ptr, buf_t *buffer,
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
 		pack32(job_desc_ptr->style_step, buffer);
 #endif
+#ifdef __METASTACK_OPT_APPTYPE_3  
+		packstr(msg->app, buffer);  
+		packstr(msg->app_name, buffer);  
+		packstr(msg->app_version, buffer);  
+		pack8(msg->app_source, buffer);  
+#endif
 	} else if (protocol_version >= SLURM_24_05_PROTOCOL_VERSION) {
 		pack32(job_desc_ptr->site_factor, buffer);
 		packstr(job_desc_ptr->batch_features, buffer);
@@ -12883,6 +12894,12 @@ _unpack_job_desc_msg(job_desc_msg_t ** job_desc_buffer_ptr, buf_t *buffer,
 #endif
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
 		safe_unpack32(&job_desc_ptr->style_step, buffer);	
+#endif
+#ifdef __METASTACK_OPT_APPTYPE_3  
+		safe_unpackstr(&msg->app, buffer);  
+		safe_unpackstr(&msg->app_name, buffer);  
+		safe_unpackstr(&msg->app_version, buffer);  
+		safe_unpack8(&msg->app_source, buffer);  
 #endif
 	} else if (protocol_version >= SLURM_24_05_PROTOCOL_VERSION) {
 		uint8_t uint8_tmp;

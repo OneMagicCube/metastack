@@ -543,7 +543,8 @@ typedef struct sbcast_cred sbcast_cred_t;		/* opaque data type */
   
 #ifndef __METASTACK_OPT_APPTYPE  
 #define __METASTACK_OPT_APPTYPE_1 // slurmctld reads the app conf
-#define __METASTACK_OPT_APPTYPE_2
+#define __METASTACK_OPT_APPTYPE_2 // scontrol crud for app config
+#define __METASTACK_OPT_APPTYPE_3 // add --app --app-version --app-name
 #endif
 
 /*****************************************************************************\
@@ -2273,6 +2274,12 @@ typedef struct job_descriptor {	/* For submit, allocate, and update requests */
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
 	uint32_t style_step;
 #endif
+#ifdef __METASTACK_OPT_APPTYPE_3  
+	char *app;           /* --app combined name, e.g. "vasp-5.7.1" */  
+	char *app_name;      /* parsed app name, e.g. "vasp" */  
+	char *app_version;   /* parsed app version, e.g. "5.7.1" */  
+	uint8_t app_source;  /* 0=user, 1=auto, 2=default */  
+#endif
 } job_desc_msg_t;
 
 typedef struct job_info {
@@ -2439,6 +2446,11 @@ typedef struct job_info {
 	char *work_dir;		/* pathname of working directory */
 #ifdef __METASTACK_NEW_PENDING_ORDER
 	uint32_t pending_order;
+#endif
+#ifdef __METASTACK_OPT_APPTYPE_3  
+	char *app_name;  
+	char *app_version;  
+	uint8_t app_source;  
 #endif
 } slurm_job_info_t;
 
