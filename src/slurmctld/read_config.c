@@ -2600,7 +2600,6 @@ extern int read_slurm_conf(int recover)
 	_build_all_app_info();  
 #endif
 
-#endif
 	restore_front_end_state(recover);
 
 	/*
