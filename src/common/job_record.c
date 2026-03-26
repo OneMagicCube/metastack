@@ -348,8 +348,8 @@ extern void job_record_delete(void *job_entry)
 	xfree(job_ptr->reason_detail);
 #endif
 #ifdef __METASTACK_OPT_APPTYPE_3  
-	xfree(job_entry->app_name);  
-	xfree(job_entry->app_version);  
+	xfree(job_ptr->app_name);  
+	xfree(job_ptr->app_version);  
 #endif
 	job_ptr->job_id = 0;
 	/* make sure we don't delete record twice */
