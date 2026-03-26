@@ -66,6 +66,12 @@ extern "C" {
 #ifndef __METASTACK_OPT_HIGH_THROUGHPUT_TERMNAL_JOB_MESSAGE
 #define __METASTACK_OPT_HIGH_THROUGHPUT_TERMNAL_JOB_MESSAGE
 #endif
+
+#ifndef __METASTACK_OPT_APPTYPE
+#define __METASTACK_OPT_APPTYPE_1
+#define __METASTACK_OPT_APPTYPE_2 
+#endif
+
 /* set errno to the specified value - then return -1 */
 #define slurm_seterrno_ret(errnum) do { \
 	slurm_seterrno(errnum);         \
