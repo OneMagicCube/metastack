@@ -420,6 +420,11 @@ typedef enum {
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
 	ESLURMD_INVALID_WATCH_DOG,
 #endif
+#ifdef __METASTACK_OPT_APPTYPE_2  
+	ESLURM_INVALID_APP_NAME,  
+	ESLURM_APP_ALREADY_EXISTS,  
+	ESLURM_APP_NOT_FOUND,  
+#endif
 } slurm_err_t;
 
 /* Type for error string table entries */

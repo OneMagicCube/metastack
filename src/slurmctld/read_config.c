@@ -1308,12 +1308,12 @@ extern int update_app(app_desc_msg_t *app_desc, bool create_flag)
   
 	if (!app_desc->app_name || !app_desc->app_name[0]) {  
 		info("%s: missing AppName", __func__);  
-		return ESLURM_INVALID_PARTITION_NAME;  
+		return ESLURM_INVALID_APP_NAME;  
 	}  
 	if (!app_desc->version || !app_desc->version[0]) {  
 		info("%s: missing Version for AppName=%s",  
 		     __func__, app_desc->app_name);  
-		return ESLURM_INVALID_PARTITION_NAME;  
+		return ESLURM_INVALID_APP_NAME;  
 	}  
   
 	app_ptr = find_app_record(app_desc->app_name, app_desc->version);  
@@ -1322,7 +1322,7 @@ extern int update_app(app_desc_msg_t *app_desc, bool create_flag)
 		if (app_ptr) {  
 			info("%s: App '%s-%s' already exists",  
 			     __func__, app_desc->app_name, app_desc->version);  
-			return ESLURM_INVALID_PARTITION_NAME;  
+			return ESLURM_APP_ALREADY_EXISTS;  
 		}  
 		app_ptr = create_app_record(app_desc->app_name,  
 		                            app_desc->version);  
@@ -1350,7 +1350,7 @@ extern int update_app(app_desc_msg_t *app_desc, bool create_flag)
 		if (!app_ptr) {  
 			info("%s: App '%s-%s' not found",  
 			     __func__, app_desc->app_name, app_desc->version);  
-			return ESLURM_INVALID_PARTITION_NAME;  
+			return ESLURM_APP_NOT_FOUND;  
 		}  
 		if (app_desc->description) {  
 			xfree(app_ptr->description);  
@@ -1390,13 +1390,13 @@ extern int delete_app(delete_app_msg_t *app_msg)
   
 	if (!app_msg->name || !app_msg->name[0]) {  
 		info("%s: missing app name", __func__);  
-		return ESLURM_INVALID_PARTITION_NAME;  
+		return ESLURM_APP_NOT_FOUND;  
 	}  
   
 	app_ptr = find_app_record_by_combined(app_msg->name);  
 	if (!app_ptr) {  
 		info("%s: App '%s' not found", __func__, app_msg->name);  
-		return ESLURM_INVALID_PARTITION_NAME;  
+		return ESLURM_APP_NOT_FOUND;  
 	}  
   
 	if (app_ptr->default_flag && default_app_loc == app_ptr) {  
