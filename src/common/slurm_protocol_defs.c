@@ -4244,6 +4244,55 @@ extern void slurm_free_ctl_conf_watch_dog(slurm_ctl_conf_info_msg_watch_dog_t * 
 
 #endif
 
+#ifdef __METASTACK_OPT_APPTYPE_2  
+extern void slurm_free_app_info_members(app_record_t *app)  
+{  
+	if (app) {  
+		xfree(app->app_name);  
+		xfree(app->version);  
+		xfree(app->description);  
+		xfree(app->watchdog);  
+	}  
+}  
+  
+extern void slurm_free_app_info_msg(slurm_ctl_conf_info_msg_app_t *msg)  
+{  
+	if (msg) {  
+		if (msg->app_array) {  
+			for (uint32_t i = 0; i < msg->record_count; i++)  
+				slurm_free_app_info_members(&msg->app_array[i]);  
+			xfree(msg->app_array);  
+		}  
+		xfree(msg);  
+	}  
+}  
+  
+extern void slurm_free_app_desc_msg(app_desc_msg_t *msg)  
+{  
+	if (msg) {  
+		xfree(msg->app_name);  
+		xfree(msg->version);  
+		xfree(msg->description);  
+		xfree(msg->watchdog);  
+		xfree(msg);  
+	}  
+}  
+  
+extern void slurm_free_delete_app_msg(delete_app_msg_t *msg)  
+{  
+	if (msg) {  
+		xfree(msg->name);  
+		xfree(msg);  
+	}  
+}  
+  
+extern void slurm_init_app_desc_msg(app_desc_msg_t *msg)  
+{  
+	memset(msg, 0, sizeof(app_desc_msg_t));  
+	msg->default_flag = 0xff; /* not set */  
+}  
+#endif
+
 /*
  * slurm_free_ctl_conf - free slurm control information response message
  * IN msg - pointer to slurm control information response message
@@ -5513,6 +5562,21 @@ extern int slurm_free_msg_data(slurm_msg_type_t type, void *data)
 	case RESPONSE_NODE_ALIAS_ADDRS:
 		slurm_free_node_alias_addrs(data);
 		break;
+#ifdef __METASTACK_OPT_APPTYPE_2  
+	case REQUEST_CREATE_APP:  
+	case REQUEST_UPDATE_APP:  
+		slurm_free_app_desc_msg(data);  
+		break;  
+	case REQUEST_DELETE_APP:  
+		slurm_free_delete_app_msg(data);  
+		break;  
+	case RESPONSE_BUILD_APP_INFO:  
+		slurm_free_app_info_msg(data);  
+		break;  
+	case REQUEST_BUILD_APP_INFO:  
+		slurm_free_last_update_msg(data);  
+		break;  
+#endif
 	default:
 		error("invalid type trying to be freed %u", type);
 		break;

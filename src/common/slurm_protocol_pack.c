@@ -6391,6 +6391,136 @@ unpack_error:
 }
 #endif
 
+#ifdef __METASTACK_OPT_APPTYPE_2  
+static void _pack_slurm_ctl_conf_app_msg(slurm_msg_t *msg, buf_t *buffer,  
+                                         uint16_t protocol_version)  
+{  
+	xassert(msg);  
+#ifdef __META_PROTOCOL  
+	buf_t *msg_buffer = msg->data;  
+	if (protocol_version >= META_3_0_PROTOCOL_VERSION) {  
+		packmem_array(msg_buffer->head, msg_buffer->processed, buffer);  
+	}  
+#endif  
+}  
+  
+static int _unpack_app_info_members(app_record_t *app, buf_t *buffer,  
+                                    uint16_t protocol_version)  
+{  
+#ifdef __META_PROTOCOL  
+	if (protocol_version >= META_3_0_PROTOCOL_VERSION) {  
+		safe_unpackstr(&app->app_name, buffer);  
+		if (app->app_name == NULL)  
+			app->app_name = xmalloc(1);  
+		safe_unpackstr(&app->version, buffer);  
+		safe_unpackstr(&app->description, buffer);  
+		safe_unpackstr(&app->watchdog, buffer);  
+		safe_unpackbool(&app->default_flag, buffer);  
+	}  
+#endif  
+	return SLURM_SUCCESS;  
+unpack_error:  
+	slurm_free_app_info_members(app);  
+	return SLURM_ERROR;  
+}  
+  
+static int _unpack_app_info_msg(slurm_ctl_conf_info_msg_app_t **msg,  
+                                buf_t *buffer, uint16_t protocol_version)  
+{  
+	uint32_t record_count = 0;  
+	slurm_ctl_conf_info_msg_app_t *app_msg;  
+  
+	app_msg = xmalloc(sizeof(slurm_ctl_conf_info_msg_app_t));  
+	*msg = app_msg;  
+  
+#ifdef __META_PROTOCOL  
+	if (protocol_version >= META_3_0_PROTOCOL_VERSION) {  
+		safe_unpack32(&record_count, buffer);  
+		safe_unpack_time(&app_msg->last_update, buffer);  
+		safe_xcalloc(app_msg->app_array, record_count,  
+		             sizeof(app_record_t));  
+		app_msg->record_count = record_count;  
+		for (uint32_t i = 0; i < record_count; i++) {  
+			if (_unpack_app_info_members(&app_msg->app_array[i],  
+			                             buffer, protocol_version))  
+				goto unpack_error;  
+		}  
+	}  
+#endif  
+	return SLURM_SUCCESS;  
+  
+unpack_error:  
+	slurm_free_app_info_msg(app_msg);  
+	*msg = NULL;  
+	return SLURM_ERROR;  
+}  
+  
+static void _pack_app_desc_msg(app_desc_msg_t *msg, buf_t *buffer,  
+                               uint16_t protocol_version)  
+{  
+#ifdef __META_PROTOCOL  
+	if (protocol_version >= META_3_0_PROTOCOL_VERSION) {  
+		packstr(msg->app_name, buffer);  
+		packstr(msg->version, buffer);  
+		packstr(msg->description, buffer);  
+		packstr(msg->watchdog, buffer);  
+		pack8(msg->default_flag, buffer);  
+	}  
+#endif  
+}  
+  
+static int _unpack_app_desc_msg(app_desc_msg_t **msg, buf_t *buffer,  
+                                uint16_t protocol_version)  
+{  
+	app_desc_msg_t *tmp_ptr = xmalloc(sizeof(app_desc_msg_t));  
+	*msg = tmp_ptr;  
+  
+#ifdef __META_PROTOCOL  
+	if (protocol_version >= META_3_0_PROTOCOL_VERSION) {  
+		safe_unpackstr(&tmp_ptr->app_name, buffer);  
+		safe_unpackstr(&tmp_ptr->version, buffer);  
+		safe_unpackstr(&tmp_ptr->description, buffer);  
+		safe_unpackstr(&tmp_ptr->watchdog, buffer);  
+		safe_unpack8(&tmp_ptr->default_flag, buffer);  
+	}  
+#endif  
+	return SLURM_SUCCESS;  
+  
+unpack_error:  
+	slurm_free_app_desc_msg(tmp_ptr);  
+	*msg = NULL;  
+	return SLURM_ERROR;  
+}  
+  
+static void _pack_delete_app_msg(delete_app_msg_t *msg, buf_t *buffer,  
+                                 uint16_t protocol_version)  
+{  
+#ifdef __META_PROTOCOL  
+	if (protocol_version >= META_3_0_PROTOCOL_VERSION) {  
+		packstr(msg->name, buffer);  
+	}  
+#endif  
+}  
+  
+static int _unpack_delete_app_msg(delete_app_msg_t **msg, buf_t *buffer,  
+                                  uint16_t protocol_version)  
+{  
+	delete_app_msg_t *tmp_ptr = xmalloc(sizeof(delete_app_msg_t));  
+	*msg = tmp_ptr;  
+  
+#ifdef __META_PROTOCOL  
+	if (protocol_version >= META_3_0_PROTOCOL_VERSION) {  
+		safe_unpackstr(&tmp_ptr->name, buffer);  
+	}  
+#endif  
+	return SLURM_SUCCESS;  
+  
+unpack_error:  
+	slurm_free_delete_app_msg(tmp_ptr);  
+	*msg = NULL;  
+	return SLURM_ERROR;  
+}  
+#endif /* __METASTACK_OPT_APPTYPE_2 */
 
 static void
 _pack_slurm_ctl_conf_msg(slurm_ctl_conf_info_msg_t * build_ptr, buf_t *buffer,

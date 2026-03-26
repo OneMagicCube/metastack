@@ -2366,6 +2366,151 @@ static void _slurm_rpc_dump_conf_watch_dog(slurm_msg_t * msg)
 }
 #endif
 
+#ifdef __METASTACK_OPT_APPTYPE_2  
+/* _slurm_rpc_dump_app_info - process RPC for app configuration information */  
+static void _slurm_rpc_dump_app_info(slurm_msg_t *msg)  
+{  
+	DEF_TIMERS;  
+	slurm_msg_t response_msg;  
+	buf_t *buffer = NULL;  
+	last_update_msg_t *last_time_msg = (last_update_msg_t *)msg->data;  
+	slurmctld_lock_t app_read_lock = {  
+		READ_LOCK, NO_LOCK, NO_LOCK, NO_LOCK, NO_LOCK };  
+  
+	START_TIMER;  
+	lock_slurmctld(app_read_lock);  
+  
+	if ((last_time_msg->last_update - 1) >= last_app_update) {  
+		debug2("%s, no change", __func__);  
+		unlock_slurmctld(app_read_lock);  
+		slurm_send_rc_msg(msg, SLURM_NO_CHANGE_IN_DATA);  
+	} else {  
+		buffer = pack_all_app(msg->auth_uid, msg->protocol_version);  
+		unlock_slurmctld(app_read_lock);  
+		END_TIMER2(__func__);  
+  
+		response_init(&response_msg, msg, RESPONSE_BUILD_APP_INFO,  
+		              buffer);  
+		slurm_send_node_msg(msg->conn_fd, &response_msg);  
+		FREE_NULL_BUFFER(buffer);  
+	}  
+}  
+  
+/* _slurm_rpc_create_app - process RPC to create an app */  
+static void _slurm_rpc_create_app(slurm_msg_t *msg)  
+{  
+	int error_code = SLURM_SUCCESS;  
+	DEF_TIMERS;  
+	app_desc_msg_t *app_desc_ptr = msg->data;  
+	slurmctld_lock_t app_write_lock = {  
+		WRITE_LOCK, NO_LOCK, NO_LOCK, NO_LOCK, NO_LOCK };  
+  
+	START_TIMER;  
+	if (!validate_super_user(msg->auth_uid)) {  
+		error_code = ESLURM_USER_ID_MISSING;  
+		error("Security violation, CREATE_APP RPC from uid=%u",  
+		      msg->auth_uid);  
+	}  
+  
+	if (error_code == SLURM_SUCCESS) {  
+		lock_slurmctld(app_write_lock);  
+		error_code = update_app(app_desc_ptr, true);  
+		unlock_slurmctld(app_write_lock);  
+		END_TIMER2(__func__);  
+	}  
+  
+	if (error_code) {  
+		info("%s AppName=%s Version=%s: %s",  
+		     __func__,  
+		     app_desc_ptr->app_name ? app_desc_ptr->app_name : "?",  
+		     app_desc_ptr->version ? app_desc_ptr->version : "?",  
+		     slurm_strerror(error_code));  
+		slurm_send_rc_msg(msg, error_code);  
+	} else {  
+		info("%s complete for %s-%s %s",  
+		     __func__,  
+		     app_desc_ptr->app_name, app_desc_ptr->version,  
+		     TIME_STR);  
+		slurm_send_rc_msg(msg, SLURM_SUCCESS);  
+	}  
+}  
+  
+/* _slurm_rpc_update_app - process RPC to update an app */  
+static void _slurm_rpc_update_app(slurm_msg_t *msg)  
+{  
+	int error_code = SLURM_SUCCESS;  
+	DEF_TIMERS;  
+	app_desc_msg_t *app_desc_ptr = msg->data;  
+	slurmctld_lock_t app_write_lock = {  
+		WRITE_LOCK, NO_LOCK, NO_LOCK, NO_LOCK, NO_LOCK };  
+  
+	START_TIMER;  
+	if (!validate_super_user(msg->auth_uid)) {  
+		error_code = ESLURM_USER_ID_MISSING;  
+		error("Security violation, UPDATE_APP RPC from uid=%u",  
+		      msg->auth_uid);  
+	}  
+  
+	if (error_code == SLURM_SUCCESS) {  
+		lock_slurmctld(app_write_lock);  
+		error_code = update_app(app_desc_ptr, false);  
+		unlock_slurmctld(app_write_lock);  
+		END_TIMER2(__func__);  
+	}  
+  
+	if (error_code) {  
+		info("%s AppName=%s Version=%s: %s",  
+		     __func__,  
+		     app_desc_ptr->app_name ? app_desc_ptr->app_name : "?",  
+		     app_desc_ptr->version ? app_desc_ptr->version : "?",  
+		     slurm_strerror(error_code));  
+		slurm_send_rc_msg(msg, error_code);  
+	} else {  
+		info("%s complete for %s-%s %s",  
+		     __func__,  
+		     app_desc_ptr->app_name, app_desc_ptr->version,  
+		     TIME_STR);  
+		slurm_send_rc_msg(msg, SLURM_SUCCESS);  
+	}  
+}  
+  
+/* _slurm_rpc_delete_app - process RPC to delete an app */  
+static void _slurm_rpc_delete_app(slurm_msg_t *msg)  
+{  
+	int error_code = SLURM_SUCCESS;  
+	DEF_TIMERS;  
+	delete_app_msg_t *app_del_ptr = msg->data;  
+	slurmctld_lock_t app_write_lock = {  
+		WRITE_LOCK, NO_LOCK, NO_LOCK, NO_LOCK, NO_LOCK };  
+  
+	START_TIMER;  
+	if (!validate_super_user(msg->auth_uid)) {  
+		error_code = ESLURM_USER_ID_MISSING;  
+		error("Security violation, DELETE_APP RPC from uid=%u",  
+		      msg->auth_uid);  
+	}  
+  
+	if (error_code == SLURM_SUCCESS) {  
+		lock_slurmctld(app_write_lock);  
+		error_code = delete_app(app_del_ptr);  
+		unlock_slurmctld(app_write_lock);  
+		END_TIMER2(__func__);  
+	}  
+  
+	if (error_code) {  
+		info("%s app=%s: %s",  
+		     __func__,  
+		     app_del_ptr->name ? app_del_ptr->name : "?",  
+		     slurm_strerror(error_code));  
+		slurm_send_rc_msg(msg, error_code);  
+	} else {  
+		info("%s complete for %s %s",  
+		     __func__, app_del_ptr->name, TIME_STR);  
+		slurm_send_rc_msg(msg, SLURM_SUCCESS);  
+	}  
+}  
+#endif /* __METASTACK_OPT_APPTYPE_2 */
+
 /* _slurm_rpc_dump_partitions - process RPC for partition state information */
 static void _slurm_rpc_dump_partitions(slurm_msg_t *msg)
 {
@@ -8148,6 +8293,20 @@ slurmctld_rpc_t slurmctld_rpcs[] =
 	},{
 		.msg_type = REQUEST_CACHE_NODE_INFO_SINGLE,
 		.func = _slurm_rpc_dump_cache_node_single,
+#endif
+#ifdef __METASTACK_OPT_APPTYPE_2  
+	},{  
+		.msg_type = REQUEST_BUILD_APP_INFO,  
+		.func = _slurm_rpc_dump_app_info,  
+	},{  
+		.msg_type = REQUEST_CREATE_APP,  
+		.func = _slurm_rpc_create_app,  
+	},{  
+		.msg_type = REQUEST_UPDATE_APP,  
+		.func = _slurm_rpc_update_app,  
+	},{  
+		.msg_type = REQUEST_DELETE_APP,  
+		.func = _slurm_rpc_delete_app,  
 #endif
 	},{	/* terminate the array. this must be last. */
 		.msg_type = 0,

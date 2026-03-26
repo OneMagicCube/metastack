@@ -1245,6 +1245,177 @@ static int _build_all_app_info(void)
 #endif
 
 
+#ifdef __METASTACK_OPT_APPTYPE_2  
+  
+typedef struct {  
+	buf_t *buffer;  
+	uint32_t apps_packed;  
+	uint16_t protocol_version;  
+	uid_t uid;  
+} _foreach_pack_app_info_t;  
+  
+void pack_app(app_record_t *app_ptr, buf_t *buffer,  
+              uint16_t protocol_version)  
+{  
+#ifdef __META_PROTOCOL  
+	if (protocol_version >= META_3_0_PROTOCOL_VERSION) {  
+		packstr(app_ptr->app_name, buffer);  
+		packstr(app_ptr->version, buffer);  
+		packstr(app_ptr->description, buffer);  
+		packstr(app_ptr->watchdog, buffer);  
+		packbool(app_ptr->default_flag, buffer);  
+	}  
+#endif  
+}  
+  
+static int _pack_app(void *object, void *arg)  
+{  
+	app_record_t *app_ptr = object;  
+	_foreach_pack_app_info_t *pack_info = arg;  
+	pack_app(app_ptr, pack_info->buffer, pack_info->protocol_version);  
+	pack_info->apps_packed++;  
+	return SLURM_SUCCESS;  
+}  
+  
+extern buf_t *pack_all_app(uid_t uid, uint16_t protocol_version)  
+{  
+	time_t now = time(NULL);  
+	int tmp_offset = 0;  
+	_foreach_pack_app_info_t pack_app_info = {  
+		.buffer = init_buf(BUF_SIZE),  
+		.apps_packed = 0,  
+		.protocol_version = protocol_version,  
+		.uid = uid,  
+	};  
+  
+	pack32(0, pack_app_info.buffer);  
+	pack_time(now, pack_app_info.buffer);  
+  
+	if (app_list)  
+		list_for_each_ro(app_list, _pack_app, &pack_app_info);  
+  
+	tmp_offset = get_buf_offset(pack_app_info.buffer);  
+	set_buf_offset(pack_app_info.buffer, 0);  
+	pack32(pack_app_info.apps_packed, pack_app_info.buffer);  
+	set_buf_offset(pack_app_info.buffer, tmp_offset);  
+  
+	return pack_app_info.buffer;  
+}  
+  
+extern int update_app(app_desc_msg_t *app_desc, bool create_flag)  
+{  
+	app_record_t *app_ptr = NULL;  
+  
+	if (!app_desc->app_name || !app_desc->app_name[0]) {  
+		info("%s: missing AppName", __func__);  
+		return ESLURM_INVALID_PARTITION_NAME;  
+	}  
+	if (!app_desc->version || !app_desc->version[0]) {  
+		info("%s: missing Version for AppName=%s",  
+		     __func__, app_desc->app_name);  
+		return ESLURM_INVALID_PARTITION_NAME;  
+	}  
+  
+	app_ptr = find_app_record(app_desc->app_name, app_desc->version);  
+  
+	if (create_flag) {  
+		if (app_ptr) {  
+			info("%s: App '%s-%s' already exists",  
+			     __func__, app_desc->app_name, app_desc->version);  
+			return ESLURM_INVALID_PARTITION_NAME;  
+		}  
+		app_ptr = create_app_record(app_desc->app_name,  
+		                            app_desc->version);  
+		if (!app_ptr)  
+			return SLURM_ERROR;  
+  
+		if (app_desc->description)  
+			app_ptr->description = xstrdup(app_desc->description);  
+		if (app_desc->watchdog)  
+			app_ptr->watchdog = xstrdup(app_desc->watchdog);  
+		if (app_desc->default_flag == 1) {  
+			/* Clear old default if any */  
+			if (default_app_loc && default_app_loc != app_ptr)  
+				default_app_loc->default_flag = false;  
+			app_ptr->default_flag = true;  
+			xfree(default_app_name);  
+			xstrfmtcat(default_app_name, "%s-%s",  
+			           app_ptr->app_name, app_ptr->version);  
+			default_app_loc = app_ptr;  
+		}  
+		last_app_update = time(NULL);  
+		info("App created: %s-%s", app_ptr->app_name, app_ptr->version);  
+	} else {  
+		/* update existing */  
+		if (!app_ptr) {  
+			info("%s: App '%s-%s' not found",  
+			     __func__, app_desc->app_name, app_desc->version);  
+			return ESLURM_INVALID_PARTITION_NAME;  
+		}  
+		if (app_desc->description) {  
+			xfree(app_ptr->description);  
+			app_ptr->description = xstrdup(app_desc->description);  
+		}  
+		if (app_desc->watchdog) {  
+			xfree(app_ptr->watchdog);  
+			app_ptr->watchdog = xstrdup(app_desc->watchdog);  
+		}  
+		if (app_desc->default_flag != 0xff) {  
+			bool new_default = (app_desc->default_flag == 1);  
+			if (new_default && !app_ptr->default_flag) {  
+				if (default_app_loc && default_app_loc != app_ptr)  
+					default_app_loc->default_flag = false;  
+				app_ptr->default_flag = true;  
+				xfree(default_app_name);  
+				xstrfmtcat(default_app_name, "%s-%s",  
+				           app_ptr->app_name, app_ptr->version);  
+				default_app_loc = app_ptr;  
+			} else if (!new_default && app_ptr->default_flag) {  
+				app_ptr->default_flag = false;  
+				if (default_app_loc == app_ptr) {  
+					xfree(default_app_name);  
+					default_app_loc = NULL;  
+				}  
+			}  
+		}  
+		last_app_update = time(NULL);  
+		info("App updated: %s-%s", app_ptr->app_name, app_ptr->version);  
+	}  
+	return SLURM_SUCCESS;  
+}  
+  
+extern int delete_app(delete_app_msg_t *app_msg)  
+{  
+	app_record_t *app_ptr;  
+  
+	if (!app_msg->name || !app_msg->name[0]) {  
+		info("%s: missing app name", __func__);  
+		return ESLURM_INVALID_PARTITION_NAME;  
+	}  
+  
+	app_ptr = find_app_record_by_combined(app_msg->name);  
+	if (!app_ptr) {  
+		info("%s: App '%s' not found", __func__, app_msg->name);  
+		return ESLURM_INVALID_PARTITION_NAME;  
+	}  
+  
+	if (app_ptr->default_flag && default_app_loc == app_ptr) {  
+		xfree(default_app_name);  
+		default_app_loc = NULL;  
+	}  
+  
+	/* Delete using the composite key */  
+	char *find_key[2];  
+	find_key[0] = app_ptr->app_name;  
+	find_key[1] = app_ptr->version;  
+	list_delete_first(app_list, &list_find_app, find_key);  
+	last_app_update = time(NULL);  
+  
+	info("App deleted: %s", app_msg->name);  
+	return SLURM_SUCCESS;  
+}  
+#endif /* __METASTACK_OPT_APPTYPE_2 */
+
 /*
  * _init_all_slurm_conf - initialize or re-initialize the slurm
  *	configuration values.
@@ -2416,8 +2587,21 @@ extern int read_slurm_conf(int recover)
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
 	_build_all_watchdog_info();
 #endif
+#ifdef __METASTACK_OPT_APPTYPE_2  
+	/* If KeepApptypeInfo is set, preserve app_list during reconfig */  
+	if (reconfig && (reconfig_flags & RECONFIG_KEEP_APPTYPE_INFO)) {  
+		/* Skip rebuilding app_list from config, keep in-memory state */  
+		info("Preserving app configuration (KeepApptypeInfo)");  
+	} else {  
+		/* Clear and rebuild from config */  
+		if (app_list)  
+			list_flush(app_list);  
+		_build_all_app_info();  
+	}  
+#else  
 #ifdef __METASTACK_OPT_APPTYPE_1  
 	_build_all_app_info();  
+#endif  
 #endif
 	restore_front_end_state(recover);
 

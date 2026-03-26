@@ -543,6 +543,7 @@ typedef struct sbcast_cred sbcast_cred_t;		/* opaque data type */
   
 #ifndef __METASTACK_OPT_APPTYPE  
 #define __METASTACK_OPT_APPTYPE_1 // slurmctld reads the app conf
+#define __METASTACK_OPT_APPTYPE_2
 #endif
 
 /*****************************************************************************\
@@ -3214,6 +3215,35 @@ typedef struct slurm_ctl_conf_info_msg_app {
 	app_record_t *app_array;  
 } slurm_ctl_conf_info_msg_app_t;  
 #endif
+#ifdef __METASTACK_OPT_APPTYPE_2  
+/* Message for create/update app */  
+typedef struct app_desc_msg {  
+	char *app_name;  
+	char *version;  
+	char *description;  
+	char *watchdog;  
+	uint8_t default_flag; /* 0=no, 1=yes, 0xff=not set (for update) */  
+} app_desc_msg_t;  
+  
+/* Message for delete app */  
+typedef struct delete_app_msg {  
+	char *name; /* combined name e.g. "vasp-5.7.1" */  
+} delete_app_msg_t;  
+  
+/* API functions */  
+extern int slurm_load_app(time_t update_time,  
+                          slurm_ctl_conf_info_msg_app_t **app_info_ptr);  
+extern int slurm_create_app(app_desc_msg_t *app_msg);  
+extern int slurm_update_app(app_desc_msg_t *app_msg);  
+extern int slurm_delete_app(delete_app_msg_t *app_msg);  
+extern void slurm_free_app_info_msg(slurm_ctl_conf_info_msg_app_t *msg);  
+extern void slurm_free_app_info_members(app_record_t *app);  
+extern void slurm_free_app_desc_msg(app_desc_msg_t *msg);  
+extern void slurm_free_delete_app_msg(delete_app_msg_t *msg);  
+extern void slurm_init_app_desc_msg(app_desc_msg_t *msg);  
+extern void slurm_print_app_info(FILE *out, app_record_t *app_ptr, int one_liner);  
+extern char *slurm_sprint_app_info(app_record_t *app_ptr, int one_liner);  
+#endif
 typedef struct will_run_response_msg {
 	uint32_t job_id;	/* ID of job to start */
 	char *job_submit_user_msg; /* job submit plugin user_msg */
@@ -4660,7 +4690,13 @@ extern void slurm_print_ctl_conf(FILE *out, slurm_conf_t *slurm_ctl_conf_ptr);
  * IN node_info_ptr - pointer to node table of information
  * IN part_info_ptr - pointer to partition information
  */
-#ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
+#if defined(__METASTACK_OPT_APPTYPE_2)  
+extern void slurm_write_ctl_conf(slurm_conf_t *slurm_ctl_conf_ptr,  
+                                 node_info_msg_t *node_info_ptr,  
+                                 partition_info_msg_t *part_info_ptr,  
+                                 slurm_ctl_conf_info_msg_watch_dog_t *slurm_watch_dog_ptr,  
+                                 slurm_ctl_conf_info_msg_app_t *slurm_app_ptr);
+#elif defined(__METASTACK_NEW_CUSTOM_EXCEPTION)
 extern void slurm_write_ctl_conf(slurm_conf_t *slurm_ctl_conf_ptr,
                                  node_info_msg_t *node_info_ptr,
                                  partition_info_msg_t *part_info_ptr,

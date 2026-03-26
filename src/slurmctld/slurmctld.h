@@ -713,6 +713,17 @@ extern app_record_t *find_app_record_by_combined(const char *combined_name);
 extern void init_app_conf(void);  
 extern void app_fini(void);  
 #endif
+
+#ifdef __METASTACK_OPT_APPTYPE_2  
+extern int update_app(app_desc_msg_t *app_desc, bool create_flag);  
+extern int delete_app(delete_app_msg_t *app_msg);  
+extern buf_t *pack_all_app(uid_t uid, uint16_t protocol_version);  
+extern void pack_app(app_record_t *app_ptr, buf_t *buffer,  
+                     uint16_t protocol_version);  
+#ifdef __METASTACK_OPT_APPTYPE_1  
+extern int list_find_app(void *x, void *key);  
+#endif
+#endif
 /*
  * build_part_bitmap - update the total_cpus, total_nodes, and node_bitmap
  *	for the specified partition, also reset the partition pointers in
