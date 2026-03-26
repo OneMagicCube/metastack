@@ -1316,6 +1316,21 @@ extern int update_app(app_desc_msg_t *app_desc, bool create_flag)
 		return ESLURM_INVALID_APP_NAME;  
 	}  
   
+	/* Validate watchdog reference if specified */  
+#ifdef __METASTACK_NEW_CUSTOM_EXCEPTION  
+	if (app_desc->watchdog && app_desc->watchdog[0]) {  
+		if (!list_find_first(watch_dog_list,  
+		                     &list_find_watch_dog,  
+		                     app_desc->watchdog)) {  
+			info("%s: AppName=%s Version=%s references "  
+			     "undefined Watchdog '%s'",  
+			     __func__, app_desc->app_name,  
+			     app_desc->version, app_desc->watchdog);  
+			return ESLURM_INVALID_APP_WATCHDOG;  
+		}  
+	}  
+#endif  
+  
 	app_ptr = find_app_record(app_desc->app_name, app_desc->version);  
   
 	if (create_flag) {  
@@ -1382,7 +1397,7 @@ extern int update_app(app_desc_msg_t *app_desc, bool create_flag)
 		info("App updated: %s-%s", app_ptr->app_name, app_ptr->version);  
 	}  
 	return SLURM_SUCCESS;  
-}  
+}
   
 extern int delete_app(delete_app_msg_t *app_msg)  
 {  

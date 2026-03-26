@@ -722,7 +722,11 @@ slurm_errtab_t slurm_errtab[] = {
 	{ ESLURM_APP_NOT_FOUND,  
 	  "ESLURM_APP_NOT_FOUND",  
 	  "App not found"  
-	},  
+	},
+	{ ESLURM_INVALID_APP_WATCHDOG,  
+	"ESLURM_INVALID_APP_WATCHDOG",  
+	"Specified watchdog does not exist"  
+	},
 #endif
 };
 
