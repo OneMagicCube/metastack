@@ -2359,7 +2359,7 @@ static void _show_it(int argc, char **argv)
 	} else if (xstrncasecmp(tag, "watchdog", MAX(tag_len, 5)) == 0) {
 		_print_config_watchdog (val);
 #endif
-ifdef __METASTACK_OPT_APPTYPE_2  
+#ifdef __METASTACK_OPT_APPTYPE_2  
 	} else if (xstrncasecmp(tag, "app", MAX(tag_len, 3)) == 0) {  
 		_print_config_app(val);  
 #endif
