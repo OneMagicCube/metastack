@@ -21454,6 +21454,12 @@ pack_msg(slurm_msg_t const *msg, buf_t *buffer)
 						msg->protocol_version);
 		break;
 #endif
+#ifdef __METASTACK_OPT_APPTYPE_2  
+	case RESPONSE_BUILD_APP_INFO:  
+		_pack_slurm_ctl_conf_app_msg((slurm_msg_t *)msg, buffer,  
+					     msg->protocol_version);  
+		break;  
+#endif
 	case REQUEST_NODE_INFO:
 		_pack_node_info_request_msg(msg, buffer);
 		break;
@@ -21474,10 +21480,24 @@ pack_msg(slurm_msg_t const *msg, buf_t *buffer)
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
 	case REQUEST_BUILD_WATCH_DOG_INFO:
 #endif
+#ifdef __METASTACK_OPT_APPTYPE_2
+	case REQUEST_BUILD_APP_INFO:
+#endif
 		_pack_last_update_msg((last_update_msg_t *)
 				      msg->data, buffer,
 				      msg->protocol_version);
 		break;
+#ifdef __METASTACK_OPT_APPTYPE_2  
+	case REQUEST_CREATE_APP:  
+	case REQUEST_UPDATE_APP:  
+		_pack_app_desc_msg((app_desc_msg_t *)msg->data, buffer,  
+				   msg->protocol_version);  
+		break;  
+	case REQUEST_DELETE_APP:  
+		_pack_delete_app_msg((delete_app_msg_t *)msg->data, buffer,  
+				     msg->protocol_version);  
+		break;  
+#endif
 	case RESPONSE_BUILD_INFO:
 		_pack_slurm_ctl_conf_msg((slurm_ctl_conf_info_msg_t *)
 					 msg->data, buffer,
@@ -22151,10 +22171,26 @@ unpack_msg(slurm_msg_t * msg, buf_t *buffer)
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
 	case REQUEST_BUILD_WATCH_DOG_INFO:
 #endif
+#ifdef __METASTACK_OPT_APPTYPE_2  
+	case REQUEST_BUILD_APP_INFO:
+#endif
 		rc = _unpack_last_update_msg((last_update_msg_t **) &
 					     (msg->data), buffer,
 					     msg->protocol_version);
 		break;
+#ifdef __METASTACK_OPT_APPTYPE_2  
+	case REQUEST_CREATE_APP:  
+	case REQUEST_UPDATE_APP:  
+		rc = _unpack_app_desc_msg(  
+			(app_desc_msg_t **)&(msg->data),  
+			buffer, msg->protocol_version);  
+		break;  
+	case REQUEST_DELETE_APP:  
+		rc = _unpack_delete_app_msg(  
+			(delete_app_msg_t **)&(msg->data),  
+			buffer, msg->protocol_version);  
+		break;  
+#endif
 	case RESPONSE_BUILD_INFO:
 		rc = _unpack_slurm_ctl_conf_msg((slurm_ctl_conf_info_msg_t
 						 **)
@@ -22175,6 +22211,13 @@ unpack_msg(slurm_msg_t * msg, buf_t *buffer)
 						& (msg->data), buffer,
 						msg->protocol_version);
 		break;
+#endif
+#ifdef __METASTACK_OPT_APPTYPE_2  
+	case RESPONSE_BUILD_APP_INFO:  
+		rc = _unpack_app_info_msg(  
+			(slurm_ctl_conf_info_msg_app_t **)&(msg->data),  
+			buffer, msg->protocol_version);  
+		break;  
 #endif
 	case RESPONSE_JOB_INFO:
 		rc = _unpack_job_info_msg(msg, buffer);
