@@ -2587,21 +2587,19 @@ extern int read_slurm_conf(int recover)
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
 	_build_all_watchdog_info();
 #endif
+
 #ifdef __METASTACK_OPT_APPTYPE_2  
-	/* If KeepApptypeInfo is set, preserve app_list during reconfig */  
-	if (reconfig && (reconfig_flags & RECONFIG_KEEP_APPTYPE_INFO)) {  
-		/* Skip rebuilding app_list from config, keep in-memory state */  
+	if ((recover >= 1) && (slurm_conf.reconfig_flags & RECONFIG_KEEP_APPTYPE_INFO)) {  
 		info("Preserving app configuration (KeepApptypeInfo)");  
 	} else {  
-		/* Clear and rebuild from config */  
 		if (app_list)  
 			list_flush(app_list);  
 		_build_all_app_info();  
 	}  
-#else  
-#ifdef __METASTACK_OPT_APPTYPE_1  
+#elif defined(__METASTACK_OPT_APPTYPE_1)  
 	_build_all_app_info();  
-#endif  
+#endif
+
 #endif
 	restore_front_end_state(recover);
 
