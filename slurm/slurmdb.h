@@ -211,6 +211,9 @@ enum cluster_fed_states {
 						    */
 #define JOBCOND_FLAG_SCRIPT           SLURM_BIT(8) /* Get batch script only */
 #define JOBCOND_FLAG_ENV              SLURM_BIT(9) /* Get job's env only */
+#ifdef __METASTACK_OPT_APPTYPE_6  
+#define JOBCOND_FLAG_APPTYPE          SLURM_BIT(10)
+#endif
 
 /* Archive / Purge time flags */
 #define SLURMDB_PURGE_BASE    0x0000ffff   /* Apply to get the number
@@ -357,6 +360,10 @@ typedef struct {
 	char *used_nodes;       /* a ranged node string where jobs ran */
 	List userid_list;	/* list of char * */
 	List wckey_list;	/* list of char * */
+#ifdef __METASTACK_OPT_APPTYPE_6  
+	List appname_list;	/* list of char * */  
+	List appversion_list;	/* list of char * */  
+#endif  
 } slurmdb_job_cond_t;
 
 /* slurmdb_stats_t needs to be defined before slurmdb_job_rec_t and
@@ -1015,6 +1022,11 @@ typedef struct {
 #ifdef __METASTACK_OPT_RESC_NODEDETAIL
 	char	*resource_node_detail;
 #endif
+#ifdef __METASTACK_OPT_APPTYPE_6  
+	char    *app_name;  
+	char    *app_version;  
+	uint8_t  app_source;    /* 0=user, 1=auto, 0xff=unset */  
+#endif 
 } slurmdb_job_rec_t;
 
 typedef struct {

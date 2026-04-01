@@ -616,7 +616,8 @@ typedef struct sbcast_cred sbcast_cred_t;		/* opaque data type */
 #define __METASTACK_OPT_APPTYPE_2 // scontrol crud for app config
 #define __METASTACK_OPT_APPTYPE_3 // add --app --app-version --app-name
 #define __METASTACK_OPT_APPTYPE_4 // squeue and scontrol show jobs app info
-#define __METASTACK_OPT_APPTYPE_5
+#define __METASTACK_OPT_APPTYPE_5 // add <cluster_name>_job_apptype_table
+#define __METASTACK_OPT_APPTYPE_6 // The sacct command supports querying the app information of jobs. 
 #endif
 
 /*****************************************************************************\

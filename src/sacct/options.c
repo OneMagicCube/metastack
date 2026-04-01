@@ -66,6 +66,10 @@
 #define OPT_LONG_HELPSTATE 0x113
 #define OPT_LONG_HELPREASON 0x114
 #define OPT_LONG_EXPAND_PATTERNS 0x115
+#ifdef __METASTACK_OPT_APPTYPE_6  
+#define OPT_LONG_APPNAME   0x116  
+#define OPT_LONG_APPVERSION 0x117  
+#endif
 
 #define JOB_HASH_SIZE 1000
 
@@ -445,6 +449,11 @@ sacct [<OPTION>]                                                            \n \
      -V, --version: Print version.                                          \n\
      -W, --wckeys:                                                          \n\
                    Only send data about these wckeys.  Default is all.      \n\
+     --appname:                                                              \n\
+                   Filter by application name(s), comma separated.           \n\  
+     --appversion:                                                           \n\  
+                   Filter by application version(s), comma separated.        \n\  
+                   Must be used with --appname.                              \n\
      --whole-hetjob[=yes|no]:                                               \n\
 		   If set to 'yes' (or no argument), then information about \n\
 		   all the heterogeneous components will be retrieved. If   \n\
@@ -738,6 +747,10 @@ extern void parse_command_line(int argc, char **argv)
                 {"associations",   required_argument, 0,    'x'},
                 {"json", optional_argument, 0, OPT_LONG_JSON},
                 {"yaml", optional_argument, 0, OPT_LONG_YAML},
+#ifdef __METASTACK_OPT_APPTYPE_6  
+                {"appname",        required_argument, 0,    OPT_LONG_APPNAME},  
+                {"appversion",     required_argument, 0,    OPT_LONG_APPVERSION},  
+#endif  
                 {0,                0,		      0,    0}};
 
 	params.opt_uid = getuid();
@@ -1056,12 +1069,31 @@ extern void parse_command_line(int argc, char **argv)
 		case OPT_LONG_HELPREASON:
 			params.opt_help = 5;
 			break;
+#ifdef __METASTACK_OPT_APPTYPE_6  
+		case OPT_LONG_APPNAME:  
+			if (!job_cond->appname_list)  
+				job_cond->appname_list = list_create(xfree_ptr);  
+			slurm_addto_char_list(job_cond->appname_list, optarg);  
+			job_cond->flags |= JOBCOND_FLAG_APPTYPE;  
+			break;  
+		case OPT_LONG_APPVERSION:  
+			if (!job_cond->appversion_list)  
+				job_cond->appversion_list = list_create(xfree_ptr);  
+			slurm_addto_char_list(job_cond->appversion_list, optarg);  
+			job_cond->flags |= JOBCOND_FLAG_APPTYPE;  
+			break;  
+#endif
 		case ':':
 		case '?':	/* getopt() has explained it */
 			exit(1);
 		}
 	}
-
+#ifdef __METASTACK_OPT_APPTYPE_6  
+	if (job_cond->appversion_list && list_count(job_cond->appversion_list)  
+	    && (!job_cond->appname_list || !list_count(job_cond->appname_list))) {  
+		fatal("--appversion must be used with --appname");  
+	}  
+#endif
 	if (!job_cond->step_list || !list_count(job_cond->step_list)) {
 		char *reason = NULL;
 		if (job_cond->flags & JOBCOND_FLAG_SCRIPT)
@@ -1451,6 +1483,13 @@ extern void parse_command_line(int argc, char **argv)
 	foundfield:
 		if (newlen_set)
 			fields[i].len = newlen;
+#ifdef __METASTACK_OPT_APPTYPE_6  
+		/* Auto-set APPTYPE flag when app format fields are requested */  
+		if (fields[i].type == PRINT_APPNAME ||  
+		    fields[i].type == PRINT_APPVERSION ||  
+		    fields[i].type == PRINT_APPSOURCE)  
+			job_cond->flags |= JOBCOND_FLAG_APPTYPE;
+#endif  
 		list_append(print_fields_list, &fields[i]);
 		start = end + 1;
 	}

@@ -119,6 +119,11 @@ char *job_req_inx[] = {
 	"t1.resource_node_detail",
 #endif
 	"t2.lineage",
+#ifdef __METASTACK_OPT_APPTYPE_6  
+	"t5.apptype",  
+	"t5.apptype_version",  
+	"t5.source",  
+#endif 
 	"t2.user"
 };
 
@@ -189,6 +194,11 @@ enum {
 	JOB_REQ_RESC_NODE,
 #endif
 	JOB_REQ_LINEAGE,
+#ifdef __METASTACK_OPT_APPTYPE_6  
+	JOB_REQ_APPNAME,  
+	JOB_REQ_APPVERSION,  
+	JOB_REQ_APPSOURCE,  
+#endif
 	JOB_REQ_USER_NAME,
 	JOB_REQ_COUNT
 };
@@ -576,7 +586,13 @@ static int _cluster_get_jobs(mysql_conn_t *mysql_conn,
 			   " left join \"%s_%s\" as t4 "
 			   "on t1.env_hash_inx=t4.hash_inx",
 			   cluster_name, job_env_table);
-
+#ifdef __METASTACK_OPT_APPTYPE_6  
+	/* Always LEFT JOIN apptype table on PRIMARY KEY - negligible cost */  
+	xstrfmtcat(query,  
+		   " left join \"%s_%s\" as t5 "  
+		   "on t1.job_db_inx=t5.job_db_inx",  
+		   cluster_name, job_apptype_table);  
+#endif
 	if (job_cond->flags & JOBCOND_FLAG_RUNAWAY) {
 		if (extra)
 			xstrcat(extra, " && (t1.time_end=0)");
@@ -708,7 +724,16 @@ static int _cluster_get_jobs(mysql_conn_t *mysql_conn,
 			job->mcs_label = xstrdup("");
 		if (row[JOB_REQ_USER_NAME])
 			job->user = xstrdup(row[JOB_REQ_USER_NAME]);
-
+#ifdef __METASTACK_OPT_APPTYPE_6  
+		if (row[JOB_REQ_APPNAME] && row[JOB_REQ_APPNAME][0])  
+			job->app_name = xstrdup(row[JOB_REQ_APPNAME]);  
+		if (row[JOB_REQ_APPVERSION] && row[JOB_REQ_APPVERSION][0])  
+			job->app_version = xstrdup(row[JOB_REQ_APPVERSION]);  
+		if (row[JOB_REQ_APPSOURCE])  
+			job->app_source = slurm_atoul(row[JOB_REQ_APPSOURCE]);  
+		else  
+			job->app_source = 0xff;  
+#endif
 		if (row[JOB_REQ_UID])
 			job->uid = slurm_atoul(row[JOB_REQ_UID]);
 
@@ -1410,6 +1435,44 @@ no_resv:
 		xstrfmtcat(*extra, " %s (t1.state != %"PRIu64")",
 			   *extra ? "&&" : "where",
 			   JOB_REVOKED);
+
+#ifdef __METASTACK_OPT_APPTYPE_6  
+	if (job_cond->appname_list &&  
+	    list_count(job_cond->appname_list)) {  
+		set = 0;  
+		if (*extra)  
+			xstrcat(*extra, " && (");  
+		else  
+			xstrcat(*extra, " where (");  
+		itr = list_iterator_create(job_cond->appname_list);  
+		while ((object = list_next(itr))) {  
+			if (set)  
+				xstrcat(*extra, " || ");  
+			xstrfmtcat(*extra, "t5.apptype='%s'", object);  
+			set = 1;  
+		}  
+		list_iterator_destroy(itr);  
+		xstrcat(*extra, ")");  
+	}  
+  
+	if (job_cond->appversion_list &&  
+	    list_count(job_cond->appversion_list)) {  
+		set = 0;  
+		if (*extra)  
+			xstrcat(*extra, " && (");  
+		else  
+			xstrcat(*extra, " where (");  
+		itr = list_iterator_create(job_cond->appversion_list);  
+		while ((object = list_next(itr))) {  
+			if (set)  
+				xstrcat(*extra, " || ");  
+			xstrfmtcat(*extra, "t5.apptype_version='%s'", object);  
+			set = 1;  
+		}  
+		list_iterator_destroy(itr);  
+		xstrcat(*extra, ")");  
+	}  
+#endif  
 
 	return SLURM_SUCCESS;
 }
