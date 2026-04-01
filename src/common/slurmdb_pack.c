@@ -5628,10 +5628,10 @@ extern void slurmdb_pack_job_rec(void *object, uint16_t protocol_version,
 #ifdef __METASTACK_OPT_RESC_NODEDETAIL
 		packstr(job->resource_node_detail, buffer);
 #endif
-#ifdef __METASTACK_OPT_APPTYPE_6  
-		packstr(object->app_name, buffer);  
-		packstr(object->app_version, buffer);  
-		pack8(object->app_source, buffer);  
+#ifdef __METASTACK_OPT_APPTYPE_6
+		packstr(job->app_name, buffer);
+		packstr(job->app_version, buffer);
+		pack8(job->app_source, buffer);
 #endif
 	} else if (protocol_version >= META_3_0_PROTOCOL_VERSION) {
 		packstr(job->account, buffer);
