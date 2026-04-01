@@ -71,6 +71,28 @@ be changed after job submission using the \fBscontrol\fR
 command.
 .IP
 
+.\" __METASTACK_OPT_APP_3  
+.TP  
+\fB\-\-app\fR=<\fIname\-version\fR>  
+Specify the application for this job in the combined format "name\-version"  
+(e.g. "vasp\-5.7.1"). This sets both the application name and version.  
+If only a name is provided without a version, only AppName is set.  
+The application must be pre\-configured via \fBscontrol create app\fR.  
+.IP  
+  
+.TP  
+\fB\-\-app\-name\fR=<\fIname\fR>  
+Specify the application name for this job (e.g. "vasp").  
+Can be used together with \fB\-\-app\-version\fR as an alternative to \fB\-\-app\fR.  
+.IP  
+  
+.TP  
+\fB\-\-app\-version\fR=<\fIversion\fR>  
+Specify the application version for this job (e.g. "5.7.1").  
+Must be used together with \fB\-\-app\-name\fR.  
+.IP  
+.\" __METASTACK_OPT_APP_3
+
 .TP
 \fB\-\-acctg\-freq\fR=<\fIdatatype\fR>=<\fIinterval\fR>[,<\fIdatatype\fR>=<\fIinterval\fR>...]
 Define the job accounting and profiling sampling intervals in seconds.

@@ -94,6 +94,20 @@ configured to \fBjobs\fP.
 Otherwise display the current user's jobs
 .IP
 
+.\" __METASTACK_OPT_APP_6  
+.TP  
+\fB\-\-appname\fR=<\fIapp_name_list\fR>  
+Display only jobs that match the specified application name(s).  
+Comma\-separated list of application names (e.g. "vasp,gromacs").  
+.IP  
+  
+.TP  
+\fB\-\-appversion\fR=<\fIapp_version_list\fR>  
+Display only jobs that match the specified application version(s).  
+Comma\-separated list of versions. Must be used together with \fB\-\-appname\fR.  
+.IP  
+.\" __METASTACK_OPT_APP_6
+
 .TP
 \fB\-x\fR, \fB\-\-associations\fR=<\fIassoc_list\fR>
 Displays the statistics only for the jobs running under the
@@ -300,6 +314,9 @@ TRESUsageInTot      TRESUsageOutAve     TRESUsageOutMax     TRESUsageOutMaxNode
 TRESUsageOutMaxTask TRESUsageOutMin     TRESUsageOutMinNode TRESUsageOutMinTask
 TRESUsageOutTot     UID                 User                UserCPU
 WCKey               WCKeyID             WorkDir
+.\" __METASTACK_OPT_APP_6  
+AppName             AppSource           AppVersion  
+.\" __METASTACK_OPT_APP_6
 .ft 1
 .fi
 .RE
@@ -586,6 +603,24 @@ Print all fields listed below.
 \f3Account\fP
 Account the job ran under.
 .IP
+
+.\" __METASTACK_OPT_APP_6  
+.TP  
+\f3AppName\fP  
+Application name associated with the job (e.g. "vasp").  
+.IP  
+  
+.TP  
+\f3AppVersion\fP  
+Application version associated with the job (e.g. "5.7.1").  
+.IP  
+  
+.TP  
+\f3AppSource\fP  
+Source of the application information. Values: "user" (explicitly specified  
+by user), "auto" (automatically detected), or empty if not set.  
+.IP  
+.\" __METASTACK_OPT_APP_6
 
 .TP
 \fBAdminComment\fR

@@ -3707,6 +3707,18 @@ If set, an "scontrol reconfig" command will preserve the current state of
 SuspendExcNodes, SuspendExcParts and SuspendExcStates.
 .IP
 
+.\" __METASTACK_OPT_APP_1  
+.TP  
+\fBKeepAppInfo\fR  
+If set, an "scontrol reconfig" command will preserve the in\-memory  
+application configuration records that may have been dynamically created,  
+updated, or deleted via "scontrol create app", "scontrol update app",  
+or "scontrol delete app". Without this flag, a reconfigure will discard  
+all dynamic app changes and reload application definitions only from the  
+slurm.conf file.  
+.IP  
+.\" __METASTACK_OPT_APP_1  
+
 .RE
 .RS 7
 The default for the above flags is not set, and the
@@ -7747,6 +7759,49 @@ when PowerDownOnIdle is set to NO.</p>
 
 Also see \fBSuspendTime\fR.
 .IP
+
+.\" __METASTACK_OPT_APP_1  
+.TP  
+\fBAppName\fR  
+Define an application configuration record. Multiple \fBAppName\fR lines may  
+appear in the configuration file. The format is:  
+.IP  
+.nf  
+AppName=<\fIname\fR> Version=<\fIversion\fR> [Description=<\fIdesc\fR>] [Watchdog=<\fIwatchdog_name\fR>] [Default=yes|no]  
+.fi  
+.IP  
+.RS  
+.TP  
+\fBVersion\fR (Required)  
+Version string for this application (e.g. "5.7.1").  
+.IP  
+  
+.TP  
+\fBDescription\fR  
+A text description of this application.  
+.IP  
+  
+.TP  
+\fBWatchdog\fR  
+Name of a WatchDogName entry to bind to this application. The referenced  
+WatchDogName must be defined in the configuration.  
+.IP  
+  
+.TP  
+\fBDefault\fR  
+If set to "yes", this application is used as the default when a job does not  
+explicitly specify an application. Only one application may be the default.  
+Default value is "no".  
+.IP  
+.RE  
+  
+Example:  
+.nf  
+  AppName=vasp Version=5.7.1 Description="VASP 5.7.1" Watchdog=vasp_dog Default=yes  
+  AppName=gromacs Version=2024.1 Description="GROMACS 2024.1"  
+.fi  
+.IP  
+.\" __METASTACK_OPT_APP_1
 
 .TP
 \fBPreemptMode\fR
