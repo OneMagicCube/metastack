@@ -288,8 +288,8 @@ extern void slurm_cred_free_args(slurm_cred_arg_t *arg)
 
 	switch_g_free_stepinfo(arg->switch_step);
 #ifdef __METASTACK_OPT_APP_7
-	xfree(cred_arg->job_app_name);  
-	xfree(cred_arg->job_app_version);  
+	xfree(arg->job_app_name);  
+	xfree(arg->job_app_version);  
 #endif
 	xfree(arg);
 }

@@ -1362,6 +1362,10 @@ static void _pack_resource_allocation_response_msg(const slurm_msg_t *smsg,
 		} else {
 			pack8(0, buffer);
 		}
+#ifdef __METASTACK_BUG_UPDATE_JOB_ENV
+		packstr(msg->tres_bind, buffer);
+		packstr(msg->tres_per_task, buffer);
+#endif
 #ifdef __METASTACK_OPT_APP_7
 		packstr(msg->app_name, buffer);  
 		packstr(msg->app_version, buffer);  
