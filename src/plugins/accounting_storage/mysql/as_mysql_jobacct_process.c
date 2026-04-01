@@ -587,12 +587,13 @@ static int _cluster_get_jobs(mysql_conn_t *mysql_conn,
 			   "on t1.env_hash_inx=t4.hash_inx",
 			   cluster_name, job_env_table);
 #ifdef __METASTACK_OPT_APP_6  
-	/* Always LEFT JOIN apptype table on PRIMARY KEY - negligible cost */  
-	xstrfmtcat(query,  
-		   " left join \"%s_%s\" as t5 "  
-		   "on t1.job_db_inx=t5.job_db_inx",  
-		   cluster_name, job_app_table);  
-#endif
+	/* Only LEFT JOIN apptype table when app info is actually needed */  
+	if (job_cond->flags & JOBCOND_FLAG_APPTYPE)  
+		xstrfmtcat(query,  
+			   " left join \"%s_%s\" as t5 "  
+			   "on t1.job_db_inx=t5.job_db_inx",  
+			   cluster_name, job_app_table);  
+#endif  
 	if (job_cond->flags & JOBCOND_FLAG_RUNAWAY) {
 		if (extra)
 			xstrcat(extra, " && (t1.time_end=0)");
@@ -1880,7 +1881,14 @@ extern List as_mysql_jobacct_process_get_jobs(mysql_conn_t *mysql_conn,
 		if (((i == JOB_REQ_SCRIPT) &&
 		     (!job_cond || !(job_cond->flags & JOBCOND_FLAG_SCRIPT))) ||
 		    ((i == JOB_REQ_ENV) &&
-		     (!job_cond || !(job_cond->flags & JOBCOND_FLAG_ENV))))
+		     (!job_cond || !(job_cond->flags & JOBCOND_FLAG_ENV)))
+#ifdef __METASTACK_OPT_APP_6  
+		    || ((i == JOB_REQ_APPNAME ||  
+		         i == JOB_REQ_APPVERSION ||  
+		         i == JOB_REQ_APPSOURCE) &&  
+		        (!job_cond || !(job_cond->flags & JOBCOND_FLAG_APPTYPE)))  
+#endif
+			 )
 			xstrcat(tmp, ", ''");
 		else
 			xstrfmtcat(tmp, ", %s", job_req_inx[i]);

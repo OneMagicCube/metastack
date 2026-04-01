@@ -321,6 +321,24 @@ int main(int argc, char **argv)
 	sacct_init();
 	parse_command_line(argc, argv);
 
+#ifdef __METASTACK_OPT_APP_6  
+	/* If user requested any app field in --format, set APPTYPE flag  
+	 * so the accounting plugin knows to LEFT JOIN job_app_table */  
+	{  
+		list_itr_t *fmt_itr = list_iterator_create(print_fields_list);  
+		print_field_t *field;  
+		while ((field = list_next(fmt_itr))) {  
+			if (field->type == PRINT_APPNAME ||  
+			    field->type == PRINT_APPVERSION ||  
+			    field->type == PRINT_APPSOURCE) {  
+				params.job_cond->flags |= JOBCOND_FLAG_APPTYPE;  
+				break;  
+			}  
+		}  
+		list_iterator_destroy(fmt_itr);  
+	}  
+#endif
+
 	/* What are we doing? Requests for help take highest priority,
 	 * but then check for illogical switch combinations.
 	 */
