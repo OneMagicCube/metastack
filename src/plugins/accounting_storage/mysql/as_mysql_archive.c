@@ -271,6 +271,27 @@ typedef struct {
 	char *batch_script;
 } local_job_script_t;
 
+#ifdef __METASTACK_OPT_APP_5  
+typedef struct {  
+	char *job_db_inx;  
+	char *apptype;  
+	char *apptype_version;  
+	char *source;  
+	char *mod_time;  
+} local_job_app_t;  
+  
+static void _free_local_job_app_members(local_job_app_t *object)  
+{  
+	if (object) {  
+		xfree(object->job_db_inx);  
+		xfree(object->apptype);  
+		xfree(object->apptype_version);  
+		xfree(object->source);  
+		xfree(object->mod_time);  
+	}  
+}  
+#endif
+
 static void _free_local_job_script_members(local_job_script_t *object)
 {
 	if (object) {
@@ -693,6 +714,25 @@ enum {
 	JOB_SCRIPT_COUNT
 };
 
+#ifdef __METASTACK_OPT_APP_5  
+enum {  
+	JOB_APP_DB_INX,  
+	JOB_APP_APPTYPE,  
+	JOB_APP_APPTYPE_VERSION,  
+	JOB_APP_SOURCE,  
+	JOB_APP_MOD_TIME,  
+	JOB_APP_COUNT  
+};  
+  
+static char *job_app_req_inx[] = {  
+	"job_db_inx",  
+	"apptype",  
+	"apptype_version",  
+	"source",  
+	"mod_time",  
+};  
+#endif
+
 /* if this changes you will need to edit the corresponding enum */
 char *resv_req_inx[] = {
 	"id_resv",
@@ -921,6 +961,9 @@ typedef enum {
 	PURGE_JOB,
 	PURGE_JOB_ENV,
 	PURGE_JOB_SCRIPT,
+#ifdef __METASTACK_OPT_APP_5  
+	PURGE_JOB_APP,  
+#endif
 	PURGE_STEP,
 	PURGE_TXN,
 	PURGE_USAGE,
@@ -1891,6 +1934,37 @@ unpack_error:
 	_free_local_job_script_members(object);
 	return SLURM_ERROR;
 }
+
+#ifdef __METASTACK_OPT_APP_5  
+static void _pack_local_job_app(local_job_app_t *object, buf_t *buffer)  
+{  
+	/* Always packs as current version */  
+	packstr(object->job_db_inx, buffer);  
+	packstr(object->apptype, buffer);  
+	packstr(object->apptype_version, buffer);  
+	packstr(object->source, buffer);  
+	packstr(object->mod_time, buffer);  
+}  
+  
+static int _unpack_local_job_app(local_job_app_t *object,  
+				 uint16_t rpc_version, buf_t *buffer)  
+{  
+	memset(object, 0, sizeof(local_job_app_t));  
+	if (rpc_version >= META_3_2_PROTOCOL_VERSION) {
+		safe_unpackstr(&object->job_db_inx, buffer);  
+		safe_unpackstr(&object->apptype, buffer);  
+		safe_unpackstr(&object->apptype_version, buffer);  
+		safe_unpackstr(&object->source, buffer);  
+		safe_unpackstr(&object->mod_time, buffer);  
+	}
+  
+	return SLURM_SUCCESS;  
+  
+unpack_error:  
+	_free_local_job_app_members(object);  
+	return SLURM_ERROR;  
+}  
+#endif
 
 static void _pack_local_resv(local_resv_t *object, buf_t *buffer)
 {
@@ -3345,6 +3419,13 @@ static char *_get_archive_columns(purge_type_t type)
 		cols      = job_script_inx;
 		col_count = JOB_SCRIPT_COUNT;
 		break;
+#ifdef __METASTACK_OPT_APP_5  
+	case PURGE_JOB_APP:  
+		xstrfmtcat(cols, "%s", job_app_req_inx[0]);  
+		for (i = 1; i < JOB_APP_COUNT; i++)  
+			xstrfmtcat(cols, ", %s", job_app_req_inx[i]);  
+		break;  
+#endif
 	case PURGE_STEP:
 		cols      = step_req_inx;
 		col_count = STEP_REQ_COUNT;
@@ -4022,6 +4103,98 @@ static char *_load_job_script(uint16_t rpc_version, buf_t *buffer,
 
 	return insert;
 }
+
+#ifdef __METASTACK_OPT_APP_5  
+static buf_t *_pack_archive_job_app(MYSQL_RES *result, char *cluster_name,  
+				    uint32_t cnt, uint32_t usage_info,  
+				    time_t *period_start)  
+{  
+	MYSQL_ROW row;  
+	buf_t *buffer;  
+	local_job_app_t app;  
+  
+	buffer = init_buf(high_buffer_size);  
+	pack16(SLURM_PROTOCOL_VERSION, buffer);  
+	pack_time(time(NULL), buffer);  
+	pack16(DBD_GOT_JOB_APP, buffer);  
+	packstr(cluster_name, buffer);  
+	pack32(cnt, buffer);  
+  
+	while ((row = mysql_fetch_row(result))) {  
+		if (period_start && !*period_start)  
+			error("period_start should already be set");  
+  
+		memset(&app, 0, sizeof(local_job_app_t));  
+  
+		app.job_db_inx = row[JOB_APP_DB_INX];  
+		app.apptype = row[JOB_APP_APPTYPE];  
+		app.apptype_version = row[JOB_APP_APPTYPE_VERSION];  
+		app.source = row[JOB_APP_SOURCE];  
+		app.mod_time = row[JOB_APP_MOD_TIME];  
+  
+		_pack_local_job_app(&app, buffer);  
+	}  
+  
+	return buffer;  
+}  
+
+/* returns sql statement from archived data or NULL on error */  
+static char *_load_job_app(uint16_t rpc_version, buf_t *buffer,  
+			   char *cluster_name, uint32_t rec_cnt)  
+{  
+	char *insert = NULL, *insert_pos = NULL;  
+	char *format = NULL, *format_pos = NULL;  
+	local_job_app_t object;  
+	int i = 0;  
+  
+	xstrfmtcatat(insert, &insert_pos,  
+		     "insert into \"%s_%s\" (%s",  
+		     cluster_name, job_app_table,  
+		     job_app_req_inx[0]);  
+	xstrcatat(format, &format_pos, "('%s'");  
+	for (i = 1; i < JOB_APP_COUNT; i++) {  
+		xstrfmtcatat(insert, &insert_pos,  
+			     ", %s", job_app_req_inx[i]);  
+		xstrcatat(format, &format_pos, ", '%s'");  
+	}  
+	xstrcatat(insert, &insert_pos, ") values ");  
+	xstrcatat(format, &format_pos, ")");  
+  
+	for (i = 0; i < rec_cnt; i++) {  
+		memset(&object, 0, sizeof(local_job_app_t));  
+		if (_unpack_local_job_app(&object, rpc_version, buffer)  
+		    != SLURM_SUCCESS) {  
+			error("issue unpacking");  
+			xfree(insert);  
+			break;  
+		}  
+  
+		if (i)  
+			xstrcatat(insert, &insert_pos, ", ");  
+  
+		xstrfmtcatat(insert, &insert_pos, format,  
+			     object.job_db_inx,  
+			     object.apptype ? object.apptype : "",  
+			     object.apptype_version ? object.apptype_version : "",  
+			     object.source ? object.source : "0",  
+			     object.mod_time ? object.mod_time : "0");  
+  
+		_free_local_job_app_members(&object);  
+	}  
+  
+	xfree(format);  
+  
+	if (insert)  
+		xstrcatat(insert, &insert_pos,  
+			  " on duplicate key update "  
+			  "apptype=VALUES(apptype), "  
+			  "apptype_version=VALUES(apptype_version), "  
+			  "source=VALUES(source), "  
+			  "mod_time=VALUES(mod_time)");  
+  
+	return insert;  
+}  
+#endif
 
 static buf_t *_pack_archive_resvs(MYSQL_RES *result, char *cluster_name,
 				  uint32_t cnt, uint32_t usage_info,
@@ -4881,6 +5054,12 @@ static uint32_t _archive_table(purge_type_t type, mysql_conn_t *mysql_conn,
 		hash_col = "script_hash_inx";
 		pack_func = &_pack_archive_job_script;
 		break;
+#ifdef __METASTACK_OPT_APP_5  
+	case PURGE_JOB_APP:  
+		parent_table = job_table;  
+		pack_func = &_pack_archive_job_app;  
+		break;  
+#endif
 	case PURGE_STEP:
 		pack_func = &_pack_archive_steps;
 		break;
@@ -4927,6 +5106,19 @@ static uint32_t _archive_table(purge_type_t type, mysql_conn_t *mysql_conn,
 				       period_end, col_name, MAX_PURGE_LIMIT,
 				       hash_col);
 		break;
+#ifdef __METASTACK_OPT_APP_5  
+	case PURGE_JOB_APP:  
+		query = xstrdup_printf("select %s from \"%s_%s\" "  
+				       "inner join (select job_db_inx from \"%s_%s\" "  
+				       "where %s <= %ld && time_end != 0 "  
+				       "order by %s asc LIMIT %d) as j "  
+				       "on \"%s_%s\".job_db_inx = j.job_db_inx",  
+				       cols, cluster_name, sql_table,  
+				       cluster_name, parent_table, col_name,  
+				       period_end, col_name, MAX_PURGE_LIMIT,  
+				       cluster_name, sql_table);  
+		break;  
+#endif
 	default:
 		query = xstrdup_printf("select %s from \"%s_%s\" where "
 				       "%s <= %ld && time_end != 0 "
@@ -5263,6 +5455,17 @@ static int _archive_purge_table(purge_type_t purge_type, uint32_t usage_info,
 						    usage_info);
 				if (rc == SLURM_ERROR)
 					return rc;
+#ifdef __METASTACK_OPT_APP_5  
+				rc = _archive_table(PURGE_JOB_APP,  
+						    mysql_conn, cluster_name,  
+						    col_name, &start, tmp_end,  
+						    arch_cond->archive_dir,  
+						    tmp_archive_period,  
+						    job_app_table,  
+						    usage_info);  
+				if (rc == SLURM_ERROR)  
+					return rc;  
+#endif
 			}
 		}
 
@@ -5565,6 +5768,11 @@ static int _process_archive_data(char **data_in, uint32_t data_size,
 		case DBD_GOT_JOB_SCRIPT:
 			data = _load_job_script(ver, buffer, cluster_name, rec_cnt);
 			break;
+#ifdef __METASTACK_OPT_APP_5  
+		case DBD_GOT_JOB_APP:  
+			data = _load_job_app(ver, buffer, cluster_name, rec_cnt);  
+			break;  
+#endif  
 		case DBD_GOT_RESVS:
 			data = _load_resvs(ver, buffer, cluster_name, rec_cnt);
 			break;

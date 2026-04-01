@@ -156,6 +156,9 @@ typedef enum {
 	DBD_JOB_HEAVY,         /* Send job script/env  		*/
 	DBD_GOT_JOB_ENV,	/* Loading env hash table*/
 	DBD_GOT_JOB_SCRIPT,	/* #1450, Loading bash script hash table */
+#ifdef __METASTACK_OPT_APP_5  
+	DBD_GOT_JOB_APP,  
+#endif
 	DBD_ADD_ACCOUNTS_COND,  /* Add new account to the mix with acct_rec and
 				 * add_assoc_cond */
 	DBD_ADD_USERS_COND,     /* Add new user to the mix with user_rec and
@@ -171,6 +174,9 @@ typedef enum {
 	DBD_NODE_STATE_BORROW,		/* Record node borrow and return state transition		*/
 	DBD_FIX_BORROWAWAY_NODE,    /* Fix any borrowaway nodes */	
 #endif
+#ifdef __METASTACK_OPT_APP_5  
+	DBD_GOT_JOB_APP = 3100,	/* Loading job app table from archive */  
+#endif 
 
 	SLURM_PERSIST_INIT = 6500, /* So we don't use the
 				    * REQUEST_PERSIST_INIT also used here.
