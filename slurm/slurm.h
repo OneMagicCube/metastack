@@ -3228,7 +3228,8 @@ typedef struct {
 	char    *app_name;      /* application name, required */  
 	char    *version;       /* version string, required */  
 	char    *description;   /* description */  
-	char    *watchdog;      /* bound watchdog name */  
+	char    *watchdog;      /* bound watchdog name */
+	char    *combined_name; /* "app_name-version", hash key (slurmctld only) */
 	bool     default_flag;  /* is this the default app */  
 } app_record_t;  
 #endif

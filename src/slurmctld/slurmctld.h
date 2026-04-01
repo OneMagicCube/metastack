@@ -72,6 +72,9 @@
 #include "src/common/xmalloc.h"
 
 #include "src/interfaces/cred.h"
+#ifdef __METASTACK_OPT_APP_1
+#include "src/common/xhash.h"
+#endif
 
 /*****************************************************************************\
  *  GENERAL CONFIGURATION parameters and data structures
@@ -380,6 +383,7 @@ extern time_t last_watch_dog_update;	/* time of last update to watch_dog records
 
 #ifdef __METASTACK_OPT_APP_1  
 extern List app_list;                   /* app preset list */  
+extern xhash_t *app_hash_table;        /* hash table indexed by combined_name */  
 extern time_t last_app_update;          /* time of last update to app records */  
 extern char *default_app_name;          /* combined name of default app, e.g. "general-1.0" */  
 extern app_record_t *default_app_loc;   /* pointer to default app record */  

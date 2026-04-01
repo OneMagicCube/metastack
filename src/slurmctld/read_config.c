@@ -107,6 +107,11 @@
 #ifdef __METASTACK_NEW_RPC_RATE_LIMIT
 #include "src/slurmctld/rate_limit.h"
 #endif
+
+#ifdef __METASTACK_OPT_APP_1
+#include "src/common/xhash.h"
+#endif
+
 #define FEATURE_MAGIC	0x34dfd8b5
 
 /* Global variables */
@@ -198,7 +203,8 @@ bool disable_change_proc_dist = false;
 List app_list = NULL;  
 time_t last_app_update = (time_t) 0;  
 char *default_app_name = NULL;  
-app_record_t *default_app_loc = NULL;  
+app_record_t *default_app_loc = NULL;
+xhash_t *app_hash_table = NULL;
 #endif
 
 #ifdef __METASTACK_BUG_OVERLAP_NODE_DIST
@@ -1066,12 +1072,24 @@ void init_watch_dog_conf(void)
 }
 #endif
 
-#ifdef __METASTACK_OPT_APP_1  
+#ifdef __METASTACK_OPT_APP_1
+/*  
+ * xhash helper function to index app_record per combined_name field  
+ * in app_hash_table  
+ */  
+static void _app_record_hash_identity(void *item, const char **key,  
+				      uint32_t *key_len)  
+{  
+	app_record_t *app_ptr = (app_record_t *)item;  
+	*key = app_ptr->combined_name;  
+	*key_len = strlen(app_ptr->combined_name);  
+} 
 static void _list_delete_app(void *app_entry)  
 {  
 	app_record_t *app_ptr = (app_record_t *)app_entry;  
 	xfree(app_ptr->app_name);  
-	xfree(app_ptr->version);  
+	xfree(app_ptr->version); 
+	xfree(app_ptr->combined_name); 
 	xfree(app_ptr->description);  
 	xfree(app_ptr->watchdog);  
 	xfree(app_ptr);  
@@ -1082,27 +1100,34 @@ void init_app_conf(void)
 	last_app_update = time(NULL);  
 	xfree(default_app_name);  
 	default_app_loc = NULL;  
+  
+	/* Clear hash table first (it only holds references, not ownership) */  
+	xhash_free(app_hash_table);  
+	app_hash_table = xhash_init(_app_record_hash_identity, NULL);  
+  
 	if (app_list)  
 		list_flush(app_list);  
 	else  
 		app_list = list_create(_list_delete_app);  
-}  
+}
   
 void app_fini(void)  
 {  
+	xhash_free(app_hash_table);  
 	FREE_NULL_LIST(app_list);  
 	xfree(default_app_name);  
 	default_app_loc = NULL;  
-}  
+}
   
 static void _init_app_record(app_record_t *app_ptr)  
 {  
 	app_ptr->app_name = NULL;  
 	app_ptr->version = NULL;  
+	app_ptr->combined_name = NULL;  
 	app_ptr->description = NULL;  
 	app_ptr->watchdog = NULL;  
 	app_ptr->default_flag = false;  
-}  
+}
   
 /*  
  * list_find_app - find an entry in the app list by composite key.  
@@ -1128,63 +1153,61 @@ app_record_t *create_app_record(const char *name, const char *version)
 	app_ptr->app_name = xstrdup(name);  
 	app_ptr->version = xstrdup(version);  
   
+	/* Build combined_name as hash key: "name-version" */  
+	xstrfmtcat(app_ptr->combined_name, "%s-%s", name, version);  
+  
 	(void)list_append(app_list, app_ptr);  
+	xhash_add(app_hash_table, app_ptr);  
   
 	return app_ptr;  
-}  
+}
   
 app_record_t *find_app_record(const char *app_name, const char *version)  
 {  
-	char *find_key[2];  
+	char buf[512];  
   
-	find_key[0] = (char *)app_name;  
-	find_key[1] = (char *)version;  
+	if (!app_name || !version || !app_hash_table)  
+		return NULL;  
   
-	return list_find_first(app_list, &list_find_app, find_key);  
-}  
+	snprintf(buf, sizeof(buf), "%s-%s", app_name, version);  
+	return (app_record_t *)xhash_get_str(app_hash_table, buf);  
+}
   
 /*  
  * find_app_record_by_combined - find an app record by combined name.  
- *   Iterates through app_list, for each record concatenates  
- *   "app_name-version" and compares with combined_name.  
+ *   Uses hash table for O(1) lookup.  
  * IN combined_name - e.g. "vasp-5.7.1"  
  * RET pointer to app record or NULL if not found  
  */  
-static int _match_app_combined(void *x, void *key)  
-{  
-	app_record_t *app_ptr = (app_record_t *)x;  
-	char *combined_name = (char *)key;  
-	char *tmp = NULL;  
-	int match;  
-  
-	xstrfmtcat(tmp, "%s-%s", app_ptr->app_name, app_ptr->version);  
-	match = !xstrcmp(tmp, combined_name);  
-	xfree(tmp);  
-  
-	return match;  
-}  
-  
 app_record_t *find_app_record_by_combined(const char *combined_name)  
 {  
-	if (!combined_name || !app_list)  
+	if (!combined_name || !app_hash_table)  
 		return NULL;  
   
-	return list_find_first(app_list, &_match_app_combined,  
-			       (void *)combined_name);  
-}  
+	return (app_record_t *)xhash_get_str(app_hash_table, combined_name);  
+}
   
 static int _build_single_appline_info(app_record_t *app)  
 {  
 	app_record_t *app_ptr = NULL;  
-	char *find_key[2];  
   
-	find_key[0] = app->app_name;  
-	find_key[1] = app->version;  
+	/* Use hash table for O(1) duplicate detection */  
+	char buf[512];  
+	snprintf(buf, sizeof(buf), "%s-%s", app->app_name, app->version);  
+	app_ptr = (app_record_t *)xhash_get_str(app_hash_table, buf);  
   
-	if (list_find_first(app_list, &list_find_app, find_key)) {  
+	if (app_ptr) {  
 		error("%s: AppName=%s Version=%s specified more than once, "  
 		      "latest value used",  
 		      __func__, app->app_name, app->version);  
+  
+		/* Remove old record from hash table first */  
+		xhash_pop_str(app_hash_table, buf);  
+  
+		/* Then remove from list */  
+		char *find_key[2];  
+		find_key[0] = app_ptr->app_name;  
+		find_key[1] = app_ptr->version;  
 		list_delete_first(app_list, &list_find_app, find_key);  
 	}  
   
@@ -1225,8 +1248,8 @@ static int _build_single_appline_info(app_record_t *app)
 	}  
   
 	return 0;  
-}  
-  
+}
+
 static int _build_all_app_info(void)  
 {  
 	app_record_t **app_array = NULL;  
@@ -1420,7 +1443,10 @@ extern int delete_app(delete_app_msg_t *app_msg)
 		default_app_loc = NULL;  
 	}  
   
-	/* Delete using the composite key */  
+	/* Remove from hash table first (O(1)) */  
+	xhash_pop_str(app_hash_table, app_ptr->combined_name);  
+  
+	/* Then delete from list using composite key */  
 	char *find_key[2];  
 	find_key[0] = app_ptr->app_name;  
 	find_key[1] = app_ptr->version;  
@@ -1429,7 +1455,7 @@ extern int delete_app(delete_app_msg_t *app_msg)
   
 	info("App deleted: %s", app_msg->name);  
 	return SLURM_SUCCESS;  
-}  
+}
 #endif /* __METASTACK_OPT_APP_2 */
 
 /*
