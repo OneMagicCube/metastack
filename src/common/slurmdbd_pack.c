@@ -813,7 +813,7 @@ static int _unpack_job_start_msg(void **msg, uint16_t rpc_version,
 		safe_unpackstr(&msg_ptr->work_dir, buffer);
 		safe_unpackstr(&msg_ptr->env_hash, buffer);
 		safe_unpackstr(&msg_ptr->script_hash, buffer);
-#ifdef __METASTACK_OPT_APPTYPE_3  
+#ifdef __METASTACK_OPT_APPTYPE_5
 		safe_unpackstr(&msg_ptr->app_name, buffer);  
 		safe_unpackstr(&msg_ptr->app_version, buffer);  
 		safe_unpack8(&msg_ptr->app_source, buffer);  
