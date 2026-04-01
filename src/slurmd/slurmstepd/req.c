@@ -137,6 +137,7 @@ static pthread_t *extern_threads = NULL;
 static pthread_mutex_t extern_thread_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t extern_thread_cond = PTHREAD_COND_INITIALIZER;
 #endif
+
 struct request_params {
 	int fd;
 	stepd_step_rec_t *step;
@@ -679,6 +680,12 @@ static int _handle_srun_node_fail(int fd, stepd_step_rec_t *step, uid_t uid)
 	int rc;
 	slurm_msg_t msg;
 	srun_node_fail_msg_t *request;
+#ifdef __METASTACK_BUG_STEPMGR_ASSIGN_FAULT_NODE
+	node_record_t *node_ptr = NULL;
+#endif
+#ifdef __METASTACK_BUG_STEPMGR_STEP_STUCK
+	job_record_t *job_ptr = NULL;
+#endif
 
 	if ((rc = _handle_stepmgr_relay_msg(fd, uid, &msg, SRUN_NODE_FAIL,
 					    false)))
@@ -686,6 +693,31 @@ static int _handle_srun_node_fail(int fd, stepd_step_rec_t *step, uid_t uid)
 
 	request = msg.data;
 	slurm_mutex_lock(&stepmgr_mutex);
+#ifdef __METASTACK_BUG_STEPMGR_ASSIGN_FAULT_NODE
+	if (request->nodelist) {
+		node_ptr = find_node_record(request->nodelist);
+	}
+#endif
+
+#ifdef __METASTACK_BUG_STEPMGR_STEP_STUCK
+	if (request->step_id.job_id) {
+		job_ptr = stepmgr_ops->find_job_record(request->step_id.job_id);
+	}
+	if (job_ptr && node_ptr && (job_ptr->kill_on_node_fail == 0)) {
+		stepmgr_auto_heal_node(job_ptr, request->nodelist);
+	}
+#endif
+
+#ifdef __METASTACK_BUG_STEPMGR_ASSIGN_FAULT_NODE
+	if (node_ptr && job_step_ptr && (job_step_ptr->kill_on_node_fail == 0)) {
+		debug("StepMgr: Handling --no-kill failure for node %s (idx %d). Clearing allocation bitmap.",
+			 request->nodelist, node_ptr->index);
+
+		if (job_step_ptr->node_bitmap) {
+			bit_clear(job_step_ptr->node_bitmap, node_ptr->index);
+		}
+	}
+#endif
 	srun_node_fail(job_step_ptr, request->nodelist);
 	slurm_mutex_unlock(&stepmgr_mutex);
 
@@ -1586,7 +1618,7 @@ static void *_wait_extern_pid(void *args)
 #ifdef __METASTACK_BUG_EXTERN_THREAD_FINISH
 	_block_on_pid(pid, step);
 #else
-	_block_on_pid(pid)
+	_block_on_pid(pid);
 #endif
 	//info("done with pid %d %d: %m", pid, rc);
 	jobacct = jobacct_gather_remove_task(pid);
@@ -1696,15 +1728,16 @@ static int _handle_add_extern_pid_internal(stepd_step_rec_t *step, pid_t pid)
 		return SLURM_ERROR;
 	}
 
-#ifdef __METASTACK_BUG_EXTERN_THREAD_FINISH
-	_wait_extern_thr_create(extern_pid);
-#else
+
 	if (xstrcasestr(slurm_conf.launch_params, "ulimit_pam_adopt"))
 		set_user_limits(step, pid);
-#endif
+#ifdef __METASTACK_BUG_EXTERN_THREAD_FINISH
+	/* spawn a thread that will wait on the pid given */
+	_wait_extern_thr_create(extern_pid);
+#else
 	/* spawn a thread that will wait on the pid given */
 	slurm_thread_create_detached(_wait_extern_pid, extern_pid);
-
+#endif
 	return SLURM_SUCCESS;
 }
 
@@ -1712,7 +1745,14 @@ static int _handle_add_extern_pid(int fd, stepd_step_rec_t *step, uid_t uid)
 {
 	int rc = SLURM_SUCCESS;
 	pid_t pid;
-
+#ifdef __METASTACK_BUG_EXTERN_THREAD_FINISH
+	slurm_mutex_lock(&step->state_mutex);
+	if (step->state >= SLURMSTEPD_STEP_CANCELLED) {
+		error("Rejecting request to add extern pid from uid %u because step is ending",
+		      uid);
+		goto rwfail;
+	}
+#endif
 	safe_read(fd, &pid, sizeof(pid_t));
 
 	if (!_slurm_authorized_user(uid)) {
@@ -1726,8 +1766,14 @@ static int _handle_add_extern_pid(int fd, stepd_step_rec_t *step, uid_t uid)
 	safe_write(fd, &rc, sizeof(int));
 
 	debug("Leaving _handle_add_extern_pid");
+#ifdef __METASTACK_BUG_EXTERN_THREAD_FINISH
+	slurm_mutex_unlock(&step->state_mutex);
+#endif
 	return SLURM_SUCCESS;
 rwfail:
+#ifdef __METASTACK_BUG_EXTERN_THREAD_FINISH
+	slurm_mutex_unlock(&step->state_mutex);
+#endif
 	return SLURM_ERROR;
 }
 
