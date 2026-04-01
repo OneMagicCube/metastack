@@ -208,6 +208,23 @@ slurm_delete_partition ( delete_part_msg_t * part_msg )
 	return _slurm_update ((void *) part_msg, REQUEST_DELETE_PARTITION);
 }
 
+#ifdef __METASTACK_OPT_APPTYPE_2  
+int slurm_create_app(app_desc_msg_t *app_msg)  
+{  
+	return _slurm_update((void *)app_msg, REQUEST_CREATE_APP);  
+}  
+  
+int slurm_update_app(app_desc_msg_t *app_msg)  
+{  
+	return _slurm_update((void *)app_msg, REQUEST_UPDATE_APP);  
+}  
+  
+int slurm_delete_app(delete_app_msg_t *app_msg)  
+{  
+	return _slurm_update((void *)app_msg, REQUEST_DELETE_APP);  
+}  
+#endif
+
 /*
  * slurm_create_reservation - create a new reservation, only usable by user root
  * IN resv_msg - description of reservation

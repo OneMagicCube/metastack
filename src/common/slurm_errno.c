@@ -710,6 +710,24 @@ slurm_errtab_t slurm_errtab[] = {
 	{ ERRTAB_ENTRY(ESLURMD_INVALID_WATCH_DOG),
 	  "The specified watch dog script is invalid"},
 #endif
+#ifdef __METASTACK_OPT_APPTYPE_2  
+	{ ESLURM_INVALID_APP_NAME,  
+	  "ESLURM_INVALID_APP_NAME",  
+	  "Invalid app name or version specified"  
+	},  
+	{ ESLURM_APP_ALREADY_EXISTS,  
+	  "ESLURM_APP_ALREADY_EXISTS",  
+	  "App already exists"  
+	},  
+	{ ESLURM_APP_NOT_FOUND,  
+	  "ESLURM_APP_NOT_FOUND",  
+	  "App not found"  
+	},
+	{ ESLURM_INVALID_APP_WATCHDOG,  
+	"ESLURM_INVALID_APP_WATCHDOG",  
+	"Specified watchdog does not exist"  
+	},
+#endif
 };
 
 unsigned int slurm_errtab_size = sizeof(slurm_errtab) / sizeof(slurm_errtab_t);

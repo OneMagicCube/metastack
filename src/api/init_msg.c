@@ -98,6 +98,9 @@ void slurm_init_job_desc_msg(job_desc_msg_t * job_desc_msg)
 	job_desc_msg->user_id = SLURM_AUTH_NOBODY;
 	job_desc_msg->wait_all_nodes	= NO_VAL16;
 	job_desc_msg->wait4switch	= NO_VAL;
+#ifdef __METASTACK_OPT_APPTYPE_3  
+	job_desc_msg->app_source = 0xff; /* not set */  
+#endif
 }
 
 /*

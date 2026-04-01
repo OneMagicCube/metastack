@@ -3425,6 +3425,9 @@ function __scontrol_create() {
 		"partitionname="
 		"reservation "
 		"reservationname="
+#ifdef __METASTACK_OPT_APPTYPE_2 
+		"app "  
+#endif
 	)
 	local param
 	param="$(__slurm_find_param "${parameters[*]}")"
@@ -3448,6 +3451,9 @@ function __scontrol_delete() {
 		"nodename="
 		"partitionname="
 		"reservationname="
+#ifdef __METASTACK_OPT_APPTYPE_2 
+		"app="  
+#endif
 	)
 	local param
 	param="$(__slurm_find_param "${parameters[*]}")"
@@ -3887,6 +3893,9 @@ function __scontrol_show() {
 		"slurmd"
 		"steps"
 		"topology"
+#ifdef __METASTACK_OPT_APPTYPE_2
+		"app"
+#endif
 	)
 	local subcmd
 	subcmd="$(__slurm_find_subcmd "${subcmds[*]}")"
@@ -4459,6 +4468,9 @@ function __scontrol_update() {
 		"suspendexcstates="
 		"suspendexcstates\+="
 		"suspendexcstates\-="
+#ifdef __METASTACK_OPT_APPTYPE_2
+		"app="
+#endif
 	)
 	local param
 	param="$(__slurm_find_param "${parameters[*]}")"
