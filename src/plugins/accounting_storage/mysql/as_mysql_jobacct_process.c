@@ -1446,9 +1446,12 @@ no_resv:
 			xstrcat(*extra, " where (");  
 		itr = list_iterator_create(job_cond->appname_list);  
 		while ((object = list_next(itr))) {  
+			char *esc_obj = slurm_add_slash_to_quotes(object);  
 			if (set)  
 				xstrcat(*extra, " || ");  
-			xstrfmtcat(*extra, "t5.apptype='%s'", object);  
+			xstrfmtcat(*extra, "t5.apptype='%s'",  
+				   esc_obj ? esc_obj : "");  
+			xfree(esc_obj);  
 			set = 1;  
 		}  
 		list_iterator_destroy(itr);  
@@ -1464,9 +1467,12 @@ no_resv:
 			xstrcat(*extra, " where (");  
 		itr = list_iterator_create(job_cond->appversion_list);  
 		while ((object = list_next(itr))) {  
+			char *esc_obj = slurm_add_slash_to_quotes(object);  
 			if (set)  
 				xstrcat(*extra, " || ");  
-			xstrfmtcat(*extra, "t5.apptype_version='%s'", object);  
+			xstrfmtcat(*extra, "t5.apptype_version='%s'",  
+				   esc_obj ? esc_obj : "");  
+			xfree(esc_obj);  
 			set = 1;  
 		}  
 		list_iterator_destroy(itr);  

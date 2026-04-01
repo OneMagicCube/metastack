@@ -832,10 +832,13 @@ no_rollup_change:
 
 	xfree(query);
 
-#ifdef __METASTACK_OPT_APP_5
+#ifdef __METASTACK_OPT_APP_5  
 	/* Insert/update apptype record into job_app_table */  
 	if (rc == SLURM_SUCCESS && job_ptr->db_index  
 	    && job_ptr->app_name && job_ptr->app_name[0]) {  
+		char *esc_app_name = slurm_add_slash_to_quotes(job_ptr->app_name);  
+		char *esc_app_version = slurm_add_slash_to_quotes(job_ptr->app_version);  
+  
 		query = xstrdup_printf(  
 			"insert into \"%s_%s\" "  
 			"(job_db_inx, apptype, apptype_version, source, mod_time) "  
@@ -845,18 +848,22 @@ no_rollup_change:
 			"source=%u, mod_time=UNIX_TIMESTAMP()",  
 			mysql_conn->cluster_name, job_app_table,  
 			job_ptr->db_index,  
-			job_ptr->app_name,  
-			job_ptr->app_version ? job_ptr->app_version : "",  
+			esc_app_name ? esc_app_name : "",  
+			esc_app_version ? esc_app_version : "",  
 			job_ptr->app_source,  
-			job_ptr->app_name,  
-			job_ptr->app_version ? job_ptr->app_version : "",  
+			esc_app_name ? esc_app_name : "",  
+			esc_app_version ? esc_app_version : "",  
 			job_ptr->app_source);  
+  
+		xfree(esc_app_name);  
+		xfree(esc_app_version);  
+  
 		DB_DEBUG(DB_JOB, mysql_conn->conn,  
 			 "apptype query\n%s", query);  
 		rc = mysql_db_query(mysql_conn, query);  
 		xfree(query);  
-	}
-#endif  
+	}  
+#endif
 
 	if (rc != SLURM_SUCCESS)
 		return rc;
