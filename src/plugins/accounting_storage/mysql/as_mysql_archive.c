@@ -5378,6 +5378,12 @@ static int _execute_archive(mysql_conn_t *mysql_conn,
 					    job_env_table, job_table,
 					    "env_hash_inx")))
 			return rc;
+#ifdef __METASTACK_OPT_APPTYPE_5
+		/* Purge orphaned apptype records */  
+		if ((rc = _purge_apptype_table(mysql_conn, cluster_name,  
+					       job_apptype_table, job_table)))  
+			return rc;  
+#endif
 	}
 
 	if (arch_cond->purge_resv != NO_VAL) {

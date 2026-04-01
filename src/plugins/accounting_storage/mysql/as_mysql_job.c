@@ -832,6 +832,32 @@ no_rollup_change:
 
 	xfree(query);
 
+#ifdef __METASTACK_OPT_APPTYPE_5
+	/* Insert/update apptype record into job_apptype_table */  
+	if (rc == SLURM_SUCCESS && job_ptr->db_index  
+	    && job_ptr->app_name && job_ptr->app_name[0]) {  
+		query = xstrdup_printf(  
+			"insert into \"%s_%s\" "  
+			"(job_db_inx, apptype, apptype_version, source, mod_time) "  
+			"values (%"PRIu64", '%s', '%s', %u, UNIX_TIMESTAMP()) "  
+			"on duplicate key update "  
+			"apptype='%s', apptype_version='%s', "  
+			"source=%u, mod_time=UNIX_TIMESTAMP()",  
+			mysql_conn->cluster_name, job_apptype_table,  
+			job_ptr->db_index,  
+			job_ptr->app_name,  
+			job_ptr->app_version ? job_ptr->app_version : "",  
+			job_ptr->app_source,  
+			job_ptr->app_name,  
+			job_ptr->app_version ? job_ptr->app_version : "",  
+			job_ptr->app_source);  
+		DB_DEBUG(DB_JOB, mysql_conn->conn,  
+			 "apptype query\n%s", query);  
+		rc = mysql_db_query(mysql_conn, query);  
+		xfree(query);  
+	}
+#endif  
+
 	if (rc != SLURM_SUCCESS)
 		return rc;
 

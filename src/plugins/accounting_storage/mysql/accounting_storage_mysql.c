@@ -163,6 +163,9 @@ char *wckey_day_table = "wckey_usage_day_table";
 char *wckey_hour_table = "wckey_usage_hour_table";
 char *wckey_month_table = "wckey_usage_month_table";
 char *wckey_table = "wckey_table";
+#ifdef __METASTACK_OPT_APPTYPE_5
+char *job_apptype_table = "job_apptype_table";  
+#endif
 
 char *event_view = "event_view";
 char *event_ext_view = "event_ext_view";
@@ -1547,6 +1550,20 @@ extern int create_cluster_tables(mysql_conn_t *mysql_conn, char *cluster_name)
 		{ NULL, NULL}
 	};
 
+#ifdef __METASTACK_OPT_APPTYPE_5
+	storage_field_t job_apptype_table_fields[] = {  
+		{ "job_db_inx", "bigint unsigned not null" },  
+		{ "apptype", "varchar(128) not null default ''" },  
+		{ "apptype_version", "varchar(64) not null default ''" },  
+		{ "apptype_runtime", "tinytext not null default ''" },  
+		{ "source", "tinyint default 0 not null" },  
+		{ "mod_time", "bigint unsigned default 0 not null" },  
+		{ "extra", "text not null default ''" },  
+		{ "deleted", "tinyint default 0 not null" },  
+		{ NULL, NULL}  
+	};  
+#endif
+
 	char table_name[200];
 
 	if (create_cluster_assoc_table(mysql_conn, cluster_name)
@@ -1675,6 +1692,17 @@ extern int create_cluster_tables(mysql_conn_t *mysql_conn, char *cluster_name)
 	    == SLURM_ERROR)
 		return SLURM_ERROR;
 
+#ifdef __METASTACK_OPT_APPTYPE_5
+	snprintf(table_name, sizeof(table_name), "\"%s_%s\"",  
+		 cluster_name, job_apptype_table);  
+	if (mysql_db_create_table(mysql_conn, table_name,  
+				  job_apptype_table_fields,  
+				  ", primary key (job_db_inx), "  
+				  "key idx_apptype (apptype))")  
+	    == SLURM_ERROR)  
+		return SLURM_ERROR;  
+#endif
+
 	snprintf(table_name, sizeof(table_name), "\"%s_%s\"",
 		 cluster_name, last_ran_table);
 	if (mysql_db_create_table(mysql_conn, table_name,
@@ -1800,6 +1828,9 @@ extern int remove_cluster_tables(mysql_conn_t *mysql_conn, char *cluster_name)
 #ifdef __METASTACK_NEW_AUTO_SUPPLEMENT_AVAIL_NODES
 		   "\"%s_%s\", "
 #endif
+#ifdef __METASTACK_OPT_APPTYPE_5
+		   "\"%s_%s\", "  
+#endif
 		   "\"%s_%s\", \"%s_%s\", \"%s_%s\", \"%s_%s\";",
 		   cluster_name, assoc_table,
 		   cluster_name, assoc_day_table,
@@ -1819,6 +1850,9 @@ extern int remove_cluster_tables(mysql_conn_t *mysql_conn, char *cluster_name)
 		   cluster_name, resv_table,
 		   cluster_name, step_table,
 		   cluster_name, suspend_table,
+#ifdef __METASTACK_OPT_APPTYPE_5
+		   cluster_name, job_apptype_table,  
+#endif
 		   cluster_name, wckey_table,
 		   cluster_name, wckey_day_table,
 		   cluster_name, wckey_hour_table,

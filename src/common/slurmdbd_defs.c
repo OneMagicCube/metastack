@@ -1208,6 +1208,10 @@ extern void slurmdbd_free_job_start_msg(void *in)
 		xfree(msg->tres_req_str);
 		xfree(msg->wckey);
 		xfree(msg->work_dir);
+#ifdef __METASTACK_OPT_APPTYPE_5 
+		xfree(msg->app_name);  
+		xfree(msg->app_version);  
+#endif
 		xfree(msg);
 	}
 }
