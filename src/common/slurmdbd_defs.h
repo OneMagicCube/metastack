@@ -156,9 +156,6 @@ typedef enum {
 	DBD_JOB_HEAVY,         /* Send job script/env  		*/
 	DBD_GOT_JOB_ENV,	/* Loading env hash table*/
 	DBD_GOT_JOB_SCRIPT,	/* #1450, Loading bash script hash table */
-#ifdef __METASTACK_OPT_APP_5  
-	DBD_GOT_JOB_APP,  
-#endif
 	DBD_ADD_ACCOUNTS_COND,  /* Add new account to the mix with acct_rec and
 				 * add_assoc_cond */
 	DBD_ADD_USERS_COND,     /* Add new user to the mix with user_rec and
