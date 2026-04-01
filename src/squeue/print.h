@@ -335,7 +335,9 @@ int _print_job_het_job_offset(job_info_t * job, int width,
 			      bool right_justify, char* suffix);
 int _print_job_het_job_id_set(job_info_t * job, int width,
 			      bool right_justify, char* suffix);
-
+#ifdef __METASTACK_OPT_APPTYPE_4  
+int _print_job_app(job_info_t *job, int width, bool right_justify, char *suffix);
+#endif
 
 /*****************************************************************************
  * Step Print Format Functions

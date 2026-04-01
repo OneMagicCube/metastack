@@ -2989,6 +2989,35 @@ int _print_step_tres_per_task(job_step_info_t * step, int width, bool right,
 	return SLURM_SUCCESS;
 }
 
+#ifdef __METASTACK_OPT_APPTYPE_4  
+/*  
+ * _print_job_app - print combined app name-version for squeue  
+ * Format: "vasp-5.7.1" or "vasp" (if no version) or empty  
+ */  
+int _print_job_app(job_info_t *job, int width, bool right_justify,  
+		   char *suffix)  
+{  
+	if (job == NULL) {  
+		/* Print the Header */  
+		_print_str("APP", width, right_justify, true);  
+	} else {  
+		char *app_str = NULL;  
+		if (job->app_name && job->app_name[0]) {  
+			if (job->app_version && job->app_version[0])  
+				xstrfmtcat(app_str, "%s-%s",  
+					   job->app_name, job->app_version);  
+			else  
+				app_str = xstrdup(job->app_name);  
+		}  
+		_print_str(app_str ? app_str : "", width, right_justify, true);  
+		xfree(app_str);  
+	}  
+	if (suffix)  
+		printf("%s", suffix);  
+	return SLURM_SUCCESS;  
+}  
+#endif
+
 /*
  * Filter job records per input specifications.
  * Returns true if the job should be filtered out (not printed).

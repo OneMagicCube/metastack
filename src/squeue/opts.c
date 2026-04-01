@@ -1067,6 +1067,9 @@ static fmt_data_job_t fmt_data_job[] = {
 #ifdef __METASTACK_NEW_PENDING_ORDER
 	{"Order", 0, _print_job_order, 0},
 #endif
+#ifdef __METASTACK_OPT_APPTYPE_4  
+	{"App", 0, _print_job_app, 0},  
+#endif 
 	{NULL, 0, NULL, 0},
 };
 

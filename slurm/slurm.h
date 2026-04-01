@@ -615,6 +615,7 @@ typedef struct sbcast_cred sbcast_cred_t;		/* opaque data type */
 #define __METASTACK_OPT_APPTYPE_1 // slurmctld reads the app conf
 #define __METASTACK_OPT_APPTYPE_2 // scontrol crud for app config
 #define __METASTACK_OPT_APPTYPE_3 // add --app --app-version --app-name
+#define __METASTACK_OPT_APPTYPE_4 // squeue and scontrol show jobs app info
 #endif
 
 /*****************************************************************************\
