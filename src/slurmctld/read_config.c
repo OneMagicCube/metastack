@@ -1270,7 +1270,9 @@ static int _build_all_app_info(void)
 #endif
 
 #ifdef __METASTACK_OPT_APP_2  
-  
+
+#define APP_STATE_VERSION "METASTACK_APP_STATE_001"
+
 typedef struct {  
 	buf_t *buffer;  
 	uint32_t apps_packed;  
@@ -1282,7 +1284,7 @@ void pack_app(app_record_t *app_ptr, buf_t *buffer,
               uint16_t protocol_version)  
 {  
 #ifdef __META_PROTOCOL  
-	if (protocol_version >= META_3_0_PROTOCOL_VERSION) {  
+	if (protocol_version >= META_3_2_PROTOCOL_VERSION) {  
 		packstr(app_ptr->app_name, buffer);  
 		packstr(app_ptr->version, buffer);  
 		packstr(app_ptr->description, buffer);  
@@ -1300,6 +1302,248 @@ static int _pack_app(void *object, void *arg)
 	pack_info->apps_packed++;  
 	return SLURM_SUCCESS;  
 }  
+
+/*  
+ * dump_all_app_state - save the state of all app records to file  
+ *   for later recovery upon restart.  
+ * RET 0 or error code  
+ */  
+extern int dump_all_app_state(void)  
+{  
+	int error_code = 0, log_fd;  
+	char *old_file, *new_file, *reg_file;  
+	slurmctld_lock_t app_read_lock = {  
+		READ_LOCK, NO_LOCK, NO_LOCK, NO_LOCK, NO_LOCK };  
+	buf_t *buffer = init_buf(BUF_SIZE);  
+	DEF_TIMERS;  
+  
+	START_TIMER;  
+  
+	/* write header */  
+	packstr(APP_STATE_VERSION, buffer);  
+	pack16(SLURM_PROTOCOL_VERSION, buffer);  
+	pack_time(time(NULL), buffer);  
+  
+	/* write app records to buffer */  
+	lock_slurmctld(app_read_lock);  
+	if (app_list) {  
+		list_itr_t *iter = list_iterator_create(app_list);  
+		app_record_t *app_ptr;  
+		while ((app_ptr = list_next(iter)))  
+			pack_app(app_ptr, buffer, SLURM_PROTOCOL_VERSION);  
+		list_iterator_destroy(iter);  
+	}  
+	unlock_slurmctld(app_read_lock);  
+  
+	/* write the buffer to file */  
+	old_file = xstrdup(slurm_conf.state_save_location);  
+	xstrcat(old_file, "/app_state.old");  
+	reg_file = xstrdup(slurm_conf.state_save_location);  
+	xstrcat(reg_file, "/app_state");  
+	new_file = xstrdup(slurm_conf.state_save_location);  
+	xstrcat(new_file, "/app_state.new");  
+  
+	lock_state_files();  
+	log_fd = creat(new_file, 0600);  
+	if (log_fd < 0) {  
+		error("Can't save state, error creating file %s, %m",  
+		      new_file);  
+		error_code = errno;  
+	} else {  
+		int pos = 0, nwrite = get_buf_offset(buffer), amount, rc;  
+		char *data = (char *)get_buf_data(buffer);  
+  
+		while (nwrite > 0) {  
+			amount = write(log_fd, &data[pos], nwrite);  
+			if ((amount < 0) && (errno != EINTR)) {  
+				error("Error writing file %s, %m", new_file);  
+				error_code = errno;  
+				break;  
+			}  
+			nwrite -= amount;  
+			pos    += amount;  
+		}  
+		rc = fsync_and_close(log_fd, "app");  
+		if (rc && !error_code)  
+			error_code = rc;  
+	}  
+	if (error_code)  
+		(void)unlink(new_file);  
+	else {	/* file shuffle */  
+		(void)unlink(old_file);  
+		if (link(reg_file, old_file))  
+			debug4("unable to create link for %s -> %s: %m",  
+			       reg_file, old_file);  
+		(void)unlink(reg_file);  
+		if (link(new_file, reg_file))  
+			debug4("unable to create link for %s -> %s: %m",  
+			       new_file, reg_file);  
+		(void)unlink(new_file);  
+	}  
+	xfree(old_file);  
+	xfree(reg_file);  
+	xfree(new_file);  
+	unlock_state_files();  
+  
+	FREE_NULL_BUFFER(buffer);  
+	END_TIMER2(__func__);  
+	return error_code;  
+}
+
+/* Open the app state save file, or backup if necessary. */  
+static buf_t *_open_app_state_file(char **state_file)  
+{  
+	buf_t *buf;  
+  
+	*state_file = xstrdup(slurm_conf.state_save_location);  
+	xstrcat(*state_file, "/app_state");  
+	if (!(buf = create_mmap_buf(*state_file)))  
+		error("Could not open app state file %s: %m",  
+		      *state_file);  
+	else  
+		return buf;  
+  
+	error("NOTE: Trying backup app state save file. "  
+	      "App config changes may be lost");  
+	xstrcat(*state_file, ".old");  
+	return create_mmap_buf(*state_file);  
+}  
+  
+/*  
+ * load_all_app_state - Load app configuration state from file.  
+ *   On recover >= 1: replaces config-loaded app_list with state file data.  
+ *   On recover == 0: does nothing (config file is authoritative on reconfigure).  
+ * IN recover - 0 = reconfigure (skip state load)  
+ *              1+ = recover state from disk  
+ * RET SLURM_SUCCESS or error code  
+ */  
+extern int load_all_app_state(int recover)  
+{  
+	char *state_file, *ver_str = NULL;  
+	time_t now;  
+	int error_code = 0;  
+	buf_t *buffer;  
+	uint16_t protocol_version = NO_VAL16;  
+	app_record_t tmp_app;  
+	int app_count = 0;  
+  
+	/* On reconfigure (recover == 0), only load state file if  
+	* RECONFIG_KEEP_APPTYPE_INFO is set — otherwise discard  
+	* dynamic changes and use config file only. */  
+	if (recover == 0 &&  
+		!(slurm_conf.reconfig_flags & RECONFIG_KEEP_APPTYPE_INFO)) {  
+		debug("Restoring app state from state file disabled");  
+		schedule_app_save();  /* 保留：将配置文件加载的数据写入 state 文件 */  
+		return SLURM_SUCCESS;  
+	}  
+	
+	/* recover >= 1 (startup): always try to load state file.  
+	* recover == 0 with KEEP_APPTYPE_INFO: also load state file. */
+  
+	/* read the file */  
+	lock_state_files();  
+	if (!(buffer = _open_app_state_file(&state_file))) {  
+		info("No app state file (%s) to recover",  
+		     state_file);  
+		xfree(state_file);  
+		unlock_state_files();  
+		return ENOENT;  
+	}  
+	xfree(state_file);  
+	unlock_state_files();  
+  
+	safe_unpackstr(&ver_str, buffer);  
+	debug3("Version string in app_state header is %s", ver_str);  
+	if (ver_str && !xstrcmp(ver_str, APP_STATE_VERSION))  
+		safe_unpack16(&protocol_version, buffer);  
+  
+	if (protocol_version == NO_VAL16) {  
+		if (!ignore_state_errors)  
+			fatal("Can not recover app state, data version "  
+			      "incompatible, start with '-i' to ignore this.");  
+		error("*****************************************************");  
+		error("Can not recover app state, data version incompatible");  
+		error("*****************************************************");  
+		xfree(ver_str);  
+		FREE_NULL_BUFFER(buffer);  
+		schedule_app_save();	/* Schedule save with new format */  
+		return EFAULT;  
+	}  
+	xfree(ver_str);  
+	safe_unpack_time(&now, buffer);  
+  
+	/*  
+	 * Clear the config-loaded app_list and rebuild from state file.  
+	 * This ensures dynamically created/modified/deleted apps are preserved.  
+	 */  
+	init_app_conf();  
+  
+	while (remaining_buf(buffer) > 0) {  
+		memset(&tmp_app, 0, sizeof(tmp_app));  
+  
+#ifdef __META_PROTOCOL  
+		if (protocol_version >= META_3_2_PROTOCOL_VERSION) {  
+			safe_unpackstr(&tmp_app.app_name, buffer);  
+			if (tmp_app.app_name == NULL)  
+				tmp_app.app_name = xmalloc(1);  
+			safe_unpackstr(&tmp_app.version, buffer);  
+			safe_unpackstr(&tmp_app.description, buffer);  
+			safe_unpackstr(&tmp_app.watchdog, buffer);  
+			safe_unpackbool(&tmp_app.default_flag, buffer);  
+		} else {  
+			goto unpack_error;  
+		}  
+#else  
+		goto unpack_error;  
+#endif  
+  
+		/* Rebuild the app record */  
+		app_record_t *app_ptr = create_app_record(  
+			tmp_app.app_name, tmp_app.version);  
+		if (app_ptr) {  
+			if (tmp_app.description)  
+				app_ptr->description =  
+					xstrdup(tmp_app.description);  
+			if (tmp_app.watchdog)  
+				app_ptr->watchdog =  
+					xstrdup(tmp_app.watchdog);  
+			app_ptr->default_flag = tmp_app.default_flag;  
+  
+			if (tmp_app.default_flag) {  
+				xfree(default_app_name);  
+				xstrfmtcat(default_app_name, "%s-%s",  
+					   app_ptr->app_name,  
+					   app_ptr->version);  
+				default_app_loc = app_ptr;  
+			}  
+			app_count++;  
+		}  
+  
+		/* Free temporary strings */  
+		xfree(tmp_app.app_name);  
+		xfree(tmp_app.version);  
+		xfree(tmp_app.description);  
+		xfree(tmp_app.watchdog);  
+	}  
+  
+	info("Recovered state of %d app records", app_count);  
+	FREE_NULL_BUFFER(buffer);  
+	last_app_update = time(NULL);  
+	return error_code;  
+  
+unpack_error:  
+	if (!ignore_state_errors)  
+		fatal("Incomplete app data checkpoint file, start with "  
+		      "'-i' to ignore this.");  
+	error("Incomplete app data checkpoint file");  
+	xfree(tmp_app.app_name);  
+	xfree(tmp_app.version);  
+	xfree(tmp_app.description);  
+	xfree(tmp_app.watchdog);  
+	info("Recovered state of %d app records", app_count);  
+	FREE_NULL_BUFFER(buffer);  
+	return EFAULT;  
+}
   
 extern buf_t *pack_all_app(uid_t uid, uint16_t protocol_version)  
 {  
@@ -1382,7 +1626,8 @@ extern int update_app(app_desc_msg_t *app_desc, bool create_flag)
 			           app_ptr->app_name, app_ptr->version);  
 			default_app_loc = app_ptr;  
 		}  
-		last_app_update = time(NULL);  
+		last_app_update = time(NULL);
+		schedule_app_save();
 		info("App created: %s-%s", app_ptr->app_name, app_ptr->version);  
 	} else {  
 		/* update existing */  
@@ -1417,7 +1662,8 @@ extern int update_app(app_desc_msg_t *app_desc, bool create_flag)
 				}  
 			}  
 		}  
-		last_app_update = time(NULL);  
+		last_app_update = time(NULL);
+		schedule_app_save();
 		info("App updated: %s-%s", app_ptr->app_name, app_ptr->version);  
 	}  
 	return SLURM_SUCCESS;  
@@ -1451,7 +1697,8 @@ extern int delete_app(delete_app_msg_t *app_msg)
 	find_key[0] = app_ptr->app_name;  
 	find_key[1] = app_ptr->version;  
 	list_delete_first(app_list, &list_find_app, find_key);  
-	last_app_update = time(NULL);  
+	last_app_update = time(NULL);
+	schedule_app_save();
   
 	info("App deleted: %s", app_msg->name);  
 	return SLURM_SUCCESS;  
@@ -2631,16 +2878,18 @@ extern int read_slurm_conf(int recover)
 #endif
 
 #ifdef __METASTACK_OPT_APP_2  
-	if ((recover >= 1) && (slurm_conf.reconfig_flags & RECONFIG_KEEP_APPTYPE_INFO)) {  
-		info("Preserving app configuration (KeepApptypeInfo)");  
-	} else {  
-		if (app_list)  
-			list_flush(app_list);  
-		_build_all_app_info();  
-	}  
-#elif defined(__METASTACK_OPT_APP_1)  
+	/* Always load app config from configuration file first */  
+	if (app_list)  
+		list_flush(app_list);  
 	_build_all_app_info();  
+  
+	/* Then optionally overlay state file data.  
+	 * On startup (recover >= 1): always restore from state file.  
+	 * On reconfigure (recover == 0): only restore if  
+	 *   RECONFIG_KEEP_APPTYPE_INFO is set. */  
+	(void)load_all_app_state(recover);  
 #endif
+
 	restore_front_end_state(recover);
 
 	/*

@@ -389,6 +389,19 @@ extern char *default_app_name;          /* combined name of default app, e.g. "g
 extern app_record_t *default_app_loc;   /* pointer to default app record */  
 #endif
 
+#ifdef __METASTACK_OPT_APP_2  
+/* Save the state of all app records to file */  
+extern int dump_all_app_state(void);  
+  
+/*  
+ * Load app state from file, recover on slurmctld restart.  
+ * IN recover - 0 = use config file only (reconfigure)  
+ *              1+ = recover saved state from disk  
+ * RET SLURM_SUCCESS or error code  
+ */  
+extern int load_all_app_state(int recover);  
+#endif
+
 #ifdef __METASTACK_OPT_HIGH_THROUGHPUT_SRUN_JOB_COM
 extern bool ignore_srun_job_complete;
 #endif

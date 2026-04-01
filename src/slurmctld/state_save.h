@@ -58,6 +58,11 @@ extern void schedule_resv_save(void);
 /* Queue saving of trigger state information */
 extern void schedule_trigger_save(void);
 
+#ifdef __METASTACK_OPT_APP_2  
+/* Queue saving of app configuration state information */  
+extern void schedule_app_save(void);  
+#endif
+
 /* shutdown the slurmctld_state_save thread */
 extern void shutdown_state_save(void);
 
