@@ -2989,7 +2989,7 @@ int _print_step_tres_per_task(job_step_info_t * step, int width, bool right,
 	return SLURM_SUCCESS;
 }
 
-#ifdef __METASTACK_OPT_APPTYPE_4  
+#ifdef __METASTACK_OPT_APP_4  
 /*  
  * _print_job_app - print combined app name-version for squeue  
  * Format: "vasp-5.7.1" or "vasp" (if no version) or empty  

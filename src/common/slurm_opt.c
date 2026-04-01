@@ -1050,7 +1050,7 @@ static slurm_cli_opt_t slurm_opt_apptype = {
 };
 #endif
 
-#ifdef __METASTACK_OPT_APPTYPE_3  
+#ifdef __METASTACK_OPT_APP_3  
 static int arg_set_app(slurm_opt_t *opt, const char *arg)  
 {  
 	xfree(opt->app);  
@@ -6125,7 +6125,7 @@ static const slurm_cli_opt_t *common_options[] = {
 	&slurm_opt_submit_line,
 	&slurm_opt_apptype,
 #endif
-#ifdef __METASTACK_OPT_APPTYPE_3  
+#ifdef __METASTACK_OPT_APP_3  
 	&slurm_opt_app,  
 #endif
 	NULL /* END */
@@ -8080,7 +8080,7 @@ extern job_desc_msg_t *slurm_opt_create_job_desc(slurm_opt_t *opt_local,
 	xfmt_tres(&job_desc->tres_per_socket, "gres/npu",
 				opt_local->npus_per_socket);
 #endif
-#ifdef __METASTACK_OPT_APPTYPE_3  
+#ifdef __METASTACK_OPT_APP_3  
 	job_desc->app = xstrdup(opt_local->app);  
 #endif
 

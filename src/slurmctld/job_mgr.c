@@ -3871,7 +3871,7 @@ extern job_record_t *job_array_split(job_record_t *job_ptr)
 	job_ptr_pend->user_name = xstrdup(job_ptr->user_name);
 	job_ptr_pend->wckey = xstrdup(job_ptr->wckey);
 	job_ptr_pend->deadline = job_ptr->deadline;
-#ifdef __METASTACK_OPT_APPTYPE_3  
+#ifdef __METASTACK_OPT_APP_3  
 	job_ptr_pend->app_name = xstrdup(job_ptr->app_name);  
 	job_ptr_pend->app_version = xstrdup(job_ptr->app_version);  
 	job_ptr_pend->app_source = job_ptr->app_source;  
@@ -7808,7 +7808,7 @@ static int _job_create(job_desc_msg_t *job_desc, int allocate, int will_run,
 
 #endif
 
-#ifdef __METASTACK_OPT_APPTYPE_3  
+#ifdef __METASTACK_OPT_APP_3  
     /* Validate --app and auto-fill app_name, app_version */  
     if (job_desc->app && job_desc->app[0]) {  
         /* User explicitly specified --app=xxx */  
@@ -9260,7 +9260,7 @@ static int _copy_job_desc_to_job_record(job_desc_msg_t *job_desc,
 	job_ptr->warn_signal = job_desc->warn_signal;
 	job_ptr->warn_time   = job_desc->warn_time;
 
-#ifdef __METASTACK_OPT_APPTYPE_3  
+#ifdef __METASTACK_OPT_APP_3  
 	job_ptr->app_name = xstrdup(job_desc->app_name);  
 	job_ptr->app_version = xstrdup(job_desc->app_version);  
 	job_ptr->app_source = job_desc->app_source;  
@@ -11802,7 +11802,7 @@ void pack_job(job_record_t *dump_job_ptr, uint16_t show_flags, buf_t *buffer,
 #ifdef __METASTACK_NEW_TIME_PREDICT
 		pack16(dump_job_ptr->predict_job, buffer);
 #endif
-#ifdef __METASTACK_OPT_APPTYPE_3  
+#ifdef __METASTACK_OPT_APP_3  
 		packstr(dump_job_ptr->app_name, buffer);  
 		packstr(dump_job_ptr->app_version, buffer);  
 		pack8(dump_job_ptr->app_source, buffer);  

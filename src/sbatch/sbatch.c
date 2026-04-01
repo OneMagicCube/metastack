@@ -131,7 +131,7 @@ int main(int argc, char **argv)
 		logopt.prefix_level = 1;
 		log_alter(logopt, 0, NULL);
 	}
-#ifdef __METASTACK_OPT_APPTYPE_3  
+#ifdef __METASTACK_OPT_APP_3  
 	/* Handle --app=list: print preset app list and exit.  
 	 * Must be before _get_script_buffer() which blocks on STDIN  
 	 * when no script file is given. */  

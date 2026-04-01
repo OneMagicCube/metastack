@@ -67,9 +67,9 @@ extern "C" {
 #define __METASTACK_OPT_HIGH_THROUGHPUT_TERMNAL_JOB_MESSAGE
 #endif
 
-#ifndef __METASTACK_OPT_APPTYPE
-#define __METASTACK_OPT_APPTYPE_1
-#define __METASTACK_OPT_APPTYPE_2 
+#ifndef __METASTACK_OPT_APP
+#define __METASTACK_OPT_APP_1
+#define __METASTACK_OPT_APP_2 
 #endif
 /* set errno to the specified value - then return -1 */
 #define slurm_seterrno_ret(errnum) do { \
@@ -425,7 +425,7 @@ typedef enum {
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
 	ESLURMD_INVALID_WATCH_DOG,
 #endif
-#ifdef __METASTACK_OPT_APPTYPE_2  
+#ifdef __METASTACK_OPT_APP_2  
 	ESLURM_INVALID_APP_NAME,  
 	ESLURM_APP_ALREADY_EXISTS,  
 	ESLURM_APP_NOT_FOUND,

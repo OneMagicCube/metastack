@@ -1682,7 +1682,7 @@ extern void slurm_free_job_desc_msg(job_desc_msg_t *msg)
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
 		xfree(msg->apptype);
 #endif
-#ifdef __METASTACK_OPT_APPTYPE_3  
+#ifdef __METASTACK_OPT_APP_3  
 		xfree(msg->app);  
 		xfree(msg->app_name);  
 		xfree(msg->app_version);  
@@ -1907,7 +1907,7 @@ extern void slurm_free_job_info_members(job_info_t * job)
 		xfree(job->user_name);
 		xfree(job->wckey);
 		xfree(job->work_dir);
-#ifdef __METASTACK_OPT_APPTYPE_3  
+#ifdef __METASTACK_OPT_APP_3  
 		xfree(job->app_name);  
 		xfree(job->app_version);  
 #endif
@@ -4253,7 +4253,7 @@ extern void slurm_free_ctl_conf_watch_dog(slurm_ctl_conf_info_msg_watch_dog_t * 
 
 #endif
 
-#ifdef __METASTACK_OPT_APPTYPE_2  
+#ifdef __METASTACK_OPT_APP_2  
 extern void slurm_free_app_info_members(app_record_t *app)  
 {  
 	if (app) {  
@@ -5571,7 +5571,7 @@ extern int slurm_free_msg_data(slurm_msg_type_t type, void *data)
 	case RESPONSE_NODE_ALIAS_ADDRS:
 		slurm_free_node_alias_addrs(data);
 		break;
-#ifdef __METASTACK_OPT_APPTYPE_2  
+#ifdef __METASTACK_OPT_APP_2  
 	case REQUEST_CREATE_APP:  
 	case REQUEST_UPDATE_APP:  
 		slurm_free_app_desc_msg(data);  

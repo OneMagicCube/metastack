@@ -1100,7 +1100,7 @@ slurm_sprint_job_info ( job_info_t * job_ptr, int one_liner )
 	}
 
 	xstrcat(out, line_end);
-#ifdef __METASTACK_OPT_APPTYPE_4  
+#ifdef __METASTACK_OPT_APP_4  
 	/****** Line: App Info ******/  
 	if (job_ptr->app_name && job_ptr->app_name[0]) {  
 		char *app_combined = NULL;  

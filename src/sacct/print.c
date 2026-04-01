@@ -2235,7 +2235,7 @@ extern void print_fields(type_t type, void *object)
 					     (curr_inx == field_count));
 			break;
 #endif
-#ifdef __METASTACK_OPT_APPTYPE_6  
+#ifdef __METASTACK_OPT_APP_6  
 		case PRINT_APPNAME:  
 			switch(type) {  
 			case JOB:  

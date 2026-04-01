@@ -119,7 +119,7 @@ char *job_req_inx[] = {
 	"t1.resource_node_detail",
 #endif
 	"t2.lineage",
-#ifdef __METASTACK_OPT_APPTYPE_6  
+#ifdef __METASTACK_OPT_APP_6  
 	"t5.apptype",  
 	"t5.apptype_version",  
 	"t5.source",  
@@ -194,7 +194,7 @@ enum {
 	JOB_REQ_RESC_NODE,
 #endif
 	JOB_REQ_LINEAGE,
-#ifdef __METASTACK_OPT_APPTYPE_6  
+#ifdef __METASTACK_OPT_APP_6  
 	JOB_REQ_APPNAME,  
 	JOB_REQ_APPVERSION,  
 	JOB_REQ_APPSOURCE,  
@@ -586,12 +586,12 @@ static int _cluster_get_jobs(mysql_conn_t *mysql_conn,
 			   " left join \"%s_%s\" as t4 "
 			   "on t1.env_hash_inx=t4.hash_inx",
 			   cluster_name, job_env_table);
-#ifdef __METASTACK_OPT_APPTYPE_6  
+#ifdef __METASTACK_OPT_APP_6  
 	/* Always LEFT JOIN apptype table on PRIMARY KEY - negligible cost */  
 	xstrfmtcat(query,  
 		   " left join \"%s_%s\" as t5 "  
 		   "on t1.job_db_inx=t5.job_db_inx",  
-		   cluster_name, job_apptype_table);  
+		   cluster_name, job_app_table);  
 #endif
 	if (job_cond->flags & JOBCOND_FLAG_RUNAWAY) {
 		if (extra)
@@ -724,7 +724,7 @@ static int _cluster_get_jobs(mysql_conn_t *mysql_conn,
 			job->mcs_label = xstrdup("");
 		if (row[JOB_REQ_USER_NAME])
 			job->user = xstrdup(row[JOB_REQ_USER_NAME]);
-#ifdef __METASTACK_OPT_APPTYPE_6  
+#ifdef __METASTACK_OPT_APP_6  
 		if (row[JOB_REQ_APPNAME] && row[JOB_REQ_APPNAME][0])  
 			job->app_name = xstrdup(row[JOB_REQ_APPNAME]);  
 		if (row[JOB_REQ_APPVERSION] && row[JOB_REQ_APPVERSION][0])  
@@ -1436,7 +1436,7 @@ no_resv:
 			   *extra ? "&&" : "where",
 			   JOB_REVOKED);
 
-#ifdef __METASTACK_OPT_APPTYPE_6  
+#ifdef __METASTACK_OPT_APP_6  
 	if (job_cond->appname_list &&  
 	    list_count(job_cond->appname_list)) {  
 		set = 0;  

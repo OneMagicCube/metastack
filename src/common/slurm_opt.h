@@ -243,7 +243,7 @@ enum {
 	LONG_OPT_SUBMIT_LINE,
 	LONG_OPT_APPTYPE,
 #endif
-#ifdef __METASTACK_OPT_APPTYPE_3  
+#ifdef __METASTACK_OPT_APP_3  
 	LONG_OPT_APP,  
 #endif
 	LONG_OPT_ENUM_END
@@ -530,7 +530,7 @@ typedef struct {
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
 	char *apptype;			/* --apptype	*/
 #endif
-#ifdef __METASTACK_OPT_APPTYPE_3  
+#ifdef __METASTACK_OPT_APP_3  
 	char *app;           /* --app */  
 #endif
 } slurm_opt_t;

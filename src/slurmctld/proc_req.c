@@ -2366,7 +2366,7 @@ static void _slurm_rpc_dump_conf_watch_dog(slurm_msg_t * msg)
 }
 #endif
 
-#ifdef __METASTACK_OPT_APPTYPE_2  
+#ifdef __METASTACK_OPT_APP_2  
 /* _slurm_rpc_dump_app_info - process RPC for app configuration information */  
 static void _slurm_rpc_dump_app_info(slurm_msg_t *msg)  
 {  
@@ -2509,7 +2509,7 @@ static void _slurm_rpc_delete_app(slurm_msg_t *msg)
 		slurm_send_rc_msg(msg, SLURM_SUCCESS);  
 	}  
 }  
-#endif /* __METASTACK_OPT_APPTYPE_2 */
+#endif /* __METASTACK_OPT_APP_2 */
 
 /* _slurm_rpc_dump_partitions - process RPC for partition state information */
 static void _slurm_rpc_dump_partitions(slurm_msg_t *msg)
@@ -8309,7 +8309,7 @@ slurmctld_rpc_t slurmctld_rpcs[] =
 		.msg_type = REQUEST_CACHE_NODE_INFO_SINGLE,
 		.func = _slurm_rpc_dump_cache_node_single,
 #endif
-#ifdef __METASTACK_OPT_APPTYPE_2  
+#ifdef __METASTACK_OPT_APP_2  
 	},{  
 		.msg_type = REQUEST_BUILD_APP_INFO,  
 		.func = _slurm_rpc_dump_app_info,  

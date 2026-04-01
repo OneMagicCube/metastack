@@ -194,7 +194,7 @@ bitstr_t **para_epilog_idle_node_bitmap = NULL; /* A collection of bitmaps for i
 bool disable_change_proc_dist = false;
 #endif
 
-#ifdef __METASTACK_OPT_APPTYPE_1  
+#ifdef __METASTACK_OPT_APP_1  
 List app_list = NULL;  
 time_t last_app_update = (time_t) 0;  
 char *default_app_name = NULL;  
@@ -344,7 +344,7 @@ void init_watch_dog_conf(void);
 static void _list_delete_watch_dog(void *watch_dog_entry);
 #endif
 
-#ifdef __METASTACK_OPT_APPTYPE_1  
+#ifdef __METASTACK_OPT_APP_1  
 static void _init_app_record(app_record_t *app_ptr);  
 static void _list_delete_app(void *app_entry);  
 static int _build_single_appline_info(app_record_t *app);  
@@ -1066,7 +1066,7 @@ void init_watch_dog_conf(void)
 }
 #endif
 
-#ifdef __METASTACK_OPT_APPTYPE_1  
+#ifdef __METASTACK_OPT_APP_1  
 static void _list_delete_app(void *app_entry)  
 {  
 	app_record_t *app_ptr = (app_record_t *)app_entry;  
@@ -1246,7 +1246,7 @@ static int _build_all_app_info(void)
 }  
 #endif
 
-#ifdef __METASTACK_OPT_APPTYPE_2  
+#ifdef __METASTACK_OPT_APP_2  
   
 typedef struct {  
 	buf_t *buffer;  
@@ -1430,7 +1430,7 @@ extern int delete_app(delete_app_msg_t *app_msg)
 	info("App deleted: %s", app_msg->name);  
 	return SLURM_SUCCESS;  
 }  
-#endif /* __METASTACK_OPT_APPTYPE_2 */
+#endif /* __METASTACK_OPT_APP_2 */
 
 /*
  * _init_all_slurm_conf - initialize or re-initialize the slurm
@@ -1450,7 +1450,7 @@ static void _init_all_slurm_conf(void)
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
 	init_watch_dog_conf();
 #endif
-#ifdef __METASTACK_OPT_APPTYPE_1  
+#ifdef __METASTACK_OPT_APP_1  
 	init_app_conf();  
 #endif 
 	init_job_conf();
@@ -2604,7 +2604,7 @@ extern int read_slurm_conf(int recover)
 	_build_all_watchdog_info();
 #endif
 
-#ifdef __METASTACK_OPT_APPTYPE_2  
+#ifdef __METASTACK_OPT_APP_2  
 	if ((recover >= 1) && (slurm_conf.reconfig_flags & RECONFIG_KEEP_APPTYPE_INFO)) {  
 		info("Preserving app configuration (KeepApptypeInfo)");  
 	} else {  
@@ -2612,7 +2612,7 @@ extern int read_slurm_conf(int recover)
 			list_flush(app_list);  
 		_build_all_app_info();  
 	}  
-#elif defined(__METASTACK_OPT_APPTYPE_1)  
+#elif defined(__METASTACK_OPT_APP_1)  
 	_build_all_app_info();  
 #endif
 	restore_front_end_state(recover);

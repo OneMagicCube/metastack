@@ -378,7 +378,7 @@ extern List watch_dog_list;			/* watch dog list */
 extern time_t last_watch_dog_update;	/* time of last update to watch_dog records */
 #endif
 
-#ifdef __METASTACK_OPT_APPTYPE_1  
+#ifdef __METASTACK_OPT_APP_1  
 extern List app_list;                   /* app preset list */  
 extern time_t last_app_update;          /* time of last update to app records */  
 extern char *default_app_name;          /* combined name of default app, e.g. "general-1.0" */  
@@ -690,7 +690,7 @@ extern part_record_t *create_ctld_part_record(const char *name);
 watch_dog_record_t *create_watch_dog_record(const char *name);
 #endif
 
-#ifdef __METASTACK_OPT_APPTYPE_1  
+#ifdef __METASTACK_OPT_APP_1  
 /*  
  * create_app_record - create an app record and add to app_list  
  * IN name - app_name  
@@ -721,13 +721,13 @@ extern void init_app_conf(void);
 extern void app_fini(void);  
 #endif
 
-#ifdef __METASTACK_OPT_APPTYPE_2  
+#ifdef __METASTACK_OPT_APP_2  
 extern int update_app(app_desc_msg_t *app_desc, bool create_flag);  
 extern int delete_app(delete_app_msg_t *app_msg);  
 extern buf_t *pack_all_app(uid_t uid, uint16_t protocol_version);  
 extern void pack_app(app_record_t *app_ptr, buf_t *buffer,  
                      uint16_t protocol_version);  
-#ifdef __METASTACK_OPT_APPTYPE_1  
+#ifdef __METASTACK_OPT_APP_1  
 extern int list_find_app(void *x, void *key);  
 #endif
 #endif
@@ -2042,7 +2042,7 @@ extern int pack_ctld_job_step_info_response_msg(
 extern buf_t *pack_all_watch_dog(uid_t uid, uint16_t protocol_version);
 #endif
 
-#ifdef __METASTACK_OPT_APPTYPE_1  
+#ifdef __METASTACK_OPT_APP_1  
 extern buf_t *pack_all_app(uid_t uid, uint16_t protocol_version);  
 void pack_app(app_record_t *app_ptr, buf_t *buffer,  
 	      uint16_t protocol_version);  
@@ -2155,7 +2155,7 @@ extern part_record_t **build_visible_parts_user(slurmdb_user_rec_t *user_ret,
 extern void watch_dog_fini (void);
 #endif
 
-#ifdef __METASTACK_OPT_APPTYPE_1  
+#ifdef __METASTACK_OPT_APP_1  
 extern void app_fini(void);  
 #endif
 

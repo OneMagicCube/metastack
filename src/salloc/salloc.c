@@ -283,7 +283,7 @@ int main(int argc, char **argv)
 		if(desc)
 			desc->style_step = JOB_SUBMIT_ALLOC;
 #endif
-#ifdef __METASTACK_OPT_APPTYPE_3  
+#ifdef __METASTACK_OPT_APP_3  
 		/* Handle --app=list */  
 		if (opt.app && !xstrcasecmp(opt.app, "list")) {  
 			slurm_ctl_conf_info_msg_app_t *app_info = NULL;  

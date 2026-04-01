@@ -710,7 +710,7 @@ slurm_errtab_t slurm_errtab[] = {
 	{ ERRTAB_ENTRY(ESLURMD_INVALID_WATCH_DOG),
 	  "The specified watch dog script is invalid"},
 #endif
-#ifdef __METASTACK_OPT_APPTYPE_2  
+#ifdef __METASTACK_OPT_APP_2  
 	{ ESLURM_INVALID_APP_NAME,  
 	  "ESLURM_INVALID_APP_NAME",  
 	  "Invalid app name or version specified"  

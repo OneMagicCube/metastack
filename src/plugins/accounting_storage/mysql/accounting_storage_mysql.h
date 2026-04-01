@@ -98,8 +98,8 @@ extern char *last_ran_table;
 #ifdef __METASTACK_NEW_AUTO_SUPPLEMENT_AVAIL_NODES
 extern char *node_borrow_table;
 #endif
-#ifdef __METASTACK_OPT_APPTYPE_5
-extern char *job_apptype_table;  
+#ifdef __METASTACK_OPT_APP_5
+extern char *job_app_table;  
 #endif
 extern char *qos_table;
 extern char *resv_table;

@@ -611,13 +611,13 @@ typedef struct sbcast_cred sbcast_cred_t;		/* opaque data type */
 #define __METASTACK_BUG_SPREAD_JOB_CRASH_CTLD
 #endif
 
-#ifndef __METASTACK_OPT_APPTYPE  
-#define __METASTACK_OPT_APPTYPE_1 // slurmctld reads the app conf
-#define __METASTACK_OPT_APPTYPE_2 // scontrol crud for app config
-#define __METASTACK_OPT_APPTYPE_3 // add --app --app-version --app-name
-#define __METASTACK_OPT_APPTYPE_4 // squeue and scontrol show jobs app info
-#define __METASTACK_OPT_APPTYPE_5 // add <cluster_name>_job_apptype_table
-#define __METASTACK_OPT_APPTYPE_6 // The sacct command supports querying the app information of jobs. 
+#ifndef __METASTACK_OPT_APP  
+#define __METASTACK_OPT_APP_1 // slurmctld reads the app conf
+#define __METASTACK_OPT_APP_2 // scontrol crud for app config
+#define __METASTACK_OPT_APP_3 // add --app --app-version --app-name
+#define __METASTACK_OPT_APP_4 // squeue and scontrol show jobs app info
+#define __METASTACK_OPT_APP_5 // add <cluster_name>_job_app_table
+#define __METASTACK_OPT_APP_6 // The sacct command supports querying the app information of jobs. 
 #endif
 
 /*****************************************************************************\
@@ -2347,7 +2347,7 @@ typedef struct job_descriptor {	/* For submit, allocate, and update requests */
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
 	uint32_t style_step;
 #endif
-#ifdef __METASTACK_OPT_APPTYPE_3  
+#ifdef __METASTACK_OPT_APP_3  
 	char *app;           /* --app combined name, e.g. "vasp-5.7.1" */  
 	char *app_name;      /* parsed app name, e.g. "vasp" */  
 	char *app_version;   /* parsed app version, e.g. "5.7.1" */  
@@ -2520,7 +2520,7 @@ typedef struct job_info {
 #ifdef __METASTACK_NEW_PENDING_ORDER
 	uint32_t pending_order;
 #endif
-#ifdef __METASTACK_OPT_APPTYPE_3  
+#ifdef __METASTACK_OPT_APP_3  
 	char *app_name;  
 	char *app_version;  
 	uint8_t app_source;  
@@ -3223,7 +3223,7 @@ typedef struct {
 
 } watch_dog_record_t;
 #endif
-#ifdef __METASTACK_OPT_APPTYPE_1  
+#ifdef __METASTACK_OPT_APP_1  
 typedef struct {  
 	char    *app_name;      /* application name, required */  
 	char    *version;       /* version string, required */  
@@ -3294,14 +3294,14 @@ typedef struct slurm_ctl_conf_info_msg_watch_dog {
 } slurm_ctl_conf_info_msg_watch_dog_t;
 #endif
 
-#ifdef __METASTACK_OPT_APPTYPE_1  
+#ifdef __METASTACK_OPT_APP_1  
 typedef struct slurm_ctl_conf_info_msg_app {  
 	time_t last_update;  
 	uint32_t record_count;  
 	app_record_t *app_array;  
 } slurm_ctl_conf_info_msg_app_t;  
 #endif
-#ifdef __METASTACK_OPT_APPTYPE_2  
+#ifdef __METASTACK_OPT_APP_2  
 /* Message for create/update app */  
 typedef struct app_desc_msg {  
 	char *app_name;  
@@ -3585,7 +3585,7 @@ typedef struct reservation_name_msg {
 #define RECONFIG_KEEP_PART_INFO SLURM_BIT(0) /* keep dynamic partition info on scontrol reconfig */
 #define RECONFIG_KEEP_PART_STAT SLURM_BIT(1) /* keep dynamic partition state on scontrol reconfig */
 #define RECONFIG_KEEP_POWER_SAVE_SETTINGS SLURM_BIT(2) /* keep dynamic power save settings on scontrol reconfig */
-#ifdef __METASTACK_OPT_APPTYPE_1  
+#ifdef __METASTACK_OPT_APP_1  
 #define RECONFIG_KEEP_APPTYPE_INFO SLURM_BIT(3)  
 #endif
 
@@ -4778,7 +4778,7 @@ extern void slurm_print_ctl_conf(FILE *out, slurm_conf_t *slurm_ctl_conf_ptr);
  * IN node_info_ptr - pointer to node table of information
  * IN part_info_ptr - pointer to partition information
  */
-#if defined(__METASTACK_OPT_APPTYPE_2)  
+#if defined(__METASTACK_OPT_APP_2)  
 extern void slurm_write_ctl_conf(slurm_conf_t *slurm_ctl_conf_ptr,  
                                  node_info_msg_t *node_info_ptr,  
                                  partition_info_msg_t *part_info_ptr,  

@@ -515,7 +515,7 @@ extern int initialize_and_process_args(int argc, char **argv, int *argc_off)
 		/* initialize options with argv */
 		_set_options(argc, argv);
 
-#ifdef __METASTACK_OPT_APPTYPE_3  
+#ifdef __METASTACK_OPT_APP_3  
         /* Handle --app=list: print preset app list and exit.  
          * Must be before _opt_args() which fatals if no command given. */  
         if (opt.app && !xstrcasecmp(opt.app, "list")) {
@@ -849,7 +849,7 @@ env_vars_t env_vars[] = {
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
   { "SLURM_JOB_APPTYPE", LONG_OPT_APPTYPE },
 #endif
-#ifdef __METASTACK_OPT_APPTYPE_3  
+#ifdef __METASTACK_OPT_APP_3  
   { "SLURM_APP", LONG_OPT_APP },  
 #endif
   { NULL }

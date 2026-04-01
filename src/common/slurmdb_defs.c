@@ -1029,7 +1029,7 @@ extern void slurmdb_destroy_job_rec(void *object)
 #ifdef __METASTACK_OPT_RESC_NODEDETAIL
 		xfree(job->resource_node_detail);
 #endif
-#ifdef __METASTACK_OPT_APPTYPE_6  
+#ifdef __METASTACK_OPT_APP_6  
 		xfree(job->app_name);  
 		xfree(job->app_version);  
 #endif 
@@ -1379,7 +1379,7 @@ extern void slurmdb_destroy_job_cond_members(slurmdb_job_cond_t *job_cond)
 	xfree(job_cond->used_nodes);
 	FREE_NULL_LIST(job_cond->userid_list);
 	FREE_NULL_LIST(job_cond->wckey_list);
-#ifdef __METASTACK_OPT_APPTYPE_6  
+#ifdef __METASTACK_OPT_APP_6  
 	FREE_NULL_LIST(job_cond->appname_list);  
 	FREE_NULL_LIST(job_cond->appversion_list);  
 #endif

@@ -832,8 +832,8 @@ no_rollup_change:
 
 	xfree(query);
 
-#ifdef __METASTACK_OPT_APPTYPE_5
-	/* Insert/update apptype record into job_apptype_table */  
+#ifdef __METASTACK_OPT_APP_5
+	/* Insert/update apptype record into job_app_table */  
 	if (rc == SLURM_SUCCESS && job_ptr->db_index  
 	    && job_ptr->app_name && job_ptr->app_name[0]) {  
 		query = xstrdup_printf(  
@@ -843,7 +843,7 @@ no_rollup_change:
 			"on duplicate key update "  
 			"apptype='%s', apptype_version='%s', "  
 			"source=%u, mod_time=UNIX_TIMESTAMP()",  
-			mysql_conn->cluster_name, job_apptype_table,  
+			mysql_conn->cluster_name, job_app_table,  
 			job_ptr->db_index,  
 			job_ptr->app_name,  
 			job_ptr->app_version ? job_ptr->app_version : "",  
