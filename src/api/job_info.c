@@ -1102,18 +1102,16 @@ slurm_sprint_job_info ( job_info_t * job_ptr, int one_liner )
 	xstrcat(out, line_end);
 #ifdef __METASTACK_OPT_APPTYPE_4  
 	/****** Line: App Info ******/  
-	{  
+	if (job_ptr->app_name && job_ptr->app_name[0]) {  
 		char *app_combined = NULL;  
-		const char *source_str = "";  
+		const char *source_str = "null";  
   
-		if (job_ptr->app_name && job_ptr->app_name[0]) {  
-			if (job_ptr->app_version && job_ptr->app_version[0])  
-				xstrfmtcat(app_combined, "%s-%s",  
-					   job_ptr->app_name,  
-					   job_ptr->app_version);  
-			else  
-				app_combined = xstrdup(job_ptr->app_name);  
-		}  
+		if (job_ptr->app_version && job_ptr->app_version[0])  
+			xstrfmtcat(app_combined, "%s-%s",  
+				   job_ptr->app_name,  
+				   job_ptr->app_version);  
+		else  
+			app_combined = xstrdup(job_ptr->app_name);  
   
 		switch (job_ptr->app_source) {  
 		case 0:  
@@ -1123,14 +1121,14 @@ slurm_sprint_job_info ( job_info_t * job_ptr, int one_liner )
 			source_str = "auto";  
 			break;  
 		default:  
-			source_str = "";  
+			source_str = "null";  
 			break;  
 		}  
   
 		xstrfmtcat(out, "App=%s AppName=%s AppVersion=%s AppSource=%s",  
-			   app_combined ? app_combined : "",  
-			   job_ptr->app_name ? job_ptr->app_name : "",  
-			   job_ptr->app_version ? job_ptr->app_version : "",  
+			   app_combined ? app_combined : "null",  
+			   job_ptr->app_name ? job_ptr->app_name : "null",  
+			   job_ptr->app_version ? job_ptr->app_version : "null",  
 			   source_str);  
 		xfree(app_combined);  
 		xstrcat(out, line_end);  
