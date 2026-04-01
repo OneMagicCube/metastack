@@ -905,6 +905,13 @@ extern resource_allocation_response_msg_t *build_alloc_msg(
 	}
 	if (job_ptr->account)
 		alloc_msg->account = xstrdup(job_ptr->account);
+#ifdef __METASTACK_OPT_APP_7
+	if (job_ptr->app_name)  
+		alloc_msg->app_name = xstrdup(job_ptr->app_name);  
+	if (job_ptr->app_version)  
+		alloc_msg->app_version = xstrdup(job_ptr->app_version);  
+	alloc_msg->app_source = job_ptr->app_source;  
+#endif
 	if (job_ptr->qos_ptr) {
 		slurmdb_qos_rec_t *qos;
 		qos = (slurmdb_qos_rec_t *)job_ptr->qos_ptr;

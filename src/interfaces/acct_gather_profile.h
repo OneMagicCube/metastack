@@ -96,6 +96,11 @@ typedef struct {
 	char *apptype;			/* apptype returned from the cli_filer plugin */
 	uint32_t profile;		/* acct_gather.conf configuration file ProfileInfluxDBDefault configuration entry corresponding to the incoming data type */
 #endif
+#ifdef __METASTACK_OPT_APP_7
+	char *app_name;  
+	char *app_version;  
+	uint8_t app_source;  
+#endif 
 } acct_gather_rank_t;
 
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION

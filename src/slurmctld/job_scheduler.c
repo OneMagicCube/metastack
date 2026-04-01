@@ -3764,7 +3764,11 @@ static batch_job_launch_msg_t *_build_launch_job_msg(job_record_t *job_ptr,
 	launch_msg_ptr->account = xstrdup(job_ptr->account);
 	if (job_ptr->qos_ptr)
 		launch_msg_ptr->qos = xstrdup(job_ptr->qos_ptr->name);
-
+#ifdef __METASTACK_OPT_APP_7
+	launch_msg_ptr->app_name = xstrdup(job_ptr->app_name);  
+	launch_msg_ptr->app_version = xstrdup(job_ptr->app_version);  
+	launch_msg_ptr->app_source = job_ptr->app_source;
+#endif
 	/*
 	 * Use resv_ptr->name instead of job_ptr->resv_name as the job
 	 * could contain multiple reservation names.
@@ -3966,7 +3970,24 @@ static void _set_het_job_env(job_record_t *het_job_leader,
 				"SLURM_JOB_ACCOUNT",
 				het_job_offset, "%s", het_job->account);
 		}
-
+#ifdef __METASTACK_OPT_APP_7
+		if (het_job->app_name) {  
+			(void) env_array_overwrite_het_fmt(  
+				&launch_msg_ptr->environment,  
+				"SLURM_JOB_APP_NAME",  
+				het_job_offset, "%s", het_job->app_name);  
+		}  
+		if (het_job->app_version) {  
+			(void) env_array_overwrite_het_fmt(  
+				&launch_msg_ptr->environment,  
+				"SLURM_JOB_APP_VERSION",  
+				het_job_offset, "%s", het_job->app_version);  
+		}
+		(void) env_array_overwrite_het_fmt(  
+			&launch_msg_ptr->environment,  
+			"SLURM_JOB_APP_SOURCE",  
+			het_job_offset, "%u", het_job->app_source);
+#endif
 		if (het_job->job_resrcs) {
 			tmp_str = uint32_compressed_to_str(
 				het_job->job_resrcs->cpu_array_cnt,

@@ -1289,6 +1289,11 @@ slurm_copy_resource_allocation_response_msg(
 	new->uid = msg->uid;
 	new->user_name = xstrdup(msg->user_name);
 	new->working_cluster_rec = NULL;
+#ifdef __METASTACK_OPT_APP_7
+	new->app_name = xstrdup(msg->app_name);  
+	new->app_version = xstrdup(msg->app_version);  
+	new->app_source = msg->app_source;  
+#endif  	
 	return new;
 }
 
@@ -1818,6 +1823,10 @@ extern void slurm_free_job_launch_msg(batch_job_launch_msg_t * msg)
 #ifdef __METASTACK_BUG_UPDATE_JOB_ENV
 		xfree(msg->tres_per_task);
 #endif
+#ifdef __METASTACK_OPT_APP_7
+		xfree(msg->app_name);  
+		xfree(msg->app_version);  
+#endif  
 		xfree(msg);
 	}
 }
@@ -2291,6 +2300,10 @@ extern void slurm_free_launch_tasks_request_msg(launch_tasks_request_msg_t * msg
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
 	xfree(msg->apptype);
 #endif
+#ifdef __METASTACK_OPT_APP_7
+	xfree(msg->app_name);  
+	xfree(msg->app_version);  
+#endif 
 	xfree(msg);
 }
 
@@ -4140,6 +4153,10 @@ extern void slurm_free_resource_allocation_response_msg_members (
 		xfree(msg->tres_per_task);
 		xfree(msg->tres_bind);
 #endif
+#ifdef __METASTACK_OPT_APP_7
+		xfree(msg->app_name);  
+		xfree(msg->app_version);  
+#endif  
 	}
 }
 

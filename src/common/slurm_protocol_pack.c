@@ -1319,7 +1319,55 @@ static void _pack_resource_allocation_response_msg(const slurm_msg_t *smsg,
 	resource_allocation_response_msg_t *msg = smsg->data;
 	xassert(msg);
 #ifdef __META_PROTOCOL
-	if (smsg->protocol_version >= META_3_1_PROTOCOL_VERSION) {
+	if (smsg->protocol_version >= META_3_2_PROTOCOL_VERSION) {
+		packstr(msg->account, buffer);
+		/* Remove alias_list 2 versions after 23.11 */
+		packnull(buffer);
+		packstr(msg->batch_host, buffer);
+		packstr_array(msg->environment, msg->env_size, buffer);
+		pack32(msg->error_code, buffer);
+		pack32(msg->gid, buffer);
+		packstr(msg->group_name, buffer);
+		packstr(msg->job_submit_user_msg, buffer);
+		pack32(msg->job_id, buffer);
+		pack32(msg->node_cnt, buffer);
+		/* Remove node_addr 2 versions after 23.11 */
+		pack8(0, buffer);
+		packstr(msg->node_list, buffer);
+		pack16(msg->ntasks_per_board, buffer);
+		pack16(msg->ntasks_per_core, buffer);
+		pack16(msg->ntasks_per_tres, buffer);
+		pack16(msg->ntasks_per_socket, buffer);
+		pack32(msg->num_cpu_groups, buffer);
+		if (msg->num_cpu_groups) {
+			pack16_array(msg->cpus_per_node,
+				     msg->num_cpu_groups,
+				     buffer);
+			pack32_array(msg->cpu_count_reps,
+				     msg->num_cpu_groups,
+				     buffer);
+		}
+		packstr(msg->partition, buffer);
+		pack64(msg->pn_min_memory, buffer);
+		packstr(msg->qos, buffer);
+		packstr(msg->resv_name, buffer);
+		packstr(msg->tres_per_node, buffer);
+		pack32(msg->uid, buffer);
+		packstr(msg->user_name, buffer);
+		if (msg->working_cluster_rec) {
+			pack8(1, buffer);
+			slurmdb_pack_cluster_rec(msg->working_cluster_rec,
+						 smsg->protocol_version,
+						 buffer);
+		} else {
+			pack8(0, buffer);
+		}
+#ifdef __METASTACK_OPT_APP_7
+		packstr(msg->app_name, buffer);  
+		packstr(msg->app_version, buffer);  
+		pack8(msg->app_source, buffer);  
+#endif 
+	} else if (smsg->protocol_version >= META_3_1_PROTOCOL_VERSION) {
 		packstr(msg->account, buffer);
 		/* Remove alias_list 2 versions after 23.11 */
 		packnull(buffer);
@@ -1530,7 +1578,70 @@ static int _unpack_resource_allocation_response_msg(slurm_msg_t *smsg,
 	smsg->data = tmp_ptr;
 
 #ifdef __META_PROTOCOL
-	if (smsg->protocol_version >= META_3_1_PROTOCOL_VERSION) {
+	if (smsg->protocol_version >= META_3_2_PROTOCOL_VERSION) {
+		safe_unpackstr(&tmp_ptr->account, buffer);
+		safe_unpackstr(&tmp_ptr->alias_list, buffer);
+		safe_unpackstr(&tmp_ptr->batch_host, buffer);
+		safe_unpackstr_array(&tmp_ptr->environment,
+				     &tmp_ptr->env_size, buffer);
+		safe_unpack32(&tmp_ptr->error_code, buffer);
+		safe_unpack32(&tmp_ptr->gid, buffer);
+		safe_unpackstr(&tmp_ptr->group_name, buffer);
+		safe_unpackstr(&tmp_ptr->job_submit_user_msg, buffer);
+		safe_unpack32(&tmp_ptr->job_id, buffer);
+		safe_unpack32(&tmp_ptr->node_cnt, buffer);
+		/* unpack node_addr after node_cnt -- need it to unpack */
+		safe_unpack8(&uint8_tmp, buffer);
+		if (uint8_tmp) {
+			if (slurm_unpack_addr_array(&tmp_ptr->node_addr,
+						    &uint32_tmp, buffer))
+				goto unpack_error;
+			if (uint32_tmp != tmp_ptr->node_cnt)
+				goto unpack_error;
+		} else
+			tmp_ptr->node_addr = NULL;
+		safe_unpackstr(&tmp_ptr->node_list, buffer);
+		safe_unpack16(&tmp_ptr->ntasks_per_board, buffer);
+		safe_unpack16(&tmp_ptr->ntasks_per_core, buffer);
+		safe_unpack16(&tmp_ptr->ntasks_per_tres, buffer);
+		safe_unpack16(&tmp_ptr->ntasks_per_socket, buffer);
+		safe_unpack32(&tmp_ptr->num_cpu_groups, buffer);
+		if (tmp_ptr->num_cpu_groups > 0) {
+			safe_unpack16_array(&tmp_ptr->cpus_per_node,
+					    &uint32_tmp, buffer);
+			if (tmp_ptr->num_cpu_groups != uint32_tmp)
+				goto unpack_error;
+			safe_unpack32_array(&tmp_ptr->cpu_count_reps,
+					    &uint32_tmp, buffer);
+			if (tmp_ptr->num_cpu_groups != uint32_tmp)
+				goto unpack_error;
+		} else {
+			tmp_ptr->cpus_per_node = NULL;
+			tmp_ptr->cpu_count_reps = NULL;
+		}
+		safe_unpackstr(&tmp_ptr->partition, buffer);
+		safe_unpack64(&tmp_ptr->pn_min_memory, buffer);
+		safe_unpackstr(&tmp_ptr->qos, buffer);
+		safe_unpackstr(&tmp_ptr->resv_name, buffer);
+		safe_unpackstr(&tmp_ptr->tres_per_node, buffer);
+		safe_unpack32(&tmp_ptr->uid, buffer);
+		safe_unpackstr(&tmp_ptr->user_name, buffer);
+		safe_unpack8(&uint8_tmp, buffer);
+		if (uint8_tmp) {
+			slurmdb_unpack_cluster_rec(
+				(void **)&tmp_ptr->working_cluster_rec,
+				smsg->protocol_version, buffer);
+		}
+#ifdef __METASTACK_BUG_UPDATE_JOB_ENV
+		safe_unpackstr(&tmp_ptr->tres_bind, buffer);
+		safe_unpackstr(&tmp_ptr->tres_per_task, buffer);
+#endif
+#ifdef __METASTACK_OPT_APP_7
+		safe_unpackstr(&tmp_ptr->app_name, buffer);  
+		safe_unpackstr(&tmp_ptr->app_version, buffer);  
+		safe_unpack8(&tmp_ptr->app_source, buffer);  
+#endif 
+	} else if (smsg->protocol_version >= META_3_1_PROTOCOL_VERSION) {
 		safe_unpackstr(&tmp_ptr->account, buffer);
 		safe_unpackstr(&tmp_ptr->alias_list, buffer);
 		safe_unpackstr(&tmp_ptr->batch_host, buffer);
@@ -4066,7 +4177,34 @@ static void _pack_job_step_create_response_msg(
 	xassert(msg);
 
 #ifdef __META_PROTOCOL
-	if ((protocol_version >= META_3_0_PROTOCOL_VERSION) &&
+	if ((protocol_version >= META_3_2_PROTOCOL_VERSION) &&
+				(protocol_version != NO_VAL16)) {
+		pack32(msg->def_cpu_bind_type, buffer);
+		packstr(msg->resv_ports, buffer);
+		pack32(msg->job_id, buffer);
+		pack32(msg->job_step_id, buffer);
+		pack_slurm_step_layout(msg->step_layout, buffer,
+				       protocol_version);
+		packstr(msg->stepmgr, buffer);
+		slurm_cred_pack(msg->cred, buffer, protocol_version);
+		switch_g_pack_stepinfo(msg->switch_step, buffer,
+				       protocol_version);
+		pack16(msg->use_protocol_ver, buffer);
+#ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
+		packstr(msg->watch_dog, buffer);
+		packstr(msg->watch_dog_script, buffer);
+		pack32(msg->init_time, buffer);
+		pack32(msg->period, buffer);
+		packbool(msg->enable_all_nodes, buffer);
+		packbool(msg->enable_all_stepds, buffer);
+		pack32(msg->style_step, buffer);
+#endif
+#ifdef __METASTACK_OPT_APP_7
+		packstr(msg->app_name, buffer);  
+		packstr(msg->app_version, buffer);  
+		pack8(msg->app_source, buffer);  
+#endif
+	} else if ((protocol_version >= META_3_0_PROTOCOL_VERSION) &&
 				(protocol_version != NO_VAL16)) {
 		pack32(msg->def_cpu_bind_type, buffer);
 		packstr(msg->resv_ports, buffer);
@@ -4169,7 +4307,43 @@ static int _unpack_job_step_create_response_msg(
 	*msg = tmp_ptr;
 
 #ifdef __META_PROTOCOL
-	if ((protocol_version >= META_3_0_PROTOCOL_VERSION) &&
+	if ((protocol_version >= META_3_2_PROTOCOL_VERSION) &&
+			(protocol_version != NO_VAL16)) {
+		safe_unpack32(&tmp_ptr->def_cpu_bind_type, buffer);
+		safe_unpackstr(&tmp_ptr->resv_ports, buffer);
+		safe_unpack32(&tmp_ptr->job_id, buffer);
+		safe_unpack32(&tmp_ptr->job_step_id, buffer);
+		if (unpack_slurm_step_layout(&tmp_ptr->step_layout, buffer,
+					     protocol_version))
+			goto unpack_error;
+		safe_unpackstr(&tmp_ptr->stepmgr, buffer);
+
+		if (!(tmp_ptr->cred = slurm_cred_unpack(buffer,
+							protocol_version)))
+			goto unpack_error;
+
+		if (switch_g_unpack_stepinfo(&tmp_ptr->switch_step, buffer,
+					     protocol_version)) {
+			error("switch_g_unpack_stepinfo: %m");
+			switch_g_free_stepinfo(tmp_ptr->switch_step);
+			goto unpack_error;
+		}
+		safe_unpack16(&tmp_ptr->use_protocol_ver, buffer);
+#ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
+		safe_unpackstr(&tmp_ptr->watch_dog, buffer);
+		safe_unpackstr(&tmp_ptr->watch_dog_script, buffer);
+		safe_unpack32(&tmp_ptr->init_time, buffer);
+		safe_unpack32(&tmp_ptr->period, buffer);
+		safe_unpackbool(&tmp_ptr->enable_all_nodes, buffer);
+		safe_unpackbool(&tmp_ptr->enable_all_stepds, buffer);
+		safe_unpack32(&tmp_ptr->style_step, buffer);
+#endif
+#ifdef __METASTACK_OPT_APP_7
+		safe_unpackstr(&tmp_ptr->app_name, buffer);  
+		safe_unpackstr(&tmp_ptr->app_version, buffer);  
+		safe_unpack8(&tmp_ptr->app_source, buffer);  
+#endif
+	} else if ((protocol_version >= META_3_0_PROTOCOL_VERSION) &&
 			(protocol_version != NO_VAL16)) {
 		safe_unpack32(&tmp_ptr->def_cpu_bind_type, buffer);
 		safe_unpackstr(&tmp_ptr->resv_ports, buffer);
@@ -14789,8 +14963,142 @@ static void _pack_launch_tasks_request_msg(launch_tasks_request_msg_t *msg,
 
 	xassert(msg);
 
-	#ifdef __META_PROTOCOL
-	if (protocol_version >= META_3_0_PROTOCOL_VERSION) {
+#ifdef __META_PROTOCOL
+	if (protocol_version >= META_3_2_PROTOCOL_VERSION) {
+		pack_step_id(&msg->step_id, buffer, protocol_version);
+		pack32_array(msg->gids, msg->ngids, buffer);
+
+		pack32(msg->het_job_node_offset, buffer);
+		pack32(msg->het_job_id, buffer);
+		pack32(msg->het_job_nnodes, buffer);
+		if (msg->het_job_nnodes != NO_VAL) {
+			for (i = 0; i < msg->het_job_nnodes; i++) {
+				pack32_array(
+					msg->het_job_tids[i],
+					(uint32_t)msg->het_job_task_cnts[i],
+					buffer);
+			}
+		}
+		pack32(msg->het_job_ntasks, buffer);
+		if (msg->het_job_ntasks != NO_VAL) {
+			for (i = 0; i < msg->het_job_ntasks; i++)
+				pack32(msg->het_job_tid_offsets[i], buffer);
+		}
+		pack32(msg->het_job_offset, buffer);
+		pack32(msg->het_job_step_cnt, buffer);
+		pack32(msg->het_job_task_offset, buffer);
+		packstr(msg->het_job_node_list, buffer);
+		pack32(msg->mpi_plugin_id, buffer);
+		pack32(msg->ntasks, buffer);
+		pack16(msg->ntasks_per_board, buffer);
+		pack16(msg->ntasks_per_core, buffer);
+		pack16(msg->ntasks_per_tres, buffer);
+		pack16(msg->ntasks_per_socket, buffer);
+		pack64(msg->job_mem_lim, buffer);
+		pack64(msg->step_mem_lim, buffer);
+
+		pack32(msg->nnodes, buffer);
+		pack16(msg->cpus_per_task, buffer);
+		pack16_array(msg->cpt_compact_array,
+			     msg->cpt_compact_cnt, buffer);
+		pack32_array(msg->cpt_compact_reps,
+			     msg->cpt_compact_cnt, buffer);
+		packstr(msg->tres_per_task, buffer);
+		pack16(msg->threads_per_core, buffer);
+		pack32(msg->task_dist, buffer);
+		pack16(msg->node_cpus, buffer);
+		pack16(msg->job_core_spec, buffer);
+		pack16(msg->accel_bind_type, buffer);
+
+		pack16(cred_version, buffer);
+		slurm_cred_pack(msg->cred, buffer, cred_version);
+		for (i = 0; i < msg->nnodes; i++) {
+			pack16(msg->tasks_to_launch[i], buffer);
+			pack32_array(msg->global_task_ids[i],
+				     (uint32_t) msg->tasks_to_launch[i],
+				     buffer);
+		}
+		pack16(msg->num_resp_port, buffer);
+		for (i = 0; i < msg->num_resp_port; i++)
+			pack16(msg->resp_port[i], buffer);
+		slurm_pack_addr(&msg->orig_addr, buffer);
+		packstr_array(msg->env, msg->envc, buffer);
+		packstr_array(msg->spank_job_env, msg->spank_job_env_size,
+			      buffer);
+		packstr(msg->container, buffer);
+		packstr(msg->cwd, buffer);
+		pack16(msg->cpu_bind_type, buffer);
+		packstr(msg->cpu_bind, buffer);
+		pack16(msg->mem_bind_type, buffer);
+		packstr(msg->mem_bind, buffer);
+		packstr_array(msg->argv, msg->argc, buffer);
+		pack32(msg->flags, buffer);
+		packstr(msg->ofname, buffer);
+		packstr(msg->efname, buffer);
+		packstr(msg->ifname, buffer);
+		pack16(msg->num_io_port, buffer);
+		for (i = 0; i < msg->num_io_port; i++)
+			pack16(msg->io_port[i], buffer);
+		pack32(msg->profile, buffer);
+		packstr(msg->task_prolog, buffer);
+		packstr(msg->task_epilog, buffer);
+		pack16(msg->slurmd_debug, buffer);
+		switch_g_pack_stepinfo(msg->switch_step, buffer,
+				       protocol_version);
+		job_options_pack(msg->options, buffer);
+
+		/* Remove alias_list 2 versions after 23.11 */
+		packnull(buffer);
+
+		packstr(msg->complete_nodelist, buffer);
+
+		pack8(msg->open_mode, buffer);
+		packstr(msg->acctg_freq, buffer);
+		pack32(msg->cpu_freq_min, buffer);
+		pack32(msg->cpu_freq_max, buffer);
+		pack32(msg->cpu_freq_gov, buffer);
+
+		packstr(msg->tres_bind, buffer);
+		packstr(msg->tres_freq, buffer);
+		pack16(msg->x11, buffer);
+		packstr(msg->x11_alloc_host, buffer);
+		pack16(msg->x11_alloc_port, buffer);
+		packstr(msg->x11_magic_cookie, buffer);
+		packstr(msg->x11_target, buffer);
+		pack16(msg->x11_target_port, buffer);
+
+		packstr(msg->stepmgr, buffer);
+
+		if (msg->job_ptr) {
+			packbool(true, buffer);
+			job_record_pack(msg->job_ptr, 0, buffer,
+					protocol_version);
+			slurm_pack_list(msg->job_node_array,
+					node_record_pack, buffer,
+					protocol_version);
+			part_record_pack(msg->part_ptr, buffer,
+					 protocol_version);
+		} else {
+			packbool(false, buffer);
+		}
+#ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
+		packstr(msg->watch_dog, buffer);
+		packstr(msg->watch_dog_script, buffer);
+		pack32(msg->init_time, buffer);
+		pack32(msg->period, buffer);
+		packbool(msg->enable_all_nodes, buffer);
+		packbool(msg->enable_all_stepds, buffer);
+		pack32(msg->style_step, buffer);
+#endif
+#ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
+		packstr(msg->apptype, buffer);
+#endif
+#ifdef __METASTACK_OPT_APP_7
+		packstr(msg->app_name, buffer);  
+		packstr(msg->app_version, buffer);  
+		pack8(msg->app_source, buffer);  
+#endif
+	} else if (protocol_version >= META_3_0_PROTOCOL_VERSION) {
 		pack_step_id(&msg->step_id, buffer, protocol_version);
 		pack32_array(msg->gids, msg->ngids, buffer);
 
@@ -15476,7 +15784,193 @@ static int _unpack_launch_tasks_request_msg(launch_tasks_request_msg_t **msg_ptr
 	*msg_ptr = msg;
 
 #ifdef __META_PROTOCOL
-	if (protocol_version >= META_3_0_PROTOCOL_VERSION) {
+	if (protocol_version >= META_3_2_PROTOCOL_VERSION) {
+		if (unpack_step_id_members(&msg->step_id, buffer,
+					   protocol_version) != SLURM_SUCCESS)
+			goto unpack_error;
+
+		safe_unpack32_array(&msg->gids, &msg->ngids, buffer);
+
+		safe_unpack32(&msg->het_job_node_offset, buffer);
+		safe_unpack32(&msg->het_job_id, buffer);
+		safe_unpack32(&msg->het_job_nnodes, buffer);
+		if (msg->het_job_nnodes != NO_VAL) {
+			safe_xcalloc(msg->het_job_task_cnts,
+				     msg->het_job_nnodes,
+				     sizeof(uint16_t));
+			safe_xcalloc(msg->het_job_tids, msg->het_job_nnodes,
+				     sizeof(uint32_t *));
+			for (i = 0; i < msg->het_job_nnodes; i++) {
+				safe_unpack32_array(&msg->het_job_tids[i],
+						    &uint32_tmp,
+						    buffer);
+				msg->het_job_task_cnts[i] = uint32_tmp;
+			}
+		}
+		safe_unpack32(&msg->het_job_ntasks, buffer);
+		if (msg->het_job_ntasks != NO_VAL) {
+			safe_xcalloc(msg->het_job_tid_offsets,
+				     msg->het_job_ntasks,
+				     sizeof(uint32_t));
+			for (i = 0; i < msg->het_job_ntasks; i++)
+				safe_unpack32(&msg->het_job_tid_offsets[i],
+					      buffer);
+		}
+		safe_unpack32(&msg->het_job_offset, buffer);
+		safe_unpack32(&msg->het_job_step_cnt, buffer);
+		safe_unpack32(&msg->het_job_task_offset, buffer);
+		safe_unpackstr(&msg->het_job_node_list, buffer);
+		safe_unpack32(&msg->mpi_plugin_id, buffer);
+		safe_unpack32(&msg->ntasks, buffer);
+		safe_unpack16(&msg->ntasks_per_board, buffer);
+		safe_unpack16(&msg->ntasks_per_core, buffer);
+		safe_unpack16(&msg->ntasks_per_tres, buffer);
+		safe_unpack16(&msg->ntasks_per_socket, buffer);
+		safe_unpack64(&msg->job_mem_lim, buffer);
+		safe_unpack64(&msg->step_mem_lim, buffer);
+
+		safe_unpack32(&msg->nnodes, buffer);
+		if (msg->nnodes >= NO_VAL)
+			goto unpack_error;
+		safe_unpack16(&msg->cpus_per_task, buffer);
+		safe_unpack16_array(&msg->cpt_compact_array,
+				    &msg->cpt_compact_cnt, buffer);
+		safe_unpack32_array(&msg->cpt_compact_reps,
+				    &uint32_tmp, buffer);
+		xassert(uint32_tmp == msg->cpt_compact_cnt);
+		safe_unpackstr(&msg->tres_per_task, buffer);
+		safe_unpack16(&msg->threads_per_core, buffer);
+		safe_unpack32(&msg->task_dist, buffer);
+		safe_unpack16(&msg->node_cpus, buffer);
+		safe_unpack16(&msg->job_core_spec, buffer);
+		safe_unpack16(&msg->accel_bind_type, buffer);
+
+		safe_unpack16(&msg->cred_version, buffer);
+		if (!(msg->cred = slurm_cred_unpack(buffer, msg->cred_version)))
+			goto unpack_error;
+		safe_xcalloc(msg->tasks_to_launch, msg->nnodes,
+			     sizeof(uint16_t));
+		safe_xcalloc(msg->global_task_ids, msg->nnodes,
+			     sizeof(uint32_t *));
+		for (i = 0; i < msg->nnodes; i++) {
+			safe_unpack16(&msg->tasks_to_launch[i], buffer);
+			safe_unpack32_array(&msg->global_task_ids[i],
+					    &uint32_tmp,
+					    buffer);
+			if (msg->tasks_to_launch[i] != (uint16_t) uint32_tmp)
+				goto unpack_error;
+		}
+		safe_unpack16(&msg->num_resp_port, buffer);
+		if (msg->num_resp_port >= NO_VAL16)
+			goto unpack_error;
+		if (msg->num_resp_port > 0) {
+			safe_xcalloc(msg->resp_port, msg->num_resp_port,
+				     sizeof(uint16_t));
+			for (i = 0; i < msg->num_resp_port; i++)
+				safe_unpack16(&msg->resp_port[i], buffer);
+		}
+		slurm_unpack_addr_no_alloc(&msg->orig_addr, buffer);
+		safe_unpackstr_array(&msg->env, &msg->envc, buffer);
+		safe_unpackstr_array(&msg->spank_job_env,
+				     &msg->spank_job_env_size, buffer);
+		safe_unpackstr(&msg->container, buffer);
+		safe_unpackstr(&msg->cwd, buffer);
+		safe_unpack16(&msg->cpu_bind_type, buffer);
+		safe_unpackstr(&msg->cpu_bind, buffer);
+		safe_unpack16(&msg->mem_bind_type, buffer);
+		safe_unpackstr(&msg->mem_bind, buffer);
+		safe_unpackstr_array(&msg->argv, &msg->argc, buffer);
+		safe_unpack32(&msg->flags, buffer);
+		safe_unpackstr(&msg->ofname, buffer);
+		safe_unpackstr(&msg->efname, buffer);
+		safe_unpackstr(&msg->ifname, buffer);
+		safe_unpack16(&msg->num_io_port, buffer);
+		if (msg->num_io_port >= NO_VAL16)
+			goto unpack_error;
+		if (msg->num_io_port > 0) {
+			safe_xcalloc(msg->io_port, msg->num_io_port,
+			             sizeof(uint16_t));
+			for (i = 0; i < msg->num_io_port; i++)
+				safe_unpack16(&msg->io_port[i], buffer);
+		}
+		safe_unpack32(&msg->profile, buffer);
+		safe_unpackstr(&msg->task_prolog, buffer);
+		safe_unpackstr(&msg->task_epilog, buffer);
+		safe_unpack16(&msg->slurmd_debug, buffer);
+
+		if (switch_g_unpack_stepinfo(&tmp_switch, buffer,
+					     protocol_version) < 0) {
+			error("switch_g_unpack_stepinfo: %m");
+			switch_g_free_stepinfo(tmp_switch);
+			goto unpack_error;
+		}
+		switch_g_free_stepinfo(tmp_switch);
+		msg->options = job_options_create();
+		if (job_options_unpack(msg->options, buffer) < 0) {
+			error("Unable to unpack extra job options: %m");
+			goto unpack_error;
+		}
+		safe_unpackstr(&msg->alias_list, buffer);
+		safe_unpackstr(&msg->complete_nodelist, buffer);
+
+		safe_unpack8(&msg->open_mode, buffer);
+		safe_unpackstr(&msg->acctg_freq, buffer);
+		safe_unpack32(&msg->cpu_freq_min, buffer);
+		safe_unpack32(&msg->cpu_freq_max, buffer);
+		safe_unpack32(&msg->cpu_freq_gov, buffer);
+
+		safe_unpackstr(&msg->tres_bind, buffer);
+		safe_unpackstr(&msg->tres_freq, buffer);
+		safe_unpack16(&msg->x11, buffer);
+		safe_unpackstr(&msg->x11_alloc_host, buffer);
+		safe_unpack16(&msg->x11_alloc_port, buffer);
+		safe_unpackstr(&msg->x11_magic_cookie, buffer);
+		safe_unpackstr(&msg->x11_target, buffer);
+		safe_unpack16(&msg->x11_target_port, buffer);
+
+		safe_unpackstr(&msg->stepmgr, buffer);
+
+		safe_unpackbool(&tmp_bool, buffer);
+		if (tmp_bool) {
+#ifdef __METASTACK_NEW_AUTO_SUPPLEMENT_AVAIL_NODES
+			if (job_record_unpack(&msg->job_ptr, 0, buffer, protocol_version) || 
+				 !msg->job_ptr || !msg->job_ptr->node_bitmap) {
+				goto unpack_error;
+			} else {
+				node_record_count = bit_size(msg->job_ptr->node_bitmap);
+			}
+#else
+			if (job_record_unpack(&msg->job_ptr, 0, buffer,
+					      protocol_version))
+				goto unpack_error;
+#endif
+			if (slurm_unpack_list(&msg->job_node_array,
+					      node_record_unpack,
+					      purge_node_rec, buffer,
+					      protocol_version))
+				goto unpack_error;
+			if (part_record_unpack(&msg->part_ptr, buffer,
+					       protocol_version))
+				goto unpack_error;
+		}
+#ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
+		safe_unpackstr(&msg->watch_dog, buffer);
+		safe_unpackstr(&msg->watch_dog_script, buffer);
+		safe_unpack32(&msg->init_time, buffer);
+		safe_unpack32(&msg->period, buffer);
+		safe_unpackbool(&msg->enable_all_nodes, buffer);
+		safe_unpackbool(&msg->enable_all_stepds, buffer);
+		safe_unpack32(&msg->style_step, buffer);
+#endif
+#ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
+		safe_unpackstr(&msg->apptype, buffer);
+#endif
+#ifdef __METASTACK_OPT_APP_3  
+		safe_unpackstr(&msg->app_name, buffer);  
+		safe_unpackstr(&msg->app_version, buffer);  
+		safe_unpack8(&msg->app_source, buffer);  
+#endif
+	} else if (protocol_version >= META_3_0_PROTOCOL_VERSION) {
 		if (unpack_step_id_members(&msg->step_id, buffer,
 					   protocol_version) != SLURM_SUCCESS)
 			goto unpack_error;
@@ -18091,7 +18585,88 @@ _pack_batch_job_launch_msg(batch_job_launch_msg_t * msg, buf_t *buffer,
 		msg->script = msg->script_buf->head;
 
 #ifdef __META_PROTOCOL
-	if (protocol_version >= META_3_1_PROTOCOL_VERSION) {
+	if (protocol_version >= META_3_2_PROTOCOL_VERSION) {
+		pack32(msg->job_id, buffer);
+		pack32(msg->het_job_id, buffer);
+
+		pack32_array(msg->gids, msg->ngids, buffer);
+
+		packstr(msg->partition, buffer);
+		pack32(msg->ntasks, buffer);
+		pack64(msg->pn_min_memory, buffer);
+
+		pack8(msg->open_mode, buffer);
+		pack8(msg->overcommit, buffer);
+
+		pack32(msg->array_job_id, buffer);
+		pack32(msg->array_task_id, buffer);
+
+		packstr(msg->acctg_freq, buffer);
+		packstr(msg->container, buffer);
+		pack16(msg->cpu_bind_type, buffer);
+		pack16(msg->cpus_per_task, buffer);
+		pack16(msg->restart_cnt, buffer);
+		pack16(msg->job_core_spec, buffer);
+
+		pack32(msg->num_cpu_groups, buffer);
+		if (msg->num_cpu_groups) {
+			pack16_array(msg->cpus_per_node, msg->num_cpu_groups,
+				     buffer);
+			pack32_array(msg->cpu_count_reps, msg->num_cpu_groups,
+				     buffer);
+		}
+
+		/* Remove alias_list 2 versions after 23.11 */
+		packnull(buffer);
+
+		packstr(msg->cpu_bind, buffer);
+		packstr(msg->nodes, buffer);
+		packstr(msg->script, buffer);
+		packstr(msg->work_dir, buffer);
+		packstr(msg->std_err, buffer);
+		packstr(msg->std_in, buffer);
+		packstr(msg->std_out, buffer);
+
+		pack32(msg->argc, buffer);
+		packstr_array(msg->argv, msg->argc, buffer);
+		packstr_array(msg->spank_job_env, msg->spank_job_env_size,
+			      buffer);
+
+		pack32(msg->envc, buffer);
+		packstr_array(msg->environment, msg->envc, buffer);
+
+		pack64(msg->job_mem, buffer);
+
+		pack16(cred_version, buffer);
+		slurm_cred_pack(msg->cred, buffer, cred_version);
+
+		packstr(msg->account, buffer);
+		packstr(msg->qos, buffer);
+		packstr(msg->resv_name, buffer);
+		pack32(msg->profile, buffer);
+		packstr(msg->tres_bind, buffer);
+		packstr(msg->tres_freq, buffer);
+#ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
+		packstr(msg->watch_dog, buffer);
+		packstr(msg->watch_dog_script, buffer);
+		pack32(msg->init_time, buffer);
+		pack32(msg->period, buffer);
+		packbool(msg->enable_all_nodes, buffer);		
+		packbool(msg->enable_all_stepds, buffer);	
+		pack32(msg->style_step, buffer);
+#endif
+#ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
+		packstr(msg->apptype, buffer);
+#endif
+#ifdef __METASTACK_BUG_UPDATE_JOB_ENV
+		packstr(msg->tres_per_task, buffer);
+#endif
+#ifdef __METASTACK_OPT_APP_7
+		packstr(msg->app_name, buffer);  
+		packstr(msg->app_version, buffer);  
+		pack8(msg->app_source, buffer);  
+#endif
+	} else if (protocol_version >= META_3_1_PROTOCOL_VERSION) {
 		pack32(msg->job_id, buffer);
 		pack32(msg->het_job_id, buffer);
 
@@ -18521,7 +19096,95 @@ _unpack_batch_job_launch_msg(batch_job_launch_msg_t ** msg, buf_t *buffer,
 	*msg = launch_msg_ptr;
 
 #ifdef __META_PROTOCOL
-	if (protocol_version >= META_3_1_PROTOCOL_VERSION) {
+	if (protocol_version >= META_3_2_PROTOCOL_VERSION) {
+		safe_unpack32(&launch_msg_ptr->job_id, buffer);
+		safe_unpack32(&launch_msg_ptr->het_job_id, buffer);
+		safe_unpack32_array(&launch_msg_ptr->gids,
+				    &launch_msg_ptr->ngids, buffer);
+
+		safe_unpackstr(&launch_msg_ptr->partition, buffer);
+		safe_unpack32(&launch_msg_ptr->ntasks, buffer);
+		safe_unpack64(&launch_msg_ptr->pn_min_memory, buffer);
+
+		safe_unpack8(&launch_msg_ptr->open_mode, buffer);
+		safe_unpack8(&launch_msg_ptr->overcommit, buffer);
+
+		safe_unpack32(&launch_msg_ptr->array_job_id, buffer);
+		safe_unpack32(&launch_msg_ptr->array_task_id, buffer);
+
+		safe_unpackstr(&launch_msg_ptr->acctg_freq, buffer);
+		safe_unpackstr(&launch_msg_ptr->container, buffer);
+		safe_unpack16(&launch_msg_ptr->cpu_bind_type, buffer);
+		safe_unpack16(&launch_msg_ptr->cpus_per_task, buffer);
+		safe_unpack16(&launch_msg_ptr->restart_cnt, buffer);
+		safe_unpack16(&launch_msg_ptr->job_core_spec, buffer);
+
+		safe_unpack32(&launch_msg_ptr->num_cpu_groups, buffer);
+		if (launch_msg_ptr->num_cpu_groups) {
+			safe_unpack16_array(&launch_msg_ptr->cpus_per_node,
+					    &uint32_tmp, buffer);
+			if (launch_msg_ptr->num_cpu_groups != uint32_tmp)
+				goto unpack_error;
+			safe_unpack32_array(&(launch_msg_ptr->cpu_count_reps),
+					    &uint32_tmp, buffer);
+			if (launch_msg_ptr->num_cpu_groups != uint32_tmp)
+				goto unpack_error;
+		}
+
+		safe_unpackstr(&launch_msg_ptr->alias_list, buffer);
+		safe_unpackstr(&launch_msg_ptr->cpu_bind, buffer);
+		safe_unpackstr(&launch_msg_ptr->nodes, buffer);
+		safe_unpackstr(&launch_msg_ptr->script, buffer);
+		safe_unpackstr(&launch_msg_ptr->work_dir, buffer);
+		safe_unpackstr(&launch_msg_ptr->std_err, buffer);
+		safe_unpackstr(&launch_msg_ptr->std_in, buffer);
+		safe_unpackstr(&launch_msg_ptr->std_out, buffer);
+
+		safe_unpack32(&launch_msg_ptr->argc, buffer);
+		safe_unpackstr_array(&launch_msg_ptr->argv,
+				     &launch_msg_ptr->argc, buffer);
+		safe_unpackstr_array(&launch_msg_ptr->spank_job_env,
+				     &launch_msg_ptr->spank_job_env_size,
+				     buffer);
+
+		safe_unpack32(&launch_msg_ptr->envc, buffer);
+		safe_unpackstr_array(&launch_msg_ptr->environment,
+				     &launch_msg_ptr->envc, buffer);
+
+		safe_unpack64(&launch_msg_ptr->job_mem, buffer);
+
+		safe_unpack16(&launch_msg_ptr->cred_version, buffer);
+		if (!(launch_msg_ptr->cred = slurm_cred_unpack(
+			      buffer, launch_msg_ptr->cred_version)))
+			goto unpack_error;
+
+		safe_unpackstr(&launch_msg_ptr->account, buffer);
+		safe_unpackstr(&launch_msg_ptr->qos, buffer);
+		safe_unpackstr(&launch_msg_ptr->resv_name, buffer);
+		safe_unpack32(&launch_msg_ptr->profile, buffer);
+		safe_unpackstr(&launch_msg_ptr->tres_bind, buffer);
+		safe_unpackstr(&launch_msg_ptr->tres_freq, buffer);
+#ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
+		safe_unpackstr(&launch_msg_ptr->watch_dog,  buffer);
+		safe_unpackstr(&launch_msg_ptr->watch_dog_script, buffer);
+		safe_unpack32(&launch_msg_ptr->init_time, buffer);
+		safe_unpack32(&launch_msg_ptr->period, buffer);
+		safe_unpackbool(&launch_msg_ptr->enable_all_nodes, buffer);
+		safe_unpackbool(&launch_msg_ptr->enable_all_stepds, buffer);
+		safe_unpack32(&launch_msg_ptr->style_step, buffer);
+#endif
+#ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
+		safe_unpackstr(&launch_msg_ptr->apptype, buffer);
+#endif
+#ifdef __METASTACK_BUG_UPDATE_JOB_ENV
+		safe_unpackstr(&launch_msg_ptr->tres_per_task, buffer);
+#endif
+#ifdef __METASTACK_OPT_APP_7
+		safe_unpackstr(&launch_msg_ptr->app_name, buffer);  
+		safe_unpackstr(&launch_msg_ptr->app_version, buffer);  
+		safe_unpack8(&launch_msg_ptr->app_source, buffer);  
+#endif
+	} else if (protocol_version >= META_3_1_PROTOCOL_VERSION) {
 		safe_unpack32(&launch_msg_ptr->job_id, buffer);
 		safe_unpack32(&launch_msg_ptr->het_job_id, buffer);
 		safe_unpack32_array(&launch_msg_ptr->gids,

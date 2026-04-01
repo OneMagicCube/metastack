@@ -853,6 +853,36 @@ int setup_env(env_t *env, bool preserve_env)
 			rc = SLURM_ERROR;
 		}
 	}
+
+#ifdef __METASTACK_OPT_APP_7  
+	if (env->app_name) {  
+		if (setenvf(&env->env,  
+			    "SLURM_JOB_APP_NAME",  
+			    "%s",  
+			    env->app_name)) {  
+			error("%s: can't set SLURM_JOB_APP_NAME env variable",  
+			      __func__);  
+			rc = SLURM_ERROR;  
+		}  
+	}  
+	if (env->app_version) {  
+		if (setenvf(&env->env,  
+			    "SLURM_JOB_APP_VERSION",  
+			    "%s",  
+			    env->app_version)) {  
+			error("%s: can't set SLURM_JOB_APP_VERSION env variable",  
+			      __func__);  
+			rc = SLURM_ERROR;  
+		}  
+	}  
+	if (setenvf(&env->env, "SLURM_JOB_APP_SOURCE", "%u",  
+		    env->app_source)) {  
+		error("%s: can't set SLURM_JOB_APP_SOURCE env variable",  
+		      __func__);  
+		rc = SLURM_ERROR;  
+	} 
+#endif
+
 	if (env->qos) {
 		if (setenvf(&env->env,
 			    "SLURM_JOB_QOS",
@@ -1147,6 +1177,21 @@ extern int env_array_for_job(char ***dest,
 					    het_job_offset, "%s",
 					    alloc->account);
 	}
+#ifdef __METASTACK_OPT_APP_7
+	if (alloc->app_name) {  
+		env_array_overwrite_het_fmt(dest, "SLURM_JOB_APP_NAME",  
+					    het_job_offset, "%s",  
+					    alloc->app_name);  
+	}  
+	if (alloc->app_version) {  
+		env_array_overwrite_het_fmt(dest, "SLURM_JOB_APP_VERSION",  
+					    het_job_offset, "%s",  
+					    alloc->app_version);  
+	}
+	env_array_overwrite_het_fmt(dest, "SLURM_JOB_APP_SOURCE",  
+				    het_job_offset, "%u",  
+				    alloc->app_source); 
+#endif
 	if (alloc->qos) {
 		env_array_overwrite_het_fmt(dest, "SLURM_JOB_QOS",
 					    het_job_offset,
@@ -1429,6 +1474,25 @@ env_array_for_batch_job(char ***dest, const batch_job_launch_msg_t *batch,
 					"%s",
 					batch->account);
 	}
+
+#ifdef __METASTACK_OPT_APP_7
+	if (batch->app_name) {  
+		env_array_overwrite_fmt(dest,  
+					"SLURM_JOB_APP_NAME",  
+					"%s",  
+					batch->app_name);  
+	}  
+	if (batch->app_version) {  
+		env_array_overwrite_fmt(dest,  
+					"SLURM_JOB_APP_VERSION",  
+					"%s",  
+					batch->app_version);  
+	}
+	env_array_overwrite_fmt(dest,  
+				"SLURM_JOB_APP_SOURCE",  
+				"%u",  
+				batch->app_source);
+#endif
 
 	if (batch->qos) {
 		env_array_overwrite_fmt(dest,

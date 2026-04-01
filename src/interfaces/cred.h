@@ -136,6 +136,11 @@ typedef struct {
 	list_t *step_gres_list;		/* GRES allocated to STEP */
 
 	void *switch_step;
+#ifdef __METASTACK_OPT_APP_7
+	char *job_app_name;		/* app name */  
+	char *job_app_version;		/* app version */  
+	uint8_t job_app_source;		/* 0=user, 1=auto, 2=default */  
+#endif 
 } slurm_cred_arg_t;
 
 #define CRED_MAGIC 0x0b0b0b

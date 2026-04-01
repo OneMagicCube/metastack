@@ -618,6 +618,7 @@ typedef struct sbcast_cred sbcast_cred_t;		/* opaque data type */
 #define __METASTACK_OPT_APP_4 // squeue and scontrol show jobs app info
 #define __METASTACK_OPT_APP_5 // add <cluster_name>_job_app_table
 #define __METASTACK_OPT_APP_6 // The sacct command supports querying the app information of jobs. 
+#define __METASTACK_OPT_APP_7 // add slurm_app env
 #endif
 
 /*****************************************************************************\
@@ -3279,6 +3280,11 @@ typedef struct resource_allocation_response_msg {
 	void *working_cluster_rec; /* Cluster to direct remaining messages to.
 				    * slurmdb_cluster_rec_t* because slurm.h
 				    * doesn't know about slurmdb.h. */
+#ifdef __METASTACK_OPT_APP_7
+	char *app_name;         /* allocation app name */  
+	char *app_version;      /* allocation app version */  
+	uint8_t app_source;     /* 0=user, 1=auto */
+#endif
 } resource_allocation_response_msg_t;
 
 typedef struct partition_info_msg {

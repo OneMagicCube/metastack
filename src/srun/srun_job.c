@@ -523,6 +523,11 @@ extern srun_job_t *job_create_allocation(
 		job->account = xstrdup(resp->account);
 		job->qos = xstrdup(resp->qos);
 		job->resv_name = xstrdup(resp->resv_name);
+#ifdef __METASTACK_OPT_APP_7
+		job->app_name = xstrdup(resp->app_name);  
+		job->app_version = xstrdup(resp->app_version);  
+		job->app_source = resp->app_source;
+#endif 
 	}
 
 	xfree(i->nodelist);
@@ -2065,6 +2070,33 @@ static void _set_env_vars2(resource_allocation_response_msg_t *resp,
 		}
 		xfree(key);
 	}
+
+#ifdef __METASTACK_OPT_APP_7
+	if (resp->app_name) {  
+		key = _build_key("SLURM_JOB_APP_NAME", het_job_offset);  
+		if (!getenv(key) &&  
+		    (setenvf(NULL, key, "%s", resp->app_name) < 0)) {  
+			error("unable to set %s in environment", key);  
+		}  
+		xfree(key);  
+	}  
+	if (resp->app_version) {  
+		key = _build_key("SLURM_JOB_APP_VERSION", het_job_offset);  
+		if (!getenv(key) &&  
+		    (setenvf(NULL, key, "%s", resp->app_version) < 0)) {  
+			error("unable to set %s in environment", key);  
+		}  
+		xfree(key);  
+	}
+	{  
+		key = _build_key("SLURM_JOB_APP_SOURCE", het_job_offset);  
+		if (!getenv(key) &&  
+		    (setenvf(NULL, key, "%u", resp->app_source) < 0)) {  
+			error("unable to set %s in environment", key);  
+		}  
+		xfree(key);  
+	}
+#endif
 
 	key = _build_key("SLURM_JOB_ID", het_job_offset);
 	if (!getenv(key) &&

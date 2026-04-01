@@ -749,6 +749,16 @@ static char **_build_watch_dog_env(acct_gather_rank_t *watch_dog)
 	setenvf(&my_env, "SLURM_JOB_UID", "%u", watch_dog->uid);
 	setenvf(&my_env, "SLURM_JOB_GID", "%u", watch_dog->gid);
 	setenvf(&my_env, "SLURM_STEP_WATCH_DOG", "%s", watch_dog->watch_dog);
+#ifdef __METASTACK_OPT_APP_7
+	if (watch_dog->app_name)  
+		setenvf(&my_env, "SLURM_JOB_APP_NAME", "%s",  
+			watch_dog->app_name);  
+	if (watch_dog->app_version)  
+		setenvf(&my_env, "SLURM_JOB_APP_VERSION", "%s",  
+			watch_dog->app_version);  
+	setenvf(&my_env, "SLURM_JOB_APP_SOURCE", "%u",  
+		watch_dog->app_source);
+#endif
 	if(watch_dog->job_stdout != NULL)
 		setenvf(&my_env, "SLURM_JOB_STDOUT", "%s", watch_dog->job_stdout);
 	if(watch_dog->job_stderr != NULL)
