@@ -7405,10 +7405,10 @@ extern char * reconfig_flags2str(uint16_t reconfig_flags)
 		xstrcat(rc, "KeepPowerSaveSettings");
 	}
 #ifdef __METASTACK_OPT_APP_1  
-	if (reconfig_flags & RECONFIG_KEEP_APPTYPE_INFO) {  
+	if (reconfig_flags & RECONFIG_KEEP_APP_INFO) {  
 		if (rc)  
 			xstrcat(rc, ",");  
-		xstrcat(rc, "KeepApptypeInfo");  
+		xstrcat(rc, "KeepAppInfo");  
 	}  
 #endif  
 
@@ -7438,8 +7438,8 @@ extern uint16_t reconfig_str2flags(char *reconfig_flags)
 		else if (xstrcasecmp(tok, "KeepPowerSaveSettings") == 0)
 			rc |= RECONFIG_KEEP_POWER_SAVE_SETTINGS;
 #ifdef __METASTACK_OPT_APP_1  
-		else if (xstrcasecmp(tok, "KeepApptypeInfo") == 0)  
-			rc |= RECONFIG_KEEP_APPTYPE_INFO;  
+		else if (xstrcasecmp(tok, "KeepAppInfo") == 0)  
+			rc |= RECONFIG_KEEP_APP_INFO;  
 #endif 
 		else {
 			error("Invalid ReconfigFlag: %s", tok);

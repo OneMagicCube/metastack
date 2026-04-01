@@ -1428,12 +1428,12 @@ extern int load_all_app_state(int recover)
 	int app_count = 0;  
   
 	/* On reconfigure (recover == 0), only load state file if  
-	* RECONFIG_KEEP_APPTYPE_INFO is set — otherwise discard  
+	* RECONFIG_KEEP_APP_INFO is set — otherwise discard  
 	* dynamic changes and use config file only. */  
 	if (recover == 0 &&  
-		!(slurm_conf.reconfig_flags & RECONFIG_KEEP_APPTYPE_INFO)) {  
+		!(slurm_conf.reconfig_flags & RECONFIG_KEEP_APP_INFO)) {  
 		debug("Restoring app state from state file disabled");  
-		schedule_app_save();  /* 保留：将配置文件加载的数据写入 state 文件 */  
+		schedule_app_save();
 		return SLURM_SUCCESS;  
 	}  
 	
@@ -2886,7 +2886,7 @@ extern int read_slurm_conf(int recover)
 	/* Then optionally overlay state file data.  
 	 * On startup (recover >= 1): always restore from state file.  
 	 * On reconfigure (recover == 0): only restore if  
-	 *   RECONFIG_KEEP_APPTYPE_INFO is set. */  
+	 *   RECONFIG_KEEP_APP_INFO is set. */  
 	(void)load_all_app_state(recover);  
 #endif
 

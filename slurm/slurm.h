@@ -3587,7 +3587,7 @@ typedef struct reservation_name_msg {
 #define RECONFIG_KEEP_PART_STAT SLURM_BIT(1) /* keep dynamic partition state on scontrol reconfig */
 #define RECONFIG_KEEP_POWER_SAVE_SETTINGS SLURM_BIT(2) /* keep dynamic power save settings on scontrol reconfig */
 #ifdef __METASTACK_OPT_APP_1  
-#define RECONFIG_KEEP_APPTYPE_INFO SLURM_BIT(3)  
+#define RECONFIG_KEEP_APP_INFO SLURM_BIT(3)  
 #endif
 
 #define HEALTH_CHECK_NODE_IDLE	0x0001	/* execute on idle nodes */
