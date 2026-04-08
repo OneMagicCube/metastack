@@ -892,6 +892,10 @@ static void *step_watch_dog(void *args)
 		xfree(watch_dog_tran->job_stdout);
 		xfree(watch_dog_tran->job_stderr);
 		xfree(watch_dog_tran);
+#ifdef __METASTACK_OPT_APP_7  
+		xfree(watch_dog_tran->app_name);  
+		xfree(watch_dog_tran->app_version);  
+#endif
 	}
 	return NULL;
 }
@@ -1862,7 +1866,11 @@ extern int jobacct_gather_watchdog(int frequency, acct_gather_rank_t *step_rank)
 	load_args->uid 					= step_rank->uid;
 	load_args->gid					= step_rank->gid;
 	load_args->switch_step			= step_rank->switch_step;
-	
+#ifdef __METASTACK_OPT_APP_7  
+	load_args->app_name = xstrdup(step_rank->app_name);  
+	load_args->app_version = xstrdup(step_rank->app_version);  
+	load_args->app_source = step_rank->app_source;  
+#endif
 	slurm_thread_create(&watch_dog_thread_id, step_watch_dog, load_args);
 	return retval;
 }
