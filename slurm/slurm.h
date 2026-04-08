@@ -619,6 +619,7 @@ typedef struct sbcast_cred sbcast_cred_t;		/* opaque data type */
 #define __METASTACK_OPT_APP_5 // add <cluster_name>_job_app_table
 #define __METASTACK_OPT_APP_6 // The sacct command supports querying the app information of jobs. 
 #define __METASTACK_OPT_APP_7 // add slurm_app env
+#define __METASTACK_OPT_APP_8 // opt cli command
 #endif
 
 /*****************************************************************************\
