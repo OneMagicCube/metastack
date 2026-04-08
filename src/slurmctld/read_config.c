@@ -1409,15 +1409,7 @@ static buf_t *_open_app_state_file(char **state_file)
 	return create_mmap_buf(*state_file);  
 }  
   
-/*  
- * load_all_app_state - Load app configuration state from file.  
- *   On recover >= 1: replaces config-loaded app_list with state file data.  
- *   On recover == 0: does nothing (config file is authoritative on reconfigure).  
- * IN recover - 0 = reconfigure (skip state load)  
- *              1+ = recover state from disk  
- * RET SLURM_SUCCESS or error code  
- */  
-extern int load_all_app_state(int recover)  
+extern int load_all_app_state(uint16_t reconfig_flags) 
 {  
 	char *state_file, *ver_str = NULL;  
 	time_t now;  
@@ -1430,8 +1422,7 @@ extern int load_all_app_state(int recover)
 	/* On reconfigure (recover == 0), only load state file if  
 	* RECONFIG_KEEP_APP_INFO is set — otherwise discard  
 	* dynamic changes and use config file only. */  
-	if (recover == 0 &&  
-		!(slurm_conf.reconfig_flags & RECONFIG_KEEP_APP_INFO)) {  
+	if (!(reconfig_flags & RECONFIG_KEEP_APP_INFO)) {  
 		debug("Restoring app state from state file disabled");  
 		schedule_app_save();
 		return SLURM_SUCCESS;  
@@ -2887,7 +2878,7 @@ extern int read_slurm_conf(int recover)
 	 * On startup (recover >= 1): always restore from state file.  
 	 * On reconfigure (recover == 0): only restore if  
 	 *   RECONFIG_KEEP_APP_INFO is set. */  
-	(void)load_all_app_state(recover);  
+	(void)load_all_app_state(reconfig_flags);
 #endif
 
 	restore_front_end_state(recover);
@@ -2975,6 +2966,9 @@ extern int read_slurm_conf(int recover)
 		load_job_ret = load_all_job_state();
 	} else if (recover > 1) {	/* Load node, part & job state files */
 		reconfig_flags |= RECONFIG_KEEP_PART_INFO;
+#ifdef __METASTACK_OPT_APP_2
+		reconfig_flags |= RECONFIG_KEEP_APP_INFO;
+#endif
 		load_job_ret = load_all_job_state();
 	}
 	(void) load_all_part_state(reconfig_flags);
