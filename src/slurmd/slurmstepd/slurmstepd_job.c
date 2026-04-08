@@ -655,7 +655,12 @@ batch_stepd_step_rec_create(batch_job_launch_msg_t *msg)
 #endif
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
 	step_rank.apptype = xstrdup(msg->apptype);
-#endif		
+#endif
+#ifdef __METASTACK_OPT_APP_7  
+	step_rank.app_name = xstrdup(msg->app_name);  
+	step_rank.app_version = xstrdup(msg->app_version);  
+	step_rank.app_source = msg->app_source;  
+#endif
 	acct_gather_profile_startpoll(msg->acctg_freq,
 				      slurm_conf.job_acct_gather_freq, &step_rank);
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
@@ -666,6 +671,10 @@ batch_stepd_step_rec_create(batch_job_launch_msg_t *msg)
 #endif
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
 	xfree(step_rank.apptype);
+#endif
+#ifdef __METASTACK_OPT_APP_7  
+	xfree(step_rank.app_name);  
+	xfree(step_rank.app_version);  
 #endif
 #endif
 	step->open_mode  = msg->open_mode;
