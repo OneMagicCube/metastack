@@ -399,7 +399,7 @@ extern int dump_all_app_state(void);
  *              1+ = recover saved state from disk  
  * RET SLURM_SUCCESS or error code  
  */  
-extern int load_all_app_state(uint16_t reconfig_flags)  
+extern int load_all_app_state(uint16_t reconfig_flags);
 #endif
 
 #ifdef __METASTACK_OPT_HIGH_THROUGHPUT_SRUN_JOB_COM
