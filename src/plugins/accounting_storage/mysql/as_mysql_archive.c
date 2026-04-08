@@ -3421,10 +3421,9 @@ static char *_get_archive_columns(purge_type_t type)
 		break;
 #ifdef __METASTACK_OPT_APP_5  
 	case PURGE_JOB_APP:  
-		xstrfmtcat(cols, "%s", job_app_req_inx[0]);  
-		for (i = 1; i < JOB_APP_COUNT; i++)  
-			xstrfmtcat(cols, ", %s", job_app_req_inx[i]);  
-		break;  
+		cols      = job_app_req_inx;
+		col_count = JOB_APP_COUNT;
+		break;
 #endif
 	case PURGE_STEP:
 		cols      = step_req_inx;
@@ -5532,6 +5531,37 @@ static int _archive_purge_table(purge_type_t purge_type, uint32_t usage_info,
 
 	return SLURM_SUCCESS;
 }
+
+#ifdef __METASTACK_OPT_APP_5  
+static int _purge_apptype_table(mysql_conn_t *mysql_conn,  
+								char *cluster_name,  
+								char *app_table,  
+								char *parent_table)  
+{  
+	int rc = SLURM_SUCCESS;  
+	char *query = xstrdup_printf(  
+		"delete from \"%s_%s\" where job_db_inx not in (select job_db_inx from \"%s_%s\")",  
+		cluster_name, app_table, cluster_name, parent_table);  
+
+	DB_DEBUG(DB_ARCHIVE, mysql_conn->conn, "query\n%s", query);  
+
+	rc = mysql_db_delete_affected_rows(mysql_conn, query);  
+	xfree(query);  
+
+	if (rc != SLURM_SUCCESS) {  
+		error("Couldn't purge orphaned records from %s_%s",  
+			cluster_name, app_table);  
+		return SLURM_ERROR;  
+	}  
+
+	if ((rc = mysql_db_commit(mysql_conn))) {  
+		error("Couldn't commit purge for %s_%s",  
+			cluster_name, app_table);  
+	}  
+
+	return rc;  
+}  
+#endif
 
 static int _execute_archive(mysql_conn_t *mysql_conn,
 			    char *cluster_name,
