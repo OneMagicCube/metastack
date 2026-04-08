@@ -5538,36 +5538,31 @@ static int _archive_purge_table(purge_type_t purge_type, uint32_t usage_info,
 }
 
 #ifdef __METASTACK_OPT_APP_5  
-static int _purge_apptype_table(mysql_conn_t *mysql_conn,  
-								char *cluster_name,  
-								char *app_table,  
-								char *parent_table)  
+static int _purge_apptype_table(mysql_conn_t *mysql_conn, char *cluster_name,  
+								char *app_table, char *parent_table)  
 {  
 	int rc = SLURM_SUCCESS;  
-	char *query = xstrdup_printf(  
-		"delete from \"%s_%s\" where job_db_inx not in (select job_db_inx from \"%s_%s\")",  
-		cluster_name, app_table, cluster_name, parent_table);  
+	char *query = NULL;  
+
+	query = xstrdup_printf("delete from \"%s_%s\" where job_db_inx not in (select job_db_inx from \"%s_%s\") LIMIT %d", cluster_name, app_table, cluster_name, parent_table, MAX_PURGE_LIMIT);  
 
 	DB_DEBUG(DB_ARCHIVE, mysql_conn->conn, "query\n%s", query);  
 
-	rc = mysql_db_delete_affected_rows(mysql_conn, query);  
+	while ((rc = mysql_db_delete_affected_rows(mysql_conn, query)) > 0) {  
+		if ((rc = mysql_db_commit(mysql_conn)))  
+			error("Couldn't commit cluster (%s) purge", cluster_name);  
+	}  
+
 	xfree(query);  
-
 	if (rc != SLURM_SUCCESS) {  
-		error("Couldn't purge orphaned records from %s_%s",  
-			cluster_name, app_table);  
+		error("Couldn't remove orphaned data from %s table", app_table);  
 		return SLURM_ERROR;  
+	} else if (mysql_db_commit(mysql_conn)) {  
+		error("Couldn't commit cluster (%s) purge", cluster_name);  
 	}  
-
-	if ((rc = mysql_db_commit(mysql_conn))) {  
-		error("Couldn't commit purge for %s_%s",  
-			cluster_name, app_table);  
-	}  
-
-	return rc;  
+	return SLURM_SUCCESS;  
 }  
 #endif
-
 static int _execute_archive(mysql_conn_t *mysql_conn,
 			    char *cluster_name,
 			    slurmdb_archive_cond_t *arch_cond)
