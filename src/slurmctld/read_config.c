@@ -2869,7 +2869,8 @@ extern int read_slurm_conf(int recover)
 #endif
 
 #ifdef __METASTACK_OPT_APP_2  
-	/* Always load app config from configuration file first */  
+	if (recover > 1)  
+        reconfig_flags |= RECONFIG_KEEP_APP_INFO; 
 	if (app_list)  
 		list_flush(app_list);  
 	_build_all_app_info();  
@@ -2966,9 +2967,6 @@ extern int read_slurm_conf(int recover)
 		load_job_ret = load_all_job_state();
 	} else if (recover > 1) {	/* Load node, part & job state files */
 		reconfig_flags |= RECONFIG_KEEP_PART_INFO;
-#ifdef __METASTACK_OPT_APP_2
-		reconfig_flags |= RECONFIG_KEEP_APP_INFO;
-#endif
 		load_job_ret = load_all_job_state();
 	}
 	(void) load_all_part_state(reconfig_flags);
