@@ -450,9 +450,9 @@ sacct [<OPTION>]                                                            \n \
      -W, --wckeys:                                                          \n\
                    Only send data about these wckeys.  Default is all.      \n\
      --appname:                                                              \n\
-                   Filter by application name(s), comma separated.           \n\  
-     --appversion:                                                           \n\  
-                   Filter by application version(s), comma separated.        \n\  
+                   Filter by application name(s), comma separated.           \n\
+     --appversion:                                                           \n\
+                   Filter by application version(s), comma separated.        \n\
                    Must be used with --appname.                              \n\
      --whole-hetjob[=yes|no]:                                               \n\
 		   If set to 'yes' (or no argument), then information about \n\

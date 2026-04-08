@@ -110,6 +110,8 @@
 
 #ifdef __METASTACK_OPT_APP_1
 #include "src/common/xhash.h"
+#include "src/common/fd.h"  
+#include "src/slurmctld/state_save.h"  
 #endif
 
 #define FEATURE_MAGIC	0x34dfd8b5
