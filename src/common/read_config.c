@@ -2042,11 +2042,6 @@ static int _parse_app_name(void **dest, slurm_parser_enum_t type,
                            const char *line, char **leftover)  
 {  
     s_p_hashtbl_t *tbl = NULL;  
-#ifdef __METASTACK_OPT_APP_8
-	/* Skip parsing on client side — only slurmctld needs app records */  
-    if (!running_in_slurmctld())  
-        return 0;  
-#endif
     static s_p_options_t _app_name_options[] = {  
         {"Version", S_P_STRING},  
         {"Description", S_P_STRING},  
@@ -2054,7 +2049,14 @@ static int _parse_app_name(void **dest, slurm_parser_enum_t type,
         {"Default", S_P_BOOLEAN},  
         {NULL}  
     };  
-  
+
+#ifdef __METASTACK_OPT_APP_8
+    if (!running_in_slurmctld()) {
+        *leftover += strlen(*leftover);
+        return 0;
+    }
+#endif
+
     tbl = s_p_hashtbl_create(_app_name_options);  
     s_p_parse_line(tbl, *leftover, leftover);  
   
