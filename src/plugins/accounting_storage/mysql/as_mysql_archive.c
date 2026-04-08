@@ -5107,11 +5107,16 @@ static uint32_t _archive_table(purge_type_t type, mysql_conn_t *mysql_conn,
 		break;
 #ifdef __METASTACK_OPT_APP_5  
 	case PURGE_JOB_APP:  
+		/*
+			The JOIN and subquery of PURGE_JOB_APP both use job_db_inx. 
+			Give an alias to the job_db_inx in the subquery to avoid 
+			ambiguity.
+		*/
 		query = xstrdup_printf("select %s from \"%s_%s\" "  
-				       "inner join (select job_db_inx from \"%s_%s\" "  
+				       "inner join (select job_db_inx as _jdi from \"%s_%s\" "  
 				       "where %s <= %ld && time_end != 0 "  
 				       "order by %s asc LIMIT %d) as j "  
-				       "on \"%s_%s\".job_db_inx = j.job_db_inx",  
+				       "on \"%s_%s\".job_db_inx = j._jdi",  
 				       cols, cluster_name, sql_table,  
 				       cluster_name, parent_table, col_name,  
 				       period_end, col_name, MAX_PURGE_LIMIT,  
