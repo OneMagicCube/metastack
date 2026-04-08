@@ -891,11 +891,11 @@ static void *step_watch_dog(void *args)
 		xfree(watch_dog_tran->watch_dog_script);
 		xfree(watch_dog_tran->job_stdout);
 		xfree(watch_dog_tran->job_stderr);
-		xfree(watch_dog_tran);
 #ifdef __METASTACK_OPT_APP_7  
 		xfree(watch_dog_tran->app_name);  
 		xfree(watch_dog_tran->app_version);  
 #endif
+		xfree(watch_dog_tran);
 	}
 	return NULL;
 }
