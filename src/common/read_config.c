@@ -2058,7 +2058,16 @@ static int _parse_app_name(void **dest, slurm_parser_enum_t type,
 #endif
 
     tbl = s_p_hashtbl_create(_app_name_options);  
-    s_p_parse_line(tbl, *leftover, leftover);  
+    if (!s_p_parse_line(tbl, *leftover, leftover)) {  
+		/* Unrecognized key in AppName line — skip entire line.  
+		* Advance leftover to end of string so the main parser  
+		* doesn't try to parse the remaining keys as top-level config. */  
+		error("AppName=%s has invalid configuration (unrecognized key), "  
+			"ignoring entire line", value ? value : "?");  
+		s_p_hashtbl_destroy(tbl);  
+		*leftover += strlen(*leftover);  
+		return 0;  
+	}
   
     app_record_t *p = _create_conf_app();  
   
