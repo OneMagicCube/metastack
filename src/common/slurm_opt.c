@@ -1074,6 +1074,42 @@ static slurm_cli_opt_t slurm_opt_app = {
 };  
 #endif
 
+#ifdef __METASTACK_OPT_APP_9  
+static int arg_set_app_source(slurm_opt_t *opt, const char *arg)  
+{  
+	uint8_t val = app_source_from_str(arg);  
+	if (val == NO_VAL8) {  
+		error("Invalid --app-source value: '%s'. "  
+		      "Valid: user, auto, portal, marketplace", arg);  
+		return SLURM_ERROR;  
+	}  
+	opt->app_source_val = val;  
+	opt->app_source_set = true;  
+	return SLURM_SUCCESS;  
+}  
+static char *arg_get_app_source(slurm_opt_t *opt)  
+{  
+	if (!opt->app_source_set)  
+		return xstrdup("");  
+	return xstrdup(app_source_to_str(opt->app_source_val));  
+}  
+static void arg_reset_app_source(slurm_opt_t *opt)  
+{  
+	opt->app_source_val = 0;  
+	opt->app_source_set = false;  
+}  
+COMMON_STRING_OPTION_SET_DATA(app_source);  
+static slurm_cli_opt_t slurm_opt_app_source = {  
+	.name = "app-source",  
+	.has_arg = required_argument,  
+	.val = LONG_OPT_APP_SOURCE,  
+	.set_func = arg_set_app_source,  
+	.set_func_data = arg_set_data_app_source,  
+	.get_func = arg_get_app_source,  
+	.reset_func = arg_reset_app_source,  
+};  
+#endif
+
 static int arg_set_compress(slurm_opt_t *opt, const char *arg)
 {
 	if (!opt->srun_opt)
@@ -6128,6 +6164,9 @@ static const slurm_cli_opt_t *common_options[] = {
 #ifdef __METASTACK_OPT_APP_3  
 	&slurm_opt_app,  
 #endif
+#ifdef __METASTACK_OPT_APP_9  
+	&slurm_opt_app_source,  
+#endif
 	NULL /* END */
 };
 
@@ -8082,6 +8121,10 @@ extern job_desc_msg_t *slurm_opt_create_job_desc(slurm_opt_t *opt_local,
 #endif
 #ifdef __METASTACK_OPT_APP_3  
 	job_desc->app = xstrdup(opt_local->app);  
+#endif
+#ifdef __METASTACK_OPT_APP_9  
+	if (opt_local->app_source_set)  
+		job_desc->app_source = opt_local->app_source_val;  
 #endif
 
 	job_desc->tres_per_task = xstrdup(opt_local->tres_per_task);

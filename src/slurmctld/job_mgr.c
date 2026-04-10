@@ -7830,8 +7830,15 @@ static int _job_create(job_desc_msg_t *job_desc, int allocate, int will_run,
         job_desc->app_name = xstrdup(app_ptr->app_name);  
         xfree(job_desc->app_version);  
         job_desc->app_version = xstrdup(app_ptr->version);  
-        job_desc->app_source = 0; /* user */  
-  
+#ifdef __METASTACK_OPT_APP_9  
+        /* Preserve --app-source if explicitly set by user (portal/marketplace),  
+         * otherwise default to APP_SOURCE_USER */  
+        if (job_desc->app_source != APP_SOURCE_PORTAL &&  
+            job_desc->app_source != APP_SOURCE_MARKETPLACE)  
+            job_desc->app_source = APP_SOURCE_USER;
+#else
+		job_desc->app_source = 0; /* user */  
+#endif
         /* If the app has a bound watchdog and user didn't specify one,  
          * use the app's watchdog */  
         if (app_ptr->watchdog && app_ptr->watchdog[0] &&  
@@ -7857,7 +7864,13 @@ static int _job_create(job_desc_msg_t *job_desc, int allocate, int will_run,
             job_desc->app_name = xstrdup(job_desc->apptype);  
             xfree(job_desc->app_version);  
             job_desc->app_version = NULL; /* no version from auto-recognition */  
-            job_desc->app_source = 1; /* auto */  
+#ifdef __METASTACK_OPT_APP_9  
+			if (job_desc->app_source != APP_SOURCE_PORTAL &&  
+				job_desc->app_source != APP_SOURCE_MARKETPLACE)  
+				job_desc->app_source = APP_SOURCE_AUTO;  
+#else  
+			job_desc->app_source = 1; /* auto */  
+#endif
         }  
 #endif  
         /* If default app exists with watchdog and user didn't specify one,  

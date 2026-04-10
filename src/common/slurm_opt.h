@@ -246,6 +246,9 @@ enum {
 #ifdef __METASTACK_OPT_APP_3  
 	LONG_OPT_APP,  
 #endif
+#ifdef __METASTACK_OPT_APP_9  
+	LONG_OPT_APP_SOURCE,  
+#endif
 	LONG_OPT_ENUM_END
 };
 
@@ -532,6 +535,10 @@ typedef struct {
 #endif
 #ifdef __METASTACK_OPT_APP_3  
 	char *app;           /* --app */  
+#endif
+#ifdef __METASTACK_OPT_APP_9  
+	uint8_t app_source_val;    /* --app-source value */  
+	bool    app_source_set;    /* whether --app-source was explicitly set */  
 #endif
 } slurm_opt_t;
 

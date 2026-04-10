@@ -1479,6 +1479,26 @@ no_resv:
 		list_iterator_destroy(itr);  
 		xstrcat(*extra, ")");  
 	}  
+#endif
+#ifdef __METASTACK_OPT_APP_9  
+	if (job_cond->appsource_list &&  
+	    list_count(job_cond->appsource_list)) {  
+		set = 0;  
+		if (*extra)  
+			xstrcat(*extra, " && (");  
+		else  
+			xstrcat(*extra, " where (");  
+		itr = list_iterator_create(job_cond->appsource_list);  
+		while ((object = list_next(itr))) {  
+			if (set)  
+				xstrcat(*extra, " || ");  
+			/* appsource_list stores numeric strings like "3","4" */  
+			xstrfmtcat(*extra, "t5.source=%s", object);  
+			set = 1;  
+		}  
+		list_iterator_destroy(itr);  
+		xstrcat(*extra, ")");  
+	}  
 #endif  
 
 	return SLURM_SUCCESS;

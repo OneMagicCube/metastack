@@ -5199,6 +5199,9 @@ extern void slurmdb_pack_job_cond(void *in, uint16_t protocol_version,
 			pack32(NO_VAL, buffer);	/* count(appname_list) */  
 			pack32(NO_VAL, buffer);	/* count(appversion_list) */  
 #endif
+#ifdef __METASTACK_OPT_APP_9  
+			pack32(NO_VAL, buffer);	/* count(appsource_list) */  
+#endif
 			return;
 		}
 
@@ -5243,7 +5246,10 @@ extern void slurmdb_pack_job_cond(void *in, uint16_t protocol_version,
 #ifdef __METASTACK_OPT_APP_6  
 		_pack_list_of_str(object->appname_list, buffer);  
 		_pack_list_of_str(object->appversion_list, buffer);  
-#endif  
+#endif
+#ifdef __METASTACK_OPT_APP_9  
+		_pack_list_of_str(object->appsource_list, buffer);  
+#endif
 	}
 }
 
@@ -5506,6 +5512,20 @@ extern int slurmdb_unpack_job_cond(void **object, uint16_t protocol_version,
 				safe_unpackstr_xmalloc(&tmp_info, &uint32_tmp,  
 						       buffer);  
 				list_append(object_ptr->appversion_list, tmp_info);  
+			}  
+		}  
+#endif
+#ifdef __METASTACK_OPT_APP_9  
+		safe_unpack32(&count, buffer);  
+		if (count > NO_VAL)  
+			goto unpack_error;  
+		if (count != NO_VAL) {  
+			object_ptr->appsource_list = list_create(xfree_ptr);  
+			for (i = 0; i < count; i++) {  
+				safe_unpackstr_xmalloc(&tmp_info, &uint32_tmp,  
+						       buffer);  
+				list_append(object_ptr->appsource_list,  
+					    tmp_info);  
 			}  
 		}  
 #endif

@@ -154,6 +154,24 @@ extern void print_jobs_array(job_info_t *jobs, int size, list_t *format)
 	for (i = 0; i < size; i++) {
 		if (_filter_job(&jobs[i]))
 			continue;
+#ifdef __METASTACK_OPT_APP_9  
+		if (params.app_source_list &&  
+		    list_count(params.app_source_list)) {  
+			bool match = false;  
+			list_itr_t *as_itr = list_iterator_create(  
+				params.app_source_list);  
+			uint8_t *src_val;  
+			while ((src_val = list_next(as_itr))) {  
+				if (*src_val == jobs[i].app_source) {  
+					match = true;  
+					break;  
+				}  
+			}  
+			list_iterator_destroy(as_itr);  
+			if (!match)  
+				continue;  
+		}  
+#endif
 		if (params.priority_flag) {
 			_create_priority_list(l, &jobs[i]);
 		} else {
@@ -3011,6 +3029,21 @@ int _print_job_app(job_info_t *job, int width, bool right_justify,
 		}  
 		_print_str(app_str ? app_str : "", width, right_justify, true);  
 		xfree(app_str);  
+	}  
+	if (suffix)  
+		printf("%s", suffix);  
+	return SLURM_SUCCESS;  
+}  
+#endif
+#ifdef __METASTACK_OPT_APP_9  
+int _print_job_app_source(job_info_t *job, int width, bool right_justify,  
+			   char *suffix)  
+{  
+	if (job == NULL) {  
+		_print_str("APPSOURCE", width, right_justify, true);  
+	} else {  
+		_print_str((char *)app_source_to_str(job->app_source),  
+			   width, right_justify, true);  
 	}  
 	if (suffix)  
 		printf("%s", suffix);  

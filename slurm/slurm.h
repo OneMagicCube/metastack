@@ -620,6 +620,7 @@ typedef struct sbcast_cred sbcast_cred_t;		/* opaque data type */
 #define __METASTACK_OPT_APP_6 // The sacct command supports querying the app information of jobs. 
 #define __METASTACK_OPT_APP_7 // add slurm_app env
 #define __METASTACK_OPT_APP_8 // opt cli command
+#define __METASTACK_OPT_APP_9 // add --app-source option and squeue/sacct app-source filter 
 #endif
 
 /*****************************************************************************\
@@ -2356,6 +2357,42 @@ typedef struct job_descriptor {	/* For submit, allocate, and update requests */
 	uint8_t app_source;  /* 0=user, 1=auto, 2=default */  
 #endif
 } job_desc_msg_t;
+
+#ifdef __METASTACK_OPT_APP_9  
+/* app_source value constants */  
+#define APP_SOURCE_USER        0  
+#define APP_SOURCE_AUTO        1  
+#define APP_SOURCE_PORTAL      3  
+#define APP_SOURCE_MARKETPLACE 4  
+  
+/* app_source string constants */  
+#define APP_SOURCE_STR_USER        "user"  
+#define APP_SOURCE_STR_AUTO        "auto"  
+#define APP_SOURCE_STR_PORTAL      "portal"  
+#define APP_SOURCE_STR_MARKETPLACE "marketplace"  
+#define APP_SOURCE_STR_UNKNOWN     "unknown"  
+  
+static inline const char *app_source_to_str(uint8_t source)  
+{  
+	switch (source) {  
+	case APP_SOURCE_USER:        return APP_SOURCE_STR_USER;  
+	case APP_SOURCE_AUTO:        return APP_SOURCE_STR_AUTO;  
+	case APP_SOURCE_PORTAL:      return APP_SOURCE_STR_PORTAL;  
+	case APP_SOURCE_MARKETPLACE: return APP_SOURCE_STR_MARKETPLACE;  
+	default:                     return APP_SOURCE_STR_UNKNOWN;  
+	}  
+}  
+  
+static inline uint8_t app_source_from_str(const char *str)  
+{  
+	if (!str) return NO_VAL8;  
+	if (!xstrcasecmp(str, APP_SOURCE_STR_USER))        return APP_SOURCE_USER;  
+	if (!xstrcasecmp(str, APP_SOURCE_STR_AUTO))        return APP_SOURCE_AUTO;  
+	if (!xstrcasecmp(str, APP_SOURCE_STR_PORTAL))      return APP_SOURCE_PORTAL;  
+	if (!xstrcasecmp(str, APP_SOURCE_STR_MARKETPLACE)) return APP_SOURCE_MARKETPLACE;  
+	return NO_VAL8;  
+}  
+#endif
 
 typedef struct job_info {
 	char *account;		/* charge to specified account */

@@ -363,7 +363,13 @@ typedef struct {
 #ifdef __METASTACK_OPT_APP_6  
 	List appname_list;	/* list of char * */  
 	List appversion_list;	/* list of char * */  
-#endif  
+#endif
+#ifdef __METASTACK_OPT_APP_9  
+	List appsource_list;	/* list of char * (numeric strings for SQL) */  
+#endif
+#ifdef __METASTACK_OPT_APP_9  
+	List appsource_list;	/* list of char * (numeric strings for SQL) */  
+#endif
 } slurmdb_job_cond_t;
 
 /* slurmdb_stats_t needs to be defined before slurmdb_job_rec_t and

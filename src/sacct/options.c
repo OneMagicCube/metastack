@@ -70,6 +70,9 @@
 #define OPT_LONG_APPNAME   0x116  
 #define OPT_LONG_APPVERSION 0x117  
 #endif
+#ifdef __METASTACK_OPT_APP_9  
+#define OPT_LONG_APPSOURCE 0x118  
+#endif
 
 #define JOB_HASH_SIZE 1000
 
@@ -750,7 +753,10 @@ extern void parse_command_line(int argc, char **argv)
 #ifdef __METASTACK_OPT_APP_6  
                 {"appname",        required_argument, 0,    OPT_LONG_APPNAME},  
                 {"appversion",     required_argument, 0,    OPT_LONG_APPVERSION},  
-#endif  
+#endif
+#ifdef __METASTACK_OPT_APP_9  
+                {"appsource",      required_argument, 0,    OPT_LONG_APPSOURCE},  
+#endif 
                 {0,                0,		      0,    0}};
 
 	params.opt_uid = getuid();
@@ -1082,6 +1088,27 @@ extern void parse_command_line(int argc, char **argv)
 			slurm_addto_char_list(job_cond->appversion_list, optarg);  
 			job_cond->flags |= JOBCOND_FLAG_APPTYPE;  
 			break;  
+#endif
+#ifdef __METASTACK_OPT_APP_9  
+		case OPT_LONG_APPSOURCE:  
+		{  
+			if (!job_cond->appsource_list)  
+				job_cond->appsource_list = list_create(xfree_ptr);  
+			char *tmp = xstrdup(optarg);  
+			char *save_ptr = NULL;  
+			char *tok = strtok_r(tmp, ",", &save_ptr);  
+			while (tok) {  
+				uint8_t val = app_source_from_str(tok);  
+				if (val == NO_VAL8)  
+					fatal("Invalid --appsource value: '%s'", tok);  
+				char *num_str = xstrdup_printf("%u", val);  
+				list_append(job_cond->appsource_list, num_str);  
+				tok = strtok_r(NULL, ",", &save_ptr);  
+			}  
+			xfree(tmp);  
+			job_cond->flags |= JOBCOND_FLAG_APPTYPE;  
+			break;  
+		}  
 #endif
 		case ':':
 		case '?':	/* getopt() has explained it */

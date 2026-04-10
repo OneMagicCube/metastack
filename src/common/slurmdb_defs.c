@@ -1383,6 +1383,9 @@ extern void slurmdb_destroy_job_cond_members(slurmdb_job_cond_t *job_cond)
 	FREE_NULL_LIST(job_cond->appname_list);  
 	FREE_NULL_LIST(job_cond->appversion_list);  
 #endif
+#ifdef __METASTACK_OPT_APP_9  
+	FREE_NULL_LIST(job_cond->appsource_list);  
+#endif 
 }
 
 extern void slurmdb_destroy_job_cond(void *object)
