@@ -1219,15 +1219,20 @@ static int _build_single_appline_info(app_record_t *app)
 		app_ptr->description = xstrdup(app->description);  
   
 	if (app->watchdog) {  
-		app_ptr->watchdog = xstrdup(app->watchdog);  
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION  
-		/* Validate watchdog reference */  
-		if (!list_find_first(watch_dog_list, &list_find_watch_dog,  
-				     app->watchdog)) {  
+    /* Validate watchdog reference — only set if valid */  
+		if (list_find_first(watch_dog_list, &list_find_watch_dog,  
+							app->watchdog)) {  
+			app_ptr->watchdog = xstrdup(app->watchdog);  
+		} else {  
 			error("AppName=%s Version=%s references undefined "  
-			      "Watchdog '%s'",  
-			      app->app_name, app->version, app->watchdog);  
+				"Watchdog '%s', ignoring watchdog setting",  
+				app->app_name, app->version, app->watchdog);  
+			/* Leave app_ptr->watchdog as NULL — app is still usable,  
+			* just without watchdog functionality */  
 		}  
+#else  
+		app_ptr->watchdog = xstrdup(app->watchdog);
 #endif  
 	}  
   
