@@ -846,7 +846,8 @@ _print_config_app(char *config_param)
 				slurm_print_app_info(stdout, &app_ptr[i],  
 				                     one_liner);  
 			}  
-			fprintf(stdout, "\n");  
+			if (print_cnt > 0)
+				fprintf(stdout, "\n");
 		}  
 	}  
   
@@ -882,7 +883,7 @@ static int _parse_app_options(int argc, char **argv, app_desc_msg_t *app_msg)
 			xfree(app_msg->version);  
 			app_msg->version = xstrdup(val);  
 			update_cnt++;  
-		} else if (!xstrncasecmp(tag, "Description", MAX(tag_len, 1))) {  
+		} else if (!xstrncasecmp(tag, "Description", MAX(tag_len, 3))) {  
 			xfree(app_msg->description);  
 			app_msg->description = xstrdup(val);  
 			update_cnt++;  
@@ -890,7 +891,7 @@ static int _parse_app_options(int argc, char **argv, app_desc_msg_t *app_msg)
 			xfree(app_msg->watchdog);  
 			app_msg->watchdog = xstrdup(val);  
 			update_cnt++;  
-		} else if (!xstrncasecmp(tag, "Default", MAX(tag_len, 2))) {  
+		} else if (!xstrncasecmp(tag, "Default", MAX(tag_len, 3))) {  
 			if (!xstrcasecmp(val, "YES") ||  
 			    !xstrcasecmp(val, "1") ||  
 			    !xstrcasecmp(val, "TRUE"))  
