@@ -4320,6 +4320,29 @@ extern void slurm_init_app_desc_msg(app_desc_msg_t *msg)
 }  
 #endif
 
+#ifdef __METASTACK_OPT_APP_9  
+extern const char *app_source_to_str(uint8_t source)  
+{  
+	switch (source) {  
+	case APP_SOURCE_USER:        return APP_SOURCE_STR_USER;  
+	case APP_SOURCE_AUTO:        return APP_SOURCE_STR_AUTO;  
+	case APP_SOURCE_PORTAL:      return APP_SOURCE_STR_PORTAL;  
+	case APP_SOURCE_MARKETPLACE: return APP_SOURCE_STR_MARKETPLACE;  
+	default:                     return APP_SOURCE_STR_UNKNOWN;  
+	}  
+}  
+  
+extern uint8_t app_source_from_str(const char *str)  
+{  
+	if (!str) return NO_VAL8;  
+	if (!xstrcasecmp(str, APP_SOURCE_STR_USER))        return APP_SOURCE_USER;  
+	if (!xstrcasecmp(str, APP_SOURCE_STR_AUTO))        return APP_SOURCE_AUTO;  
+	if (!xstrcasecmp(str, APP_SOURCE_STR_PORTAL))      return APP_SOURCE_PORTAL;  
+	if (!xstrcasecmp(str, APP_SOURCE_STR_MARKETPLACE)) return APP_SOURCE_MARKETPLACE;  
+	return NO_VAL8;  
+}  
+#endif
+
 /*
  * slurm_free_ctl_conf - free slurm control information response message
  * IN msg - pointer to slurm control information response message

@@ -2372,26 +2372,9 @@ typedef struct job_descriptor {	/* For submit, allocate, and update requests */
 #define APP_SOURCE_STR_MARKETPLACE "marketplace"  
 #define APP_SOURCE_STR_UNKNOWN     "unknown"  
   
-static inline const char *app_source_to_str(uint8_t source)  
-{  
-	switch (source) {  
-	case APP_SOURCE_USER:        return APP_SOURCE_STR_USER;  
-	case APP_SOURCE_AUTO:        return APP_SOURCE_STR_AUTO;  
-	case APP_SOURCE_PORTAL:      return APP_SOURCE_STR_PORTAL;  
-	case APP_SOURCE_MARKETPLACE: return APP_SOURCE_STR_MARKETPLACE;  
-	default:                     return APP_SOURCE_STR_UNKNOWN;  
-	}  
-}  
-  
-static inline uint8_t app_source_from_str(const char *str)  
-{  
-	if (!str) return NO_VAL8;  
-	if (!xstrcasecmp(str, APP_SOURCE_STR_USER))        return APP_SOURCE_USER;  
-	if (!xstrcasecmp(str, APP_SOURCE_STR_AUTO))        return APP_SOURCE_AUTO;  
-	if (!xstrcasecmp(str, APP_SOURCE_STR_PORTAL))      return APP_SOURCE_PORTAL;  
-	if (!xstrcasecmp(str, APP_SOURCE_STR_MARKETPLACE)) return APP_SOURCE_MARKETPLACE;  
-	return NO_VAL8;  
-}  
+extern const char *app_source_to_str(uint8_t source);  
+/* helper: string -> uint8, returns NO_VAL8 on error */  
+extern uint8_t app_source_from_str(const char *str); 
 #endif
 
 typedef struct job_info {
