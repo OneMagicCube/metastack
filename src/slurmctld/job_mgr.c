@@ -7808,6 +7808,20 @@ static int _job_create(job_desc_msg_t *job_desc, int allocate, int will_run,
 
 #endif
 
+#ifdef __METASTACK_OPT_APP_9  
+	/* --app-source requires --app to be specified */  
+	if ((!job_desc->app || !job_desc->app[0]) &&  
+		job_desc->app_source != 0xff) {  
+		info("%s: --app-source requires --app to be specified", __func__);  
+		if (err_msg) {  
+			xfree(*err_msg);  
+			xstrfmtcat(*err_msg,  "--app-source option requires --app specification");  
+		}  
+		error_code = ESLURM_INVALID_APP_NAME;  
+		goto cleanup_fail;  
+	}  
+#endif
+
 #ifdef __METASTACK_OPT_APP_3  
     /* Validate --app and auto-fill app_name, app_version */  
     if (job_desc->app && job_desc->app[0]) {  

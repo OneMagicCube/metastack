@@ -750,13 +750,13 @@ extern void parse_command_line(int argc, char **argv)
                 {"associations",   required_argument, 0,    'x'},
                 {"json", optional_argument, 0, OPT_LONG_JSON},
                 {"yaml", optional_argument, 0, OPT_LONG_YAML},
-#ifdef __METASTACK_OPT_APP_6  
-                {"appname",        required_argument, 0,    OPT_LONG_APPNAME},  
-                {"appversion",     required_argument, 0,    OPT_LONG_APPVERSION},  
+#ifdef __METASTACK_OPT_APP_6    
+                {"app-name",       required_argument, 0,    OPT_LONG_APPNAME},    
+                {"app-version",    required_argument, 0,    OPT_LONG_APPVERSION},    
 #endif
 #ifdef __METASTACK_OPT_APP_9  
-                {"appsource",      required_argument, 0,    OPT_LONG_APPSOURCE},  
-#endif 
+                {"app-source",     required_argument, 0,    OPT_LONG_APPSOURCE},  
+#endif
                 {0,                0,		      0,    0}};
 
 	params.opt_uid = getuid();
@@ -1100,7 +1100,7 @@ extern void parse_command_line(int argc, char **argv)
 			while (tok) {  
 				uint8_t val = app_source_from_str(tok);  
 				if (val == NO_VAL8)  
-					fatal("Invalid --appsource value: '%s'", tok);  
+					fatal("Invalid --app-source value: '%s'", tok);  
 				char *num_str = xstrdup_printf("%u", val);  
 				list_append(job_cond->appsource_list, num_str);  
 				tok = strtok_r(NULL, ",", &save_ptr);  
@@ -1115,11 +1115,11 @@ extern void parse_command_line(int argc, char **argv)
 			exit(1);
 		}
 	}
-#ifdef __METASTACK_OPT_APP_6  
-	if (job_cond->appversion_list && list_count(job_cond->appversion_list)  
-	    && (!job_cond->appname_list || !list_count(job_cond->appname_list))) {  
-		fatal("--appversion must be used with --appname");  
-	}  
+#ifdef __METASTACK_OPT_APP_6    
+	if (job_cond->appversion_list && list_count(job_cond->appversion_list)
+	    && (!job_cond->appname_list || !list_count(job_cond->appname_list))) {
+		fatal("--app-version must be used with --app-name");    
+	}
 #endif
 	if (!job_cond->step_list || !list_count(job_cond->step_list)) {
 		char *reason = NULL;
