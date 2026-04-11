@@ -1456,6 +1456,10 @@ extern void parse_command_line(int argc, char **argv)
 			dot = DEFAULT_COMP_FIELDS;
 		else if ( ( env_val = getenv("SACCT_FORMAT") ) )
 			dot = xstrdup(env_val);
+#ifdef __METASTACK_OPT_APP_9  
+		else if (job_cond->flags & JOBCOND_FLAG_APPTYPE)  
+			dot = DEFAULT_APP_FIELDS;  
+#endif 
 		else
 			dot = DEFAULT_FIELDS;
 
