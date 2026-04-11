@@ -1098,7 +1098,20 @@ static void arg_reset_app_source(slurm_opt_t *opt)
 	opt->app_source_val = 0;  
 	opt->app_source_set = false;  
 }  
-COMMON_STRING_OPTION_SET_DATA(app_source);  
+static int arg_set_data_app_source(slurm_opt_t *opt,  
+				   const data_t *arg,  
+				   data_t *errors)  
+{  
+	char *str = NULL;  
+	int rc;  
+  
+	rc = data_get_string_converted(arg, &str);  
+	if (rc) return rc;  
+  
+	rc = arg_set_app_source(opt, str);  
+	xfree(str);  
+	return rc;  
+}
 static slurm_cli_opt_t slurm_opt_app_source = {  
 	.name = "app-source",  
 	.has_arg = required_argument,  
