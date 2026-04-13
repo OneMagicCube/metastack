@@ -5508,9 +5508,11 @@ static int _archive_purge_table(purge_type_t purge_type, uint32_t usage_info,
 						    tmp_archive_period,  
 						    job_app_table,  
 						    usage_info);  
-				if (rc == SLURM_ERROR)  
+				if (rc == SLURM_ERROR) {  
 					error("Failed to archive job app table for cluster %s, continuing",  
 					      cluster_name);  
+					rc = SLURM_SUCCESS;  
+				}  
 #endif
 			}
 		}

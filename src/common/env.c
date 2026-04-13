@@ -875,14 +875,14 @@ int setup_env(env_t *env, bool preserve_env)
 			rc = SLURM_ERROR;  
 		}  
 	}  
-	if (env->app_name) {
+	if (env->app_name) {  
 		if (setenvf(&env->env, "SLURM_JOB_APP_SOURCE", "%u",  
-		    env->app_source)) {  
-		error("%s: can't set SLURM_JOB_APP_SOURCE env variable",  
-		      __func__);  
-		rc = SLURM_ERROR;  
-		} 
-	} 
+			    env->app_source)) {  
+			error("%s: can't set SLURM_JOB_APP_SOURCE env variable",  
+			      __func__);  
+			rc = SLURM_ERROR;  
+		}  
+	}  
 #endif
 
 	if (env->qos) {

@@ -908,7 +908,7 @@ static int _parse_app_options(int argc, char **argv, app_desc_msg_t *app_msg)
 	}  
 	return update_cnt;  
 }  
-  
+
 int scontrol_create_app(int argc, char **argv)  
 {  
 	app_desc_msg_t app_msg;  
@@ -917,27 +917,33 @@ int scontrol_create_app(int argc, char **argv)
 	if (_parse_app_options(argc, argv, &app_msg) == 0) {  
 		exit_code = 1;  
 		error("No parameters specified");  
-		return SLURM_SUCCESS;  
+		goto cleanup;  
 	}  
   
 	if (!app_msg.app_name) {  
 		exit_code = 1;  
 		error("AppName must be given.");  
-		return SLURM_SUCCESS;  
+		goto cleanup;  
 	}  
 	if (!app_msg.version) {  
 		exit_code = 1;  
 		error("Version must be given.");  
-		return SLURM_SUCCESS;  
+		goto cleanup;  
 	}  
   
 	if (slurm_create_app(&app_msg)) {  
 		exit_code = 1;  
 		slurm_perror("Error creating the app");  
+		xfree(app_msg.app_name);  
+		xfree(app_msg.version);  
+		xfree(app_msg.description);  
+		xfree(app_msg.watchdog);  
 		return slurm_get_errno();  
 	}  
   
 	printf("App created: %s-%s\n", app_msg.app_name, app_msg.version);  
+  
+cleanup:  
 	xfree(app_msg.app_name);  
 	xfree(app_msg.version);  
 	xfree(app_msg.description);  
@@ -953,31 +959,38 @@ int scontrol_update_app(int argc, char **argv)
 	if (_parse_app_options(argc, argv, &app_msg) == 0) {  
 		exit_code = 1;  
 		error("No parameters specified");  
-		return SLURM_SUCCESS;  
+		goto cleanup;  
 	}  
   
 	if (!app_msg.app_name) {  
 		exit_code = 1;  
 		error("AppName must be given.");  
-		return SLURM_SUCCESS;  
+		goto cleanup;  
 	}  
 	if (!app_msg.version) {  
 		exit_code = 1;  
 		error("Version must be given.");  
-		return SLURM_SUCCESS;  
+		goto cleanup;  
 	}  
   
 	if (slurm_update_app(&app_msg)) {  
 		exit_code = 1;  
 		slurm_perror("Error updating the app");  
+		xfree(app_msg.app_name);  
+		xfree(app_msg.version);  
+		xfree(app_msg.description);  
+		xfree(app_msg.watchdog);  
 		return slurm_get_errno();  
 	}  
+  
+cleanup:  
 	xfree(app_msg.app_name);  
 	xfree(app_msg.version);  
 	xfree(app_msg.description);  
 	xfree(app_msg.watchdog);  
 	return SLURM_SUCCESS;  
-}  
+}
+
 #endif /* __METASTACK_OPT_APP_2 */
 
 /*

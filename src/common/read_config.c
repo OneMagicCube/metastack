@@ -2124,10 +2124,11 @@ static void _destroy_app_name(void *ptr)
 	app_record_t *p = (app_record_t *)ptr;  
 	xfree(p->app_name);  
 	xfree(p->version);  
+	xfree(p->combined_name);  
 	xfree(p->description);  
 	xfree(p->watchdog);  
 	xfree(ptr);  
-}  
+}
 #endif
 
 static int _parse_partitionname(void **dest, slurm_parser_enum_t type,

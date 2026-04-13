@@ -1200,7 +1200,6 @@ static int _build_single_appline_info(app_record_t *app)
 	char *buf = NULL;  
 	xstrfmtcat(buf, "%s-%s", app->app_name, app->version);    
 	app_ptr = (app_record_t *)xhash_get_str(app_hash_table, buf);    
-	xfree(buf);
   
 	if (app_ptr) {  
 		error("%s: AppName=%s Version=%s specified more than once, "  
@@ -1215,7 +1214,9 @@ static int _build_single_appline_info(app_record_t *app)
 		find_key[0] = app_ptr->app_name;  
 		find_key[1] = app_ptr->version;  
 		list_delete_first(app_list, &list_find_app, find_key);  
-	}  
+	}
+
+	xfree(buf);
   
 	app_ptr = create_app_record(app->app_name, app->version);  
   
