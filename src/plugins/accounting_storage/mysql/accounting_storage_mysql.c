@@ -1553,10 +1553,10 @@ extern int create_cluster_tables(mysql_conn_t *mysql_conn, char *cluster_name)
 #ifdef __METASTACK_OPT_APP_5
 	storage_field_t job_app_table_fields[] = {  
 		{ "job_db_inx", "bigint unsigned not null" },  
-		{ "apptype", "varchar(128) not null default ''" },  
-		{ "apptype_version", "varchar(64) not null default ''" },  
-		{ "apptype_runtime", "tinytext not null default ''" },  
-		{ "source", "tinyint default 0 not null" },  
+		{ "app_name", "varchar(128) not null default ''" },  
+		{ "app_version", "varchar(64) not null default ''" },  
+		{ "app_runtime", "tinytext not null default ''" },  
+		{ "app_source", "tinyint default 0 not null" },
 		{ "mod_time", "bigint unsigned default 0 not null" },  
 		{ "extra", "text not null default ''" },  
 		{ "deleted", "tinyint default 0 not null" },  
@@ -1698,7 +1698,7 @@ extern int create_cluster_tables(mysql_conn_t *mysql_conn, char *cluster_name)
 	if (mysql_db_create_table(mysql_conn, table_name,  
 				  job_app_table_fields,  
 				  ", primary key (job_db_inx), "  
-				  "key idx_apptype (apptype))")  
+				  "key idx_app_name (app_name))"
 	    == SLURM_ERROR)  
 		return SLURM_ERROR;  
 #endif

@@ -120,9 +120,9 @@ char *job_req_inx[] = {
 	"t1.resource_node_detail",
 #endif
 #ifdef __METASTACK_OPT_APP_10  
-	"t5.apptype",  
-	"t5.apptype_version",  
-	"t5.source",  
+	"t5.app_name",  
+	"t5.app_version",  
+	"t5.app_source",  
 #endif
 	"t2.`user`"
 };
@@ -195,9 +195,9 @@ enum {
 	JOB_REQ_RESC_NODE,
 #endif
 #ifdef __METASTACK_OPT_APP_10  
-	JOB_REQ_APPNAME,  
-	JOB_REQ_APPVERSION,  
-	JOB_REQ_APPSOURCE,  
+	JOB_REQ_APP_NAME,  
+	JOB_REQ_APP_VERSION,  
+	JOB_REQ_APP_SOURCE,  
 #endif
 	JOB_REQ_USER_NAME,
 	JOB_REQ_COUNT
@@ -592,7 +592,7 @@ static int _cluster_get_jobs(kingbase_conn_t *kingbase_conn,
 			   cluster_name, job_env_table);
 #ifdef __METASTACK_OPT_APP_10  
 	/* Only LEFT JOIN apptype table when app info is actually needed */  
-	if (job_cond->flags & JOBCOND_FLAG_APPTYPE)  
+	if (job_cond->flags & JOBCOND_FLAG_APP)  
 		xstrfmtcat(query,  
 			   " left join `%s_%s` as t5 "  
 			   "on t1.job_db_inx=t5.job_db_inx",  
@@ -738,13 +738,13 @@ static int _cluster_get_jobs(kingbase_conn_t *kingbase_conn,
 			job->user = xstrdup(temp);
 #ifdef __METASTACK_OPT_APP_10  
 		{  
-			char *tmp_app = KCIResultGetColumnValue(result, i, JOB_REQ_APPNAME);  
+			char *tmp_app = KCIResultGetColumnValue(result, i, JOB_REQ_APP_NAME);  
 			if (tmp_app && tmp_app[0])  
 				job->app_name = xstrdup(tmp_app);  
-			tmp_app = KCIResultGetColumnValue(result, i, JOB_REQ_APPVERSION);  
+			tmp_app = KCIResultGetColumnValue(result, i, JOB_REQ_APP_VERSION);  
 			if (tmp_app && tmp_app[0])  
 				job->app_version = xstrdup(tmp_app);  
-			tmp_app = KCIResultGetColumnValue(result, i, JOB_REQ_APPSOURCE);  
+			tmp_app = KCIResultGetColumnValue(result, i, JOB_REQ_APP_SOURCE);  
 			if (tmp_app)  
 				job->app_source = slurm_atoul(tmp_app);  
 		}  
@@ -1494,7 +1494,7 @@ no_resv:
 			char *esc_obj = slurm_add_slash_to_quotes(object);  
 			if (set)  
 				xstrcat(*extra, " or ");  
-			xstrfmtcat(*extra, "t5.apptype='%s'",  
+			xstrfmtcat(*extra, "t5.app_name='%s'",  
 				   esc_obj ? esc_obj : "");  
 			xfree(esc_obj);  
 			set = 1;  
@@ -1515,7 +1515,7 @@ no_resv:
 			char *esc_obj = slurm_add_slash_to_quotes(object);  
 			if (set)  
 				xstrcat(*extra, " or ");  
-			xstrfmtcat(*extra, "t5.apptype_version='%s'",  
+			xstrfmtcat(*extra, "t5.app_version='%s'",  
 				   esc_obj ? esc_obj : "");  
 			xfree(esc_obj);  
 			set = 1;  
@@ -1535,7 +1535,7 @@ no_resv:
 		while ((object = list_next(itr))) {  
 			if (set)  
 				xstrcat(*extra, " or ");  
-			xstrfmtcat(*extra, "t5.source=%s", object);  
+			xstrfmtcat(*extra, "t5.app_source=%s", object);  
 			set = 1;  
 		}  
 		list_iterator_destroy(itr);  
@@ -1945,10 +1945,10 @@ extern List as_kingbase_jobacct_process_get_jobs(kingbase_conn_t *kingbase_conn,
 		    ((i == JOB_REQ_ENV) &&
 		     (!job_cond || !(job_cond->flags & JOBCOND_FLAG_ENV)))
 #ifdef __METASTACK_OPT_APP_6  
-		    || ((i == JOB_REQ_APPNAME ||  
-		         i == JOB_REQ_APPVERSION ||  
-		         i == JOB_REQ_APPSOURCE) &&  
-		        (!job_cond || !(job_cond->flags & JOBCOND_FLAG_APPTYPE)))  
+		    || ((i == JOB_REQ_APP_NAME ||  
+		         i == JOB_REQ_APP_VERSION ||  
+		         i == JOB_REQ_APP_SOURCE) &&  
+		        (!job_cond || !(job_cond->flags & JOBCOND_FLAG_APP)))  
 #endif
 			 )
 			xstrcat(tmp, ", ''");

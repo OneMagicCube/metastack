@@ -833,7 +833,7 @@ no_rollup_change:
 	xfree(query);
 
 #ifdef __METASTACK_OPT_APP_5  
-	/* Insert/update apptype record into job_app_table */  
+	/* Insert/update app record into job_app_table */  
 	if (rc == SLURM_SUCCESS && job_ptr->db_index  
 	    && job_ptr->app_name && job_ptr->app_name[0]) {  
 		char *esc_app_name = slurm_add_slash_to_quotes(job_ptr->app_name);  
@@ -841,11 +841,11 @@ no_rollup_change:
   
 		query = xstrdup_printf(  
 			"insert into \"%s_%s\" "  
-			"(job_db_inx, apptype, apptype_version, source, mod_time) "  
+			"(job_db_inx, app_name, app_version, app_source, mod_time) "  
 			"values (%"PRIu64", '%s', '%s', %u, UNIX_TIMESTAMP()) "  
 			"on duplicate key update "  
-			"apptype='%s', apptype_version='%s', "  
-			"source=%u, mod_time=UNIX_TIMESTAMP()",  
+			"app_name='%s', app_version='%s', "  
+			"app_source=%u, mod_time=UNIX_TIMESTAMP()",  
 			mysql_conn->cluster_name, job_app_table,  
 			job_ptr->db_index,  
 			esc_app_name ? esc_app_name : "",  
@@ -859,7 +859,7 @@ no_rollup_change:
 		xfree(esc_app_version);  
   
 		DB_DEBUG(DB_JOB, mysql_conn->conn,  
-			 "apptype query\n%s", query);  
+			 "app query\n%s", query);  
 		rc = mysql_db_query(mysql_conn, query);  
 		xfree(query);  
 	}  

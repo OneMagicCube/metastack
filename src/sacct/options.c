@@ -1080,13 +1080,13 @@ extern void parse_command_line(int argc, char **argv)
 			if (!job_cond->appname_list)  
 				job_cond->appname_list = list_create(xfree_ptr);  
 			slurm_addto_char_list(job_cond->appname_list, optarg);  
-			job_cond->flags |= JOBCOND_FLAG_APPTYPE;  
+			job_cond->flags |= JOBCOND_FLAG_APP;  
 			break;  
 		case OPT_LONG_APPVERSION:  
 			if (!job_cond->appversion_list)  
 				job_cond->appversion_list = list_create(xfree_ptr);  
 			slurm_addto_char_list(job_cond->appversion_list, optarg);  
-			job_cond->flags |= JOBCOND_FLAG_APPTYPE;  
+			job_cond->flags |= JOBCOND_FLAG_APP;  
 			break;  
 #endif
 #ifdef __METASTACK_OPT_APP_9  
@@ -1106,7 +1106,7 @@ extern void parse_command_line(int argc, char **argv)
 				tok = strtok_r(NULL, ",", &save_ptr);  
 			}  
 			xfree(tmp);  
-			job_cond->flags |= JOBCOND_FLAG_APPTYPE;  
+			job_cond->flags |= JOBCOND_FLAG_APP;  
 			break;  
 		}  
 #endif
@@ -1457,7 +1457,7 @@ extern void parse_command_line(int argc, char **argv)
 		else if ( ( env_val = getenv("SACCT_FORMAT") ) )
 			dot = xstrdup(env_val);
 #ifdef __METASTACK_OPT_APP_9  
-		else if (job_cond->flags & JOBCOND_FLAG_APPTYPE)  
+		else if (job_cond->flags & JOBCOND_FLAG_APP)  
 			dot = DEFAULT_APP_FIELDS;  
 #endif 
 		else
@@ -1519,7 +1519,7 @@ extern void parse_command_line(int argc, char **argv)
 		if (fields[i].type == PRINT_APPNAME ||  
 		    fields[i].type == PRINT_APPVERSION ||  
 		    fields[i].type == PRINT_APPSOURCE)  
-			job_cond->flags |= JOBCOND_FLAG_APPTYPE;
+			job_cond->flags |= JOBCOND_FLAG_APP;
 #endif  
 		list_append(print_fields_list, &fields[i]);
 		start = end + 1;

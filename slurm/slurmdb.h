@@ -212,7 +212,7 @@ enum cluster_fed_states {
 #define JOBCOND_FLAG_SCRIPT           SLURM_BIT(8) /* Get batch script only */
 #define JOBCOND_FLAG_ENV              SLURM_BIT(9) /* Get job's env only */
 #ifdef __METASTACK_OPT_APP_6  
-#define JOBCOND_FLAG_APPTYPE          SLURM_BIT(10)
+#define JOBCOND_FLAG_APP          SLURM_BIT(10)
 #endif
 
 /* Archive / Purge time flags */

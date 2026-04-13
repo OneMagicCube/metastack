@@ -927,12 +927,12 @@ no_rollup_change:
   
 		query = xstrdup_printf(  
 			"insert into `%s_%s` "  
-			"(job_db_inx, apptype, apptype_version, source, mod_time) "  
+			"(job_db_inx, app_name, app_version, app_source, mod_time) "  
 			"values (%"PRIu64", '%s', '%s', %u, "  
 			"extract(epoch from now())::bigint) "  
 			"on duplicate key update "  
-			"apptype='%s', apptype_version='%s', "  
-			"source=%u, mod_time=extract(epoch from now())::bigint",  
+			"app_name='%s', app_version='%s', "  
+			"app_source=%u, mod_time=extract(epoch from now())::bigint",  
 			kingbase_conn->cluster_name, job_app_table,  
 			job_ptr->db_index,  
 			esc_app_name ? esc_app_name : "",  
@@ -946,7 +946,7 @@ no_rollup_change:
 		xfree(esc_app_version);  
   
 		DB_DEBUG(DB_JOB, kingbase_conn->conn,  
-			 "apptype query\n%s", query);  
+			 "app query\n%s", query);  
   
 		fetch_flag_t *fetch_flag = set_fetch_flag(false, false, false);  
 		fetch_result_t *data_rt = xmalloc(sizeof(fetch_result_t));  

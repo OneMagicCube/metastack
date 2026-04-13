@@ -274,9 +274,9 @@ typedef struct {
 #ifdef __METASTACK_OPT_APP_5  
 typedef struct {  
 	char *job_db_inx;  
-	char *apptype;  
-	char *apptype_version;  
-	char *source;  
+	char *app_name;  
+	char *app_version;  
+	char *app_source;  
 	char *mod_time;  
 } local_job_app_t;  
   
@@ -284,9 +284,9 @@ static void _free_local_job_app_members(local_job_app_t *object)
 {  
 	if (object) {  
 		xfree(object->job_db_inx);  
-		xfree(object->apptype);  
-		xfree(object->apptype_version);  
-		xfree(object->source);  
+		xfree(object->app_name);  
+		xfree(object->app_version);  
+		xfree(object->app_source);  
 		xfree(object->mod_time);  
 	}  
 }  
@@ -717,18 +717,18 @@ enum {
 #ifdef __METASTACK_OPT_APP_5  
 enum {  
 	JOB_APP_DB_INX,  
-	JOB_APP_APPTYPE,  
-	JOB_APP_APPTYPE_VERSION,  
-	JOB_APP_SOURCE,  
+	JOB_APP_APP_NAME,  
+	JOB_APP_APP_VERSION,  
+	JOB_APP_APP_SOURCE,  
 	JOB_APP_MOD_TIME,  
 	JOB_APP_COUNT  
 };  
   
 static char *job_app_req_inx[] = {  
 	"job_db_inx",  
-	"apptype",  
-	"apptype_version",  
-	"source",  
+	"app_name",  
+	"app_version",  
+	"app_source",  
 	"mod_time",  
 };  
 #endif
@@ -1940,9 +1940,9 @@ static void _pack_local_job_app(local_job_app_t *object, buf_t *buffer)
 {  
 	/* Always packs as current version */  
 	packstr(object->job_db_inx, buffer);  
-	packstr(object->apptype, buffer);  
-	packstr(object->apptype_version, buffer);  
-	packstr(object->source, buffer);  
+	packstr(object->app_name, buffer);  
+	packstr(object->app_version, buffer);  
+	packstr(object->app_source, buffer);  
 	packstr(object->mod_time, buffer);  
 }  
   
@@ -1952,9 +1952,9 @@ static int _unpack_local_job_app(local_job_app_t *object,
 	memset(object, 0, sizeof(local_job_app_t));  
 	if (rpc_version >= META_3_2_PROTOCOL_VERSION) {
 		safe_unpackstr(&object->job_db_inx, buffer);  
-		safe_unpackstr(&object->apptype, buffer);  
-		safe_unpackstr(&object->apptype_version, buffer);  
-		safe_unpackstr(&object->source, buffer);  
+		safe_unpackstr(&object->app_name, buffer);  
+		safe_unpackstr(&object->app_version, buffer);  
+		safe_unpackstr(&object->app_source, buffer);  
 		safe_unpackstr(&object->mod_time, buffer);  
 	}
   
@@ -4126,9 +4126,9 @@ static buf_t *_pack_archive_job_app(MYSQL_RES *result, char *cluster_name,
 		memset(&app, 0, sizeof(local_job_app_t));  
   
 		app.job_db_inx = row[JOB_APP_DB_INX];  
-		app.apptype = row[JOB_APP_APPTYPE];  
-		app.apptype_version = row[JOB_APP_APPTYPE_VERSION];  
-		app.source = row[JOB_APP_SOURCE];  
+		app.app_name = row[JOB_APP_APP_NAME];  
+		app.app_version = row[JOB_APP_APP_VERSION];  
+		app.app_source = row[JOB_APP_APP_SOURCE];  
 		app.mod_time = row[JOB_APP_MOD_TIME];  
   
 		_pack_local_job_app(&app, buffer);  
@@ -4173,9 +4173,9 @@ static char *_load_job_app(uint16_t rpc_version, buf_t *buffer,
   
 		xstrfmtcatat(insert, &insert_pos, format,  
 			     object.job_db_inx,  
-			     object.apptype ? object.apptype : "",  
-			     object.apptype_version ? object.apptype_version : "",  
-			     object.source ? object.source : "0",  
+			     object.app_name ? object.app_name : "",  
+			     object.app_version ? object.app_version : "",  
+			     object.app_source ? object.app_source : "0",  
 			     object.mod_time ? object.mod_time : "0");  
   
 		_free_local_job_app_members(&object);  
@@ -4186,9 +4186,9 @@ static char *_load_job_app(uint16_t rpc_version, buf_t *buffer,
 	if (insert)  
 		xstrcatat(insert, &insert_pos,  
 			  " on duplicate key update "  
-			  "apptype=VALUES(apptype), "  
-			  "apptype_version=VALUES(apptype_version), "  
-			  "source=VALUES(source), "  
+			  "app_name=VALUES(app_name), "  
+			  "app_version=VALUES(app_version), "  
+			  "app_source=VALUES(app_source), "  
 			  "mod_time=VALUES(mod_time)");  
   
 	return insert;  
@@ -5538,7 +5538,7 @@ static int _archive_purge_table(purge_type_t purge_type, uint32_t usage_info,
 }
 
 #ifdef __METASTACK_OPT_APP_5  
-static int _purge_apptype_table(mysql_conn_t *mysql_conn, char *cluster_name,  
+static int _purge_app_table(mysql_conn_t *mysql_conn, char *cluster_name,  
 								char *app_table, char *parent_table)  
 {  
 	int rc = SLURM_SUCCESS;  
@@ -5612,8 +5612,8 @@ static int _execute_archive(mysql_conn_t *mysql_conn,
 					    "env_hash_inx")))
 			return rc;
 #ifdef __METASTACK_OPT_APP_5
-		/* Purge orphaned apptype records */  
-		if ((rc = _purge_apptype_table(mysql_conn, cluster_name,  
+		/* Purge orphaned app records */  
+		if ((rc = _purge_app_table(mysql_conn, cluster_name,  
 					       job_app_table, job_table)))  
 			return rc;  
 #endif

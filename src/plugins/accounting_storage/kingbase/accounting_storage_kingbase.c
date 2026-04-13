@@ -1712,10 +1712,10 @@ extern int create_cluster_tables(kingbase_conn_t *kingbase_conn, char *cluster_n
 #ifdef __METASTACK_OPT_APP_10  
 	storage_field_t job_app_table_fields[] = {  
 		{ "job_db_inx", "bigint not null" },  
-		{ "apptype", "varchar(128) not null default ''" },  
-		{ "apptype_version", "varchar(64) not null default ''" },  
-		{ "apptype_runtime", "tinytext not null default ''" },  
-		{ "source", "tinyint default 0 not null" },  
+		{ "app_name", "varchar(128) not null default ''" },  
+		{ "app_version", "varchar(64) not null default ''" },  
+		{ "app_runtime", "tinytext not null default ''" },  
+		{ "app_source", "tinyint default 0 not null" },
 		{ "mod_time", "bigint default 0 not null" },  
 		{ "extra", "text not null default ''" },  
 		{ "deleted", "tinyint default 0 not null" },  
@@ -1994,7 +1994,7 @@ extern int create_cluster_tables(kingbase_conn_t *kingbase_conn, char *cluster_n
 	snprintf(table_name, sizeof(table_name), "%s_%s",  
 				cluster_name, job_app_table);  
 	xstrfmtcat(end, ", primary key (job_db_inx));"  
-				"create index idx_apptype_%s_%s on %s_%s (apptype);",  
+				"create index idx_app_name_%s_%s on %s_%s (app_name);",  
 				cluster_name, job_app_table,  
 				cluster_name, job_app_table);  
 	if (kingbase_db_create_table(kingbase_conn, table_name,  

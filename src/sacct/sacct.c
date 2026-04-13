@@ -331,7 +331,7 @@ int main(int argc, char **argv)
 			if (field->type == PRINT_APPNAME ||  
 			    field->type == PRINT_APPVERSION ||  
 			    field->type == PRINT_APPSOURCE) {  
-				params.job_cond->flags |= JOBCOND_FLAG_APPTYPE;  
+				params.job_cond->flags |= JOBCOND_FLAG_APP;  
 				break;  
 			}  
 		}  

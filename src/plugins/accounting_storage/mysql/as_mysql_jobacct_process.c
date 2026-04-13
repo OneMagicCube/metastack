@@ -120,9 +120,9 @@ char *job_req_inx[] = {
 #endif
 	"t2.lineage",
 #ifdef __METASTACK_OPT_APP_6  
-	"t5.apptype",  
-	"t5.apptype_version",  
-	"t5.source",  
+	"t5.app_name",  
+	"t5.app_version",  
+	"t5.app_source",
 #endif 
 	"t2.user"
 };
@@ -195,9 +195,9 @@ enum {
 #endif
 	JOB_REQ_LINEAGE,
 #ifdef __METASTACK_OPT_APP_6  
-	JOB_REQ_APPNAME,  
-	JOB_REQ_APPVERSION,  
-	JOB_REQ_APPSOURCE,  
+	JOB_REQ_APP_NAME,  
+	JOB_REQ_APP_VERSION,  
+	JOB_REQ_APP_SOURCE,  
 #endif
 	JOB_REQ_USER_NAME,
 	JOB_REQ_COUNT
@@ -587,8 +587,8 @@ static int _cluster_get_jobs(mysql_conn_t *mysql_conn,
 			   "on t1.env_hash_inx=t4.hash_inx",
 			   cluster_name, job_env_table);
 #ifdef __METASTACK_OPT_APP_6  
-	/* Only LEFT JOIN apptype table when app info is actually needed */  
-	if (job_cond->flags & JOBCOND_FLAG_APPTYPE)  
+	/* Only LEFT JOIN app table when app info is actually needed */
+	if (job_cond->flags & JOBCOND_FLAG_APP)  
 		xstrfmtcat(query,  
 			   " left join \"%s_%s\" as t5 "  
 			   "on t1.job_db_inx=t5.job_db_inx",  
@@ -726,12 +726,12 @@ static int _cluster_get_jobs(mysql_conn_t *mysql_conn,
 		if (row[JOB_REQ_USER_NAME])
 			job->user = xstrdup(row[JOB_REQ_USER_NAME]);
 #ifdef __METASTACK_OPT_APP_6  
-		if (row[JOB_REQ_APPNAME] && row[JOB_REQ_APPNAME][0])  
-			job->app_name = xstrdup(row[JOB_REQ_APPNAME]);  
-		if (row[JOB_REQ_APPVERSION] && row[JOB_REQ_APPVERSION][0])  
-			job->app_version = xstrdup(row[JOB_REQ_APPVERSION]);  
-		if (row[JOB_REQ_APPSOURCE])  
-			job->app_source = slurm_atoul(row[JOB_REQ_APPSOURCE]);  
+		if (row[JOB_REQ_APP_NAME] && row[JOB_REQ_APP_NAME][0])  
+			job->app_name = xstrdup(row[JOB_REQ_APP_NAME]);  
+		if (row[JOB_REQ_APP_VERSION] && row[JOB_REQ_APP_VERSION][0])  
+			job->app_version = xstrdup(row[JOB_REQ_APP_VERSION]);  
+		if (row[JOB_REQ_APP_SOURCE])  
+			job->app_source = slurm_atoul(row[JOB_REQ_APP_SOURCE]);  
 		else  
 			job->app_source = 0xff;  
 #endif
@@ -1450,7 +1450,7 @@ no_resv:
 			char *esc_obj = slurm_add_slash_to_quotes(object);  
 			if (set)  
 				xstrcat(*extra, " || ");  
-			xstrfmtcat(*extra, "t5.apptype='%s'",  
+			xstrfmtcat(*extra, "t5.app_name='%s'",  
 				   esc_obj ? esc_obj : "");  
 			xfree(esc_obj);  
 			set = 1;  
@@ -1471,7 +1471,7 @@ no_resv:
 			char *esc_obj = slurm_add_slash_to_quotes(object);  
 			if (set)  
 				xstrcat(*extra, " || ");  
-			xstrfmtcat(*extra, "t5.apptype_version='%s'",  
+			xstrfmtcat(*extra, "t5.app_version='%s'",  
 				   esc_obj ? esc_obj : "");  
 			xfree(esc_obj);  
 			set = 1;  
@@ -1493,7 +1493,7 @@ no_resv:
 			if (set)  
 				xstrcat(*extra, " || ");  
 			/* appsource_list stores numeric strings like "3","4" */  
-			xstrfmtcat(*extra, "t5.source='%s'", object);
+			xstrfmtcat(*extra, "t5.app_source='%s'", object);
 			set = 1;  
 		}  
 		list_iterator_destroy(itr);  
@@ -1903,10 +1903,10 @@ extern List as_mysql_jobacct_process_get_jobs(mysql_conn_t *mysql_conn,
 		    ((i == JOB_REQ_ENV) &&
 		     (!job_cond || !(job_cond->flags & JOBCOND_FLAG_ENV)))
 #ifdef __METASTACK_OPT_APP_6  
-		    || ((i == JOB_REQ_APPNAME ||  
-		         i == JOB_REQ_APPVERSION ||  
-		         i == JOB_REQ_APPSOURCE) &&  
-		        (!job_cond || !(job_cond->flags & JOBCOND_FLAG_APPTYPE)))  
+		    || ((i == JOB_REQ_APP_NAME ||  
+		         i == JOB_REQ_APP_VERSION ||  
+		         i == JOB_REQ_APP_SOURCE) &&  
+		        (!job_cond || !(job_cond->flags & JOBCOND_FLAG_APP)))  
 #endif
 			 )
 			xstrcat(tmp, ", ''");
