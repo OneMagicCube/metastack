@@ -859,8 +859,11 @@ no_rollup_change:
 		xfree(esc_app_version);  
   
 		DB_DEBUG(DB_JOB, mysql_conn->conn,  
-			 "app query\n%s", query);  
-		rc = mysql_db_query(mysql_conn, query);  
+			 "app query\n%s", query);
+		int app_rc = mysql_db_query(mysql_conn, query);  
+		if (app_rc != SLURM_SUCCESS)  
+			error("Failed to insert app info for job db_index %"PRIu64,  
+			      job_ptr->db_index);
 		xfree(query);  
 	}  
 #endif

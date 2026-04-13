@@ -950,7 +950,10 @@ no_rollup_change:
   
 		fetch_flag_t *fetch_flag = set_fetch_flag(false, false, false);  
 		fetch_result_t *data_rt = xmalloc(sizeof(fetch_result_t));  
-		rc = kingbase_for_fetch(kingbase_conn, query, fetch_flag, data_rt);  
+		int app_rc = kingbase_for_fetch(kingbase_conn, query, fetch_flag, data_rt);    
+		if (app_rc != SLURM_SUCCESS)    
+			error("Failed to insert app info for job db_index %"PRIu64,    
+			      job_ptr->db_index);  
 		free_res_data(data_rt, fetch_flag);  
 		xfree(query);  
 	}  

@@ -276,9 +276,12 @@ typedef struct {
 	char *job_db_inx;  
 	char *app_name;  
 	char *app_version;  
+	char *app_runtime;  
 	char *app_source;  
 	char *mod_time;  
-} local_job_app_t;  
+	char *extra;  
+	char *deleted;  
+} local_job_app_t; 
   
 static void _free_local_job_app_members(local_job_app_t *object)  
 {  
@@ -294,11 +297,15 @@ static void _free_local_job_app_members(local_job_app_t *object)
 
 static void _free_local_job_script_members(local_job_script_t *object)
 {
-	if (object) {
-		xfree(object->hash_inx);
-		xfree(object->last_used);
-		xfree(object->script_hash);
-		xfree(object->batch_script);
+	if (object) {  
+		xfree(object->job_db_inx);  
+		xfree(object->app_name);  
+		xfree(object->app_version);  
+		xfree(object->app_runtime);  
+		xfree(object->app_source);  
+		xfree(object->mod_time);  
+		xfree(object->extra);  
+		xfree(object->deleted);  
 	}
 }
 
@@ -719,8 +726,11 @@ enum {
 	JOB_APP_DB_INX,  
 	JOB_APP_APP_NAME,  
 	JOB_APP_APP_VERSION,  
+	JOB_APP_APP_RUNTIME,  
 	JOB_APP_APP_SOURCE,  
 	JOB_APP_MOD_TIME,  
+	JOB_APP_EXTRA,  
+	JOB_APP_DELETED,  
 	JOB_APP_COUNT  
 };  
   
@@ -728,8 +738,11 @@ static char *job_app_req_inx[] = {
 	"job_db_inx",  
 	"app_name",  
 	"app_version",  
+	"app_runtime",  
 	"app_source",  
 	"mod_time",  
+	"extra",  
+	"deleted",  
 };  
 #endif
 
@@ -1942,28 +1955,38 @@ static void _pack_local_job_app(local_job_app_t *object, buf_t *buffer)
 	packstr(object->job_db_inx, buffer);  
 	packstr(object->app_name, buffer);  
 	packstr(object->app_version, buffer);  
+	packstr(object->app_runtime, buffer);  
 	packstr(object->app_source, buffer);  
 	packstr(object->mod_time, buffer);  
-}  
+	packstr(object->extra, buffer);  
+	packstr(object->deleted, buffer);  
+}
   
 static int _unpack_local_job_app(local_job_app_t *object,  
 				 uint16_t rpc_version, buf_t *buffer)  
 {  
 	memset(object, 0, sizeof(local_job_app_t));  
-	if (rpc_version >= META_3_2_PROTOCOL_VERSION) {
+	if (rpc_version >= META_3_2_PROTOCOL_VERSION) {  
 		safe_unpackstr(&object->job_db_inx, buffer);  
 		safe_unpackstr(&object->app_name, buffer);  
 		safe_unpackstr(&object->app_version, buffer);  
+		safe_unpackstr(&object->app_runtime, buffer);  
 		safe_unpackstr(&object->app_source, buffer);  
 		safe_unpackstr(&object->mod_time, buffer);  
-	}
+		safe_unpackstr(&object->extra, buffer);  
+		safe_unpackstr(&object->deleted, buffer);  
+	} else {  
+		error("_unpack_local_job_app: unsupported rpc_version %u",  
+		      rpc_version);  
+		goto unpack_error;  
+	}  
   
 	return SLURM_SUCCESS;  
   
 unpack_error:  
 	_free_local_job_app_members(object);  
 	return SLURM_ERROR;  
-}  
+} 
 #endif
 
 static void _pack_local_resv(local_resv_t *object, buf_t *buffer)
@@ -4128,14 +4151,17 @@ static buf_t *_pack_archive_job_app(MYSQL_RES *result, char *cluster_name,
 		app.job_db_inx = row[JOB_APP_DB_INX];  
 		app.app_name = row[JOB_APP_APP_NAME];  
 		app.app_version = row[JOB_APP_APP_VERSION];  
+		app.app_runtime = row[JOB_APP_APP_RUNTIME];  
 		app.app_source = row[JOB_APP_APP_SOURCE];  
 		app.mod_time = row[JOB_APP_MOD_TIME];  
+		app.extra = row[JOB_APP_EXTRA];  
+		app.deleted = row[JOB_APP_DELETED];  
   
 		_pack_local_job_app(&app, buffer);  
 	}  
   
 	return buffer;  
-}  
+}
 
 /* returns sql statement from archived data or NULL on error */  
 static char *_load_job_app(uint16_t rpc_version, buf_t *buffer,  
@@ -4164,6 +4190,7 @@ static char *_load_job_app(uint16_t rpc_version, buf_t *buffer,
 		if (_unpack_local_job_app(&object, rpc_version, buffer)  
 		    != SLURM_SUCCESS) {  
 			error("issue unpacking");  
+			_free_local_job_app_members(&object);  
 			xfree(insert);  
 			break;  
 		}  
@@ -4175,8 +4202,11 @@ static char *_load_job_app(uint16_t rpc_version, buf_t *buffer,
 			     object.job_db_inx,  
 			     object.app_name ? object.app_name : "",  
 			     object.app_version ? object.app_version : "",  
+			     object.app_runtime ? object.app_runtime : "",  
 			     object.app_source ? object.app_source : "0",  
-			     object.mod_time ? object.mod_time : "0");  
+			     object.mod_time ? object.mod_time : "0",  
+			     object.extra ? object.extra : "",  
+			     object.deleted ? object.deleted : "0");  
   
 		_free_local_job_app_members(&object);  
 	}  
@@ -4188,11 +4218,14 @@ static char *_load_job_app(uint16_t rpc_version, buf_t *buffer,
 			  " on duplicate key update "  
 			  "app_name=VALUES(app_name), "  
 			  "app_version=VALUES(app_version), "  
+			  "app_runtime=VALUES(app_runtime), "  
 			  "app_source=VALUES(app_source), "  
-			  "mod_time=VALUES(mod_time)");  
+			  "mod_time=VALUES(mod_time), "  
+			  "extra=VALUES(extra), "  
+			  "deleted=VALUES(deleted)");  
   
 	return insert;  
-}  
+}
 #endif
 
 static buf_t *_pack_archive_resvs(MYSQL_RES *result, char *cluster_name,
@@ -5468,7 +5501,8 @@ static int _archive_purge_table(purge_type_t purge_type, uint32_t usage_info,
 						    job_app_table,  
 						    usage_info);  
 				if (rc == SLURM_ERROR)  
-					return rc;  
+					error("Failed to archive job app table for cluster %s, continuing",  
+					      cluster_name);
 #endif
 			}
 		}
@@ -5539,20 +5573,22 @@ static int _archive_purge_table(purge_type_t purge_type, uint32_t usage_info,
 
 #ifdef __METASTACK_OPT_APP_5  
 static int _purge_app_table(mysql_conn_t *mysql_conn, char *cluster_name,  
-								char *app_table, char *parent_table)  
+							char *app_table, char *parent_table)  
 {  
 	int rc = SLURM_SUCCESS;  
 	char *query = NULL;  
-
+  
 	query = xstrdup_printf("delete from \"%s_%s\" where job_db_inx not in (select job_db_inx from \"%s_%s\") LIMIT %d", cluster_name, app_table, cluster_name, parent_table, MAX_PURGE_LIMIT);  
-
+  
 	DB_DEBUG(DB_ARCHIVE, mysql_conn->conn, "query\n%s", query);  
-
+  
 	while ((rc = mysql_db_delete_affected_rows(mysql_conn, query)) > 0) {  
-		if ((rc = mysql_db_commit(mysql_conn)))  
+		if ((rc = mysql_db_commit(mysql_conn))) {  
 			error("Couldn't commit cluster (%s) purge", cluster_name);  
+			break;  
+		}  
 	}  
-
+  
 	xfree(query);  
 	if (rc != SLURM_SUCCESS) {  
 		error("Couldn't remove orphaned data from %s table", app_table);  
@@ -5561,7 +5597,7 @@ static int _purge_app_table(mysql_conn_t *mysql_conn, char *cluster_name,
 		error("Couldn't commit cluster (%s) purge", cluster_name);  
 	}  
 	return SLURM_SUCCESS;  
-}  
+}
 #endif
 static int _execute_archive(mysql_conn_t *mysql_conn,
 			    char *cluster_name,

@@ -730,10 +730,10 @@ static int _cluster_get_jobs(mysql_conn_t *mysql_conn,
 			job->app_name = xstrdup(row[JOB_REQ_APP_NAME]);  
 		if (row[JOB_REQ_APP_VERSION] && row[JOB_REQ_APP_VERSION][0])  
 			job->app_version = xstrdup(row[JOB_REQ_APP_VERSION]);  
-		if (row[JOB_REQ_APP_SOURCE])  
+		if (row[JOB_REQ_APP_SOURCE] && row[JOB_REQ_APP_SOURCE][0])  
 			job->app_source = slurm_atoul(row[JOB_REQ_APP_SOURCE]);  
 		else  
-			job->app_source = 0xff;  
+			job->app_source = 0xff; 
 #endif
 		if (row[JOB_REQ_UID])
 			job->uid = slurm_atoul(row[JOB_REQ_UID]);
@@ -1493,7 +1493,7 @@ no_resv:
 			if (set)  
 				xstrcat(*extra, " || ");  
 			/* appsource_list stores numeric strings like "3","4" */  
-			xstrfmtcat(*extra, "t5.app_source='%s'", object);
+			xstrfmtcat(*extra, "t5.app_source=%lu", slurm_atoul(object));
 			set = 1;  
 		}  
 		list_iterator_destroy(itr);  

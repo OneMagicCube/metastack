@@ -745,7 +745,7 @@ static int _cluster_get_jobs(kingbase_conn_t *kingbase_conn,
 			if (tmp_app && tmp_app[0])  
 				job->app_version = xstrdup(tmp_app);  
 			tmp_app = KCIResultGetColumnValue(result, i, JOB_REQ_APP_SOURCE);  
-			if (tmp_app)  
+			if (tmp_app && tmp_app[0])
 				job->app_source = slurm_atoul(tmp_app);  
 		}  
 #endif
@@ -1535,7 +1535,7 @@ no_resv:
 		while ((object = list_next(itr))) {  
 			if (set)  
 				xstrcat(*extra, " or ");  
-			xstrfmtcat(*extra, "t5.app_source=%s", object);  
+			xstrfmtcat(*extra, "t5.app_source=%lu", slurm_atoul(object)); 
 			set = 1;  
 		}  
 		list_iterator_destroy(itr);  
@@ -1944,7 +1944,7 @@ extern List as_kingbase_jobacct_process_get_jobs(kingbase_conn_t *kingbase_conn,
 		     (!job_cond || !(job_cond->flags & JOBCOND_FLAG_SCRIPT))) ||
 		    ((i == JOB_REQ_ENV) &&
 		     (!job_cond || !(job_cond->flags & JOBCOND_FLAG_ENV)))
-#ifdef __METASTACK_OPT_APP_6  
+#ifdef __METASTACK_OPT_APP_10 
 		    || ((i == JOB_REQ_APP_NAME ||  
 		         i == JOB_REQ_APP_VERSION ||  
 		         i == JOB_REQ_APP_SOURCE) &&  
