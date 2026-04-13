@@ -2241,7 +2241,8 @@ extern void print_fields(type_t type, void *object)
 			case JOB:  
 				tmp_char = job->app_name;  
 				break;  
-			default:  
+			default:
+				tmp_char = "";
 				break;  
 			}  
 			field->print_routine(field,  
@@ -2253,7 +2254,8 @@ extern void print_fields(type_t type, void *object)
 			case JOB:  
 				tmp_char = job->app_version;  
 				break;  
-			default:  
+			default:
+				tmp_char = "";  
 				break;  
 			}  
 			field->print_routine(field,  
@@ -2279,7 +2281,8 @@ extern void print_fields(type_t type, void *object)
 					tmp_char = "";  
 				}  
 				break;  
-			default:  
+			default:
+				tmp_char = "";  
 				break;  
 			}  
 			field->print_routine(field,  

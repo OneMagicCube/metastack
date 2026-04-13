@@ -2088,13 +2088,13 @@ static void _set_env_vars2(resource_allocation_response_msg_t *resp,
 		}  
 		xfree(key);  
 	}
-	{  
-		key = _build_key("SLURM_JOB_APP_SOURCE", het_job_offset);  
-		if (!getenv(key) &&  
-		    (setenvf(NULL, key, "%u", resp->app_source) < 0)) {  
-			error("unable to set %s in environment", key);  
-		}  
-		xfree(key);  
+	if (resp->app_name) {    
+		key = _build_key("SLURM_JOB_APP_SOURCE", het_job_offset);    
+		if (!getenv(key) &&    
+		    (setenvf(NULL, key, "%u", resp->app_source) < 0)) {    
+			error("unable to set %s in environment", key);    
+		}    
+		xfree(key);    
 	}
 #endif
 

@@ -1190,9 +1190,11 @@ extern int env_array_for_job(char ***dest,
 					    het_job_offset, "%s",  
 					    alloc->app_version);  
 	}
-	env_array_overwrite_het_fmt(dest, "SLURM_JOB_APP_SOURCE",  
-				    het_job_offset, "%u",  
-				    alloc->app_source); 
+	if (alloc->app_name) {  
+		env_array_overwrite_het_fmt(dest, "SLURM_JOB_APP_SOURCE",    
+					    het_job_offset, "%u",    
+					    alloc->app_source);
+	} 
 #endif
 	if (alloc->qos) {
 		env_array_overwrite_het_fmt(dest, "SLURM_JOB_QOS",
@@ -1479,21 +1481,11 @@ env_array_for_batch_job(char ***dest, const batch_job_launch_msg_t *batch,
 
 #ifdef __METASTACK_OPT_APP_7
 	if (batch->app_name) {  
-		env_array_overwrite_fmt(dest,  
-					"SLURM_JOB_APP_NAME",  
-					"%s",  
-					batch->app_name);  
-	}  
-	if (batch->app_version) {  
-		env_array_overwrite_fmt(dest,  
-					"SLURM_JOB_APP_VERSION",  
-					"%s",  
-					batch->app_version);  
+		env_array_overwrite_fmt(dest, "SLURM_JOB_APP_NAME", "%s", batch->app_name);  
+		if (batch->app_version)  
+			env_array_overwrite_fmt(dest, "SLURM_JOB_APP_VERSION", "%s", batch->app_version);  
+		env_array_overwrite_fmt(dest, "SLURM_JOB_APP_SOURCE", "%u", batch->app_source);  
 	}
-	env_array_overwrite_fmt(dest,  
-				"SLURM_JOB_APP_SOURCE",  
-				"%u",  
-				batch->app_source);
 #endif
 
 	if (batch->qos) {

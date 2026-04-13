@@ -3983,10 +3983,12 @@ static void _set_het_job_env(job_record_t *het_job_leader,
 				"SLURM_JOB_APP_VERSION",  
 				het_job_offset, "%s", het_job->app_version);  
 		}
-		(void) env_array_overwrite_het_fmt(  
-			&launch_msg_ptr->environment,  
-			"SLURM_JOB_APP_SOURCE",  
-			het_job_offset, "%u", het_job->app_source);
+		if (het_job->app_name) {  
+			(void) env_array_overwrite_het_fmt(    
+				&launch_msg_ptr->environment,    
+				"SLURM_JOB_APP_SOURCE",    
+				het_job_offset, "%u", het_job->app_source);  
+		}
 #endif
 		if (het_job->job_resrcs) {
 			tmp_str = uint32_compressed_to_str(

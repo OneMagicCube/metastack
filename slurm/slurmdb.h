@@ -1028,7 +1028,7 @@ typedef struct {
 #ifdef __METASTACK_OPT_APP_6  
 	char    *app_name;  
 	char    *app_version;  
-	uint8_t  app_source;    /* 0=user, 1=auto, 0xff=unset */  
+	uint8_t  app_source;    /* 0=user, 1=auto, 2=portal, 3=marketplace, 0xff=unset */
 #endif 
 } slurmdb_job_rec_t;
 

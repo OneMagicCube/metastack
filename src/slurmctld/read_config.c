@@ -1164,15 +1164,18 @@ app_record_t *create_app_record(const char *name, const char *version)
 	return app_ptr;  
 }
   
-app_record_t *find_app_record(const char *app_name, const char *version)  
-{  
-	char buf[512];  
+app_record_t *find_app_record(const char *app_name, const char *version)    
+{    
+	char *buf = NULL;  
+	app_record_t *result;  
+
+	if (!app_name || !version || !app_hash_table)    
+		return NULL;    
   
-	if (!app_name || !version || !app_hash_table)  
-		return NULL;  
-  
-	snprintf(buf, sizeof(buf), "%s-%s", app_name, version);  
-	return (app_record_t *)xhash_get_str(app_hash_table, buf);  
+	xstrfmtcat(buf, "%s-%s", app_name, version);    
+	result = (app_record_t *)xhash_get_str(app_hash_table, buf);    
+	xfree(buf);  
+	return result;  
 }
   
 /*  
@@ -1194,9 +1197,10 @@ static int _build_single_appline_info(app_record_t *app)
 	app_record_t *app_ptr = NULL;  
   
 	/* Use hash table for O(1) duplicate detection */  
-	char buf[512];  
-	snprintf(buf, sizeof(buf), "%s-%s", app->app_name, app->version);  
-	app_ptr = (app_record_t *)xhash_get_str(app_hash_table, buf);  
+	char *buf = NULL;  
+	xstrfmtcat(buf, "%s-%s", app->app_name, app->version);    
+	app_ptr = (app_record_t *)xhash_get_str(app_hash_table, buf);    
+	xfree(buf);
   
 	if (app_ptr) {  
 		error("%s: AppName=%s Version=%s specified more than once, "  
@@ -1238,20 +1242,20 @@ static int _build_single_appline_info(app_record_t *app)
   
 	app_ptr->default_flag = app->default_flag;  
   
-	if (app->default_flag) {  
+	if (app->default_flag) {
 		if (default_app_name &&  
-		    (xstrcmp(default_app_name, app->app_name) ||  
-		     xstrcmp(default_app_loc->version, app->version))) {  
-			info("%s: changing default app from %s-%s to %s-%s",  
+		    (xstrcmp(default_app_loc->app_name, app->app_name) ||  
+		    xstrcmp(default_app_loc->version, app->version))) {
+			info("%s: changing default app from %s-%s to %s-%s",
 			     __func__,  
 			     default_app_loc->app_name,  
 			     default_app_loc->version,  
 			     app->app_name, app->version);  
-		}  
-		xfree(default_app_name);  
-		xstrfmtcat(default_app_name, "%s-%s",  
-			   app->app_name, app->version);  
-		default_app_loc = app_ptr;  
+		}
+		xfree(default_app_name);
+		xstrfmtcat(default_app_name, "%s-%s",
+			   app->app_name, app->version);
+		default_app_loc = app_ptr;
 	}  
   
 	return 0;  

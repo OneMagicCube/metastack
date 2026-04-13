@@ -1095,7 +1095,7 @@ static char *arg_get_app_source(slurm_opt_t *opt)
 }  
 static void arg_reset_app_source(slurm_opt_t *opt)  
 {  
-	opt->app_source_val = 0;  
+	opt->app_source_val = NO_VAL8;
 	opt->app_source_set = false;  
 }  
 static int arg_set_data_app_source(slurm_opt_t *opt,  

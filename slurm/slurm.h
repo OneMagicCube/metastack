@@ -3304,7 +3304,7 @@ typedef struct resource_allocation_response_msg {
 #ifdef __METASTACK_OPT_APP_7
 	char *app_name;         /* allocation app name */  
 	char *app_version;      /* allocation app version */  
-	uint8_t app_source;     /* 0=user, 1=auto */
+	uint8_t app_source;     /* 0=user, 1=auto, 2=portal, 3=marketplace */
 #endif
 } resource_allocation_response_msg_t;
 

@@ -756,8 +756,10 @@ static char **_build_watch_dog_env(acct_gather_rank_t *watch_dog)
 	if (watch_dog->app_version)  
 		setenvf(&my_env, "SLURM_JOB_APP_VERSION", "%s",  
 			watch_dog->app_version);  
-	setenvf(&my_env, "SLURM_JOB_APP_SOURCE", "%u",  
-		watch_dog->app_source);
+	if (watch_dog->app_name) {  
+		setenvf(&my_env, "SLURM_JOB_APP_SOURCE", "%u",    
+			watch_dog->app_source);  
+	}
 #endif
 	if(watch_dog->job_stdout != NULL)
 		setenvf(&my_env, "SLURM_JOB_STDOUT", "%s", watch_dog->job_stdout);

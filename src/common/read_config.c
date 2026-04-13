@@ -2051,10 +2051,10 @@ static int _parse_app_name(void **dest, slurm_parser_enum_t type,
     };  
 
 #ifdef __METASTACK_OPT_APP_8
-    if (!running_in_slurmctld()) {
-        *leftover += strlen(*leftover);
-        return 0;
-    }
+	if (!running_in_slurmctld()) {
+		*leftover += strlen(*leftover);
+		return 0;
+	}
 #endif
 
     tbl = s_p_hashtbl_create(_app_name_options);  
@@ -2071,8 +2071,13 @@ static int _parse_app_name(void **dest, slurm_parser_enum_t type,
   
     app_record_t *p = _create_conf_app();  
   
-    if (value != NULL)  
-        p->app_name = xstrdup(value);  
+    if (value == NULL) {  
+		error("AppName line missing name value, ignoring");
+		_destroy_app_name(p);  
+		s_p_hashtbl_destroy(tbl);  
+		return 0;  
+	}
+	p->app_name = xstrdup(value);  
   
     if (!s_p_get_string(&p->version, "Version", tbl)) {  
         error("AppName=%s missing required Version, ignoring",  
@@ -2100,7 +2105,8 @@ static void _init_conf_app(app_record_t *conf_app)
 	conf_app->app_name = NULL;  
 	conf_app->version = NULL;  
 	conf_app->description = NULL;  
-	conf_app->watchdog = NULL;  
+	conf_app->watchdog = NULL;
+	conf_app->combined_name = NULL;
 	conf_app->default_flag = false;  
 }  
   

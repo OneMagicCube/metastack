@@ -551,7 +551,7 @@ struct job_record {
 #ifdef __METASTACK_OPT_APP_3  
 	char *app_name;      /* application name from --app */  
 	char *app_version;   /* application version from --app */  
-	uint8_t app_source;  /* 0=user, 1=auto, 2=default */  
+	uint8_t app_source;  /* 0=user, 1=auto, 2=portal, 3=marketplace */
 #endif
 };
 

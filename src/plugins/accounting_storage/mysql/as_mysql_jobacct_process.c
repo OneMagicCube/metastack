@@ -1493,7 +1493,7 @@ no_resv:
 			if (set)  
 				xstrcat(*extra, " || ");  
 			/* appsource_list stores numeric strings like "3","4" */  
-			xstrfmtcat(*extra, "t5.source=%s", object);  
+			xstrfmtcat(*extra, "t5.source='%s'", object);
 			set = 1;  
 		}  
 		list_iterator_destroy(itr);  

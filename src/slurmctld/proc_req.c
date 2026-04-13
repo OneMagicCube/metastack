@@ -2389,7 +2389,8 @@ static void _slurm_rpc_dump_app_info(slurm_msg_t *msg)
   
 	if ((last_time_msg->last_update - 1) >= last_app_update) {  
 		debug2("%s, no change", __func__);  
-		unlock_slurmctld(app_read_lock);  
+		unlock_slurmctld(app_read_lock);
+		END_TIMER2(__func__);
 		slurm_send_rc_msg(msg, SLURM_NO_CHANGE_IN_DATA);  
 	} else {  
 		buffer = pack_all_app(msg->auth_uid, msg->protocol_version);  

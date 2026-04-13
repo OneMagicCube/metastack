@@ -872,8 +872,13 @@ static int _parse_app_options(int argc, char **argv, app_desc_msg_t *app_msg)
 			tag_len = val - argv[i];  
 			val++;  
 		} else {  
-			tag_len = strlen(tag);  
-		}  
+			tag_len = strlen(tag);
+		}
+
+		if (!val) {  
+			error("Missing value for option '%s' (expected '=')", tag);  
+			continue;  
+		}
   
 		if (!xstrncasecmp(tag, "AppName", MAX(tag_len, 4))) {  
 			xfree(app_msg->app_name);  
@@ -933,6 +938,10 @@ int scontrol_create_app(int argc, char **argv)
 	}  
   
 	printf("App created: %s-%s\n", app_msg.app_name, app_msg.version);  
+	xfree(app_msg.app_name);  
+	xfree(app_msg.version);  
+	xfree(app_msg.description);  
+	xfree(app_msg.watchdog);  
 	return SLURM_SUCCESS;  
 }  
   
@@ -963,7 +972,10 @@ int scontrol_update_app(int argc, char **argv)
 		slurm_perror("Error updating the app");  
 		return slurm_get_errno();  
 	}  
-  
+	xfree(app_msg.app_name);  
+	xfree(app_msg.version);  
+	xfree(app_msg.description);  
+	xfree(app_msg.watchdog);  
 	return SLURM_SUCCESS;  
 }  
 #endif /* __METASTACK_OPT_APP_2 */

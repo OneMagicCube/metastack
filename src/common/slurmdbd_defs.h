@@ -333,7 +333,7 @@ typedef struct dbd_job_start_msg {
 #ifdef __METASTACK_OPT_APP_5
 	char    *app_name;      /* application name */  
 	char    *app_version;   /* application version */  
-	uint8_t  app_source;    /* 0=user, 1=auto */  
+	uint8_t  app_source;    /* 0=user, 1=auto, 2=portal, 3=marketplace */
 #endif  
 } dbd_job_start_msg_t;
 
