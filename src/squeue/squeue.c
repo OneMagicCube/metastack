@@ -414,6 +414,12 @@ static int _print_job(bool clear_old, bool log_cluster_name, int argc,
 				"username:.8 ,statecompact:.2 ,timeused:.10 ,"
 				"numnodes:.6 ,reasonlist:0");
 		}
+#ifdef __METASTACK_OPT_APP_9  
+		/* When filtering by app, automatically show App and AppSource columns */  
+		if (params.app_name_list || params.app_source_list) {  
+			xstrcat(params.format_long, ",App:.15 ,AppSource:.12");  
+		}  
+#endif
 	}
 
 	if (!params.format_list) {

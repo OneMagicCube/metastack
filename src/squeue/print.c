@@ -170,7 +170,26 @@ extern void print_jobs_array(job_info_t *jobs, int size, list_t *format)
 			list_iterator_destroy(as_itr);  
 			if (!match)  
 				continue;  
-		}  
+		}
+		/* Filter by --app-name */  
+		if (params.app_name_list &&  
+		    list_count(params.app_name_list)) {  
+			bool match = false;  
+			if (jobs[i].app_name && jobs[i].app_name[0]) {  
+				list_itr_t *an_itr = list_iterator_create(  
+					params.app_name_list);  
+				char *name_val;  
+				while ((name_val = list_next(an_itr))) {  
+					if (!xstrcasecmp(name_val, jobs[i].app_name)) {  
+						match = true;  
+						break;  
+					}  
+				}  
+				list_iterator_destroy(an_itr);  
+			}  
+			if (!match)  
+				continue;  
+		} 
 #endif
 		if (params.priority_flag) {
 			_create_priority_list(l, &jobs[i]);

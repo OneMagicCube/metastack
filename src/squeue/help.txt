@@ -1,6 +1,9 @@
 Usage: squeue [OPTIONS]
   -A, --account=account(s)        comma separated list of accounts
                                   to view, default is all accounts
+      --app-name=name(s)          comma separated list of app names to view  
+      --app-source=source(s)      comma separated list of app sources to view  
+                                  (user, auto, portal, marketplace)
   -a, --all                       display jobs in hidden partitions
       --cache                     retrieve job information from the cache
       --federation                Report federated information if a member

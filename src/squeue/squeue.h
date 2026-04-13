@@ -130,6 +130,7 @@ struct squeue_parameters {
 #endif
 #ifdef __METASTACK_OPT_APP_9  
 	List app_source_list;  /* list of uint8_t* values to filter by app_source */  
+	List app_name_list;    /* list of char* app names to filter by app_name */ 
 #endif 
 };
 

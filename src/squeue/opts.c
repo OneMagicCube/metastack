@@ -81,7 +81,8 @@
 #define OPT_LONG_NOCACHE        0x201
 #endif
 #ifdef __METASTACK_OPT_APP_9  
-#define OPT_LONG_APP_SOURCE   0x202  
+#define OPT_LONG_APP_SOURCE   0x202
+#define OPT_LONG_APP_NAME     0x203 
 #endif
 
 /* FUNCTIONS */
@@ -463,7 +464,8 @@ extern void parse_command_line(int argc, char **argv)
 		{"json", optional_argument, 0, OPT_LONG_JSON},
 		{"yaml", optional_argument, 0, OPT_LONG_YAML},
 #ifdef __METASTACK_OPT_APP_9  
-		{"app-source", required_argument, 0, OPT_LONG_APP_SOURCE},  
+		{"app-source", required_argument, 0, OPT_LONG_APP_SOURCE},
+		{"app-name",   required_argument, 0, OPT_LONG_APP_NAME},  
 #endif 
 		{NULL,         0,                 0, 0}
 	};
@@ -753,7 +755,12 @@ extern void parse_command_line(int argc, char **argv)
 			}  
 			xfree(tmp);  
 			break;  
-		}  
+		}
+		case OPT_LONG_APP_NAME:  
+			if (!params.app_name_list)  
+				params.app_name_list = list_create(xfree_ptr);  
+			slurm_addto_char_list(params.app_name_list, optarg);  
+			break;
 #endif
 		}
 	}
