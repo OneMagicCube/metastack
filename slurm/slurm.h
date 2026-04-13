@@ -620,7 +620,8 @@ typedef struct sbcast_cred sbcast_cred_t;		/* opaque data type */
 #define __METASTACK_OPT_APP_6 // The sacct command supports querying the app information of jobs. 
 #define __METASTACK_OPT_APP_7 // add slurm_app env
 #define __METASTACK_OPT_APP_8 // opt cli command
-#define __METASTACK_OPT_APP_9 // add --app-source option and squeue/sacct app-source filter 
+#define __METASTACK_OPT_APP_9 // add --app-source option and squeue/sacct app-source filter
+#define __METASTACK_OPT_APP_10 // adapt app database support for kingbase
 #endif
 
 /*****************************************************************************\

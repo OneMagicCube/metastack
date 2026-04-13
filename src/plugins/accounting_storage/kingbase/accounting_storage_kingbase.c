@@ -162,6 +162,9 @@ char *wckey_day_table = "wckey_usage_day_table";
 char *wckey_hour_table = "wckey_usage_hour_table";
 char *wckey_month_table = "wckey_usage_month_table";
 char *wckey_table = "wckey_table";
+#ifdef __METASTACK_OPT_APP_10  
+char *job_app_table = "job_app_table"; 
+#endif
 
 char *event_view = "event_view";
 char *event_ext_view = "event_ext_view";
@@ -1706,6 +1709,20 @@ extern int create_cluster_tables(kingbase_conn_t *kingbase_conn, char *cluster_n
 		{ NULL, NULL}
 	};
 
+#ifdef __METASTACK_OPT_APP_10  
+	storage_field_t job_app_table_fields[] = {  
+		{ "job_db_inx", "bigint not null" },  
+		{ "apptype", "varchar(128) not null default ''" },  
+		{ "apptype_version", "varchar(64) not null default ''" },  
+		{ "apptype_runtime", "tinytext not null default ''" },  
+		{ "source", "tinyint default 0 not null" },  
+		{ "mod_time", "bigint default 0 not null" },  
+		{ "extra", "text not null default ''" },  
+		{ "deleted", "tinyint default 0 not null" },  
+		{ NULL, NULL}  
+	};  
+#endif
+
 	char table_name[200];
 	char *end = NULL;
 
@@ -1973,6 +1990,22 @@ extern int create_cluster_tables(kingbase_conn_t *kingbase_conn, char *cluster_n
 		}
 	xfree(end);
 	
+#ifdef __METASTACK_OPT_APP_10  
+	snprintf(table_name, sizeof(table_name), "%s_%s",  
+				cluster_name, job_app_table);  
+	xstrfmtcat(end, ", primary key (job_db_inx));"  
+				"create index idx_apptype_%s_%s on %s_%s (apptype);",  
+				cluster_name, job_app_table,  
+				cluster_name, job_app_table);  
+	if (kingbase_db_create_table(kingbase_conn, table_name,  
+									job_app_table_fields, end)  
+		== SLURM_ERROR) {  
+		xfree(end);  
+		return SLURM_ERROR;  
+	}  
+	xfree(end);  
+#endif
+
 	snprintf(table_name, sizeof(table_name), "%s_%s",
 		 cluster_name, wckey_day_table);
 	xstrfmtcat(end, ", primary key (id, id_tres, time_start));"
@@ -2049,6 +2082,9 @@ extern int remove_cluster_tables(kingbase_conn_t *kingbase_conn, char *cluster_n
 #ifdef __METASTACK_NEW_AUTO_SUPPLEMENT_AVAIL_NODES
 		   "`%s_%s`, "
 #endif
+#ifdef __METASTACK_OPT_APP_10  
+		   "`%s_%s`, "  
+#endif
 		   "`%s_%s`, `%s_%s`, `%s_%s`, `%s_%s`;",
 		   cluster_name, assoc_table,
 		   cluster_name, assoc_day_table,
@@ -2068,6 +2104,9 @@ extern int remove_cluster_tables(kingbase_conn_t *kingbase_conn, char *cluster_n
 		   cluster_name, resv_table,
 		   cluster_name, step_table,
 		   cluster_name, suspend_table,
+#ifdef __METASTACK_OPT_APP_10  
+		   cluster_name, job_app_table,  
+#endif
 		   cluster_name, wckey_table,
 		   cluster_name, wckey_day_table,
 		   cluster_name, wckey_hour_table,
