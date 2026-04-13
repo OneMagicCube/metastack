@@ -7819,7 +7819,7 @@ static int _job_create(job_desc_msg_t *job_desc, int allocate, int will_run,
 		}  
 		error_code = ESLURM_INVALID_APP_NAME;  
 		goto cleanup_fail;  
-	}  
+	}
 #endif
 
 #ifdef __METASTACK_OPT_APP_3  

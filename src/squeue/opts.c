@@ -1100,7 +1100,7 @@ static fmt_data_job_t fmt_data_job[] = {
 	{"App", 0, _print_job_app, 0},  
 #endif 
 #ifdef __METASTACK_OPT_APP_9  
-	{"AppSource", 0, _print_job_app_source, 0},  
+	{"AppSource", 0, _print_job_app_source, 0},
 #endif
 	{NULL, 0, NULL, 0},
 };

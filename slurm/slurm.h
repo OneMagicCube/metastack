@@ -2354,7 +2354,7 @@ typedef struct job_descriptor {	/* For submit, allocate, and update requests */
 	char *app;           /* --app combined name, e.g. "vasp-5.7.1" */  
 	char *app_name;      /* parsed app name, e.g. "vasp" */  
 	char *app_version;   /* parsed app version, e.g. "5.7.1" */  
-	uint8_t app_source;  /* 0=user, 1=auto, 2=default */  
+	uint8_t app_source;  /* 0=user, 1=auto, 2=portal, 3=marketplace */
 #endif
 } job_desc_msg_t;
 
@@ -2362,8 +2362,8 @@ typedef struct job_descriptor {	/* For submit, allocate, and update requests */
 /* app_source value constants */  
 #define APP_SOURCE_USER        0  
 #define APP_SOURCE_AUTO        1  
-#define APP_SOURCE_PORTAL      3  
-#define APP_SOURCE_MARKETPLACE 4  
+#define APP_SOURCE_PORTAL      2  
+#define APP_SOURCE_MARKETPLACE 3  
   
 /* app_source string constants */  
 #define APP_SOURCE_STR_USER        "user"  
