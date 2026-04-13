@@ -361,11 +361,13 @@ typedef struct {
 	List userid_list;	/* list of char * */
 	List wckey_list;	/* list of char * */
 #ifdef __METASTACK_OPT_APP_6  
-	List appname_list;	/* list of char * */  
-	List appversion_list;	/* list of char * */  
-#endif
+	List appname_list;      /* list of char *, --app-name filter values */  
+	List appversion_list;   /* list of char *, --app-version filter values */  
+#endif  
 #ifdef __METASTACK_OPT_APP_9  
-	List appsource_list;	/* list of char * (numeric strings for SQL) */  
+	List appsource_list;    /* list of char * (numeric strings "0","1",...),  
+	                         * --app-source filter values, converted from  
+	                         * string names to numeric for SQL WHERE clause */  
 #endif
 } slurmdb_job_cond_t;
 
@@ -1026,10 +1028,11 @@ typedef struct {
 	char	*resource_node_detail;
 #endif
 #ifdef __METASTACK_OPT_APP_6  
-	char    *app_name;  
-	char    *app_version;  
-	uint8_t  app_source;    /* 0=user, 1=auto, 2=portal, 3=marketplace, 0xff=unset */
-#endif 
+	char    *app_name;      /* application name from job_app_table */  
+	char    *app_version;   /* application version from job_app_table */  
+	uint8_t  app_source;    /* 0=user, 1=auto, 2=portal, 3=marketplace,  
+	                         * 0xff=unset (no app info for this job) */  
+#endif
 } slurmdb_job_rec_t;
 
 typedef struct {

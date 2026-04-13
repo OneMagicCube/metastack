@@ -833,6 +833,12 @@ no_rollup_change:
 	xfree(query);
 
 #ifdef __METASTACK_OPT_APP_5  
+	/*  
+	* Fault isolation: app table write uses a separate app_rc variable.  
+	* Failure only logs an error and does NOT affect the main rc,  
+	* ensuring job_start succeeds even if app metadata persistence fails.  
+	*/
+
 	/* Insert/update app record into job_app_table */  
 	if (rc == SLURM_SUCCESS && job_ptr->db_index  
 	    && job_ptr->app_name && job_ptr->app_name[0]) {  

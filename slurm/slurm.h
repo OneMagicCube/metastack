@@ -2359,8 +2359,17 @@ typedef struct job_descriptor {	/* For submit, allocate, and update requests */
 #endif
 } job_desc_msg_t;
 
-#ifdef __METASTACK_OPT_APP_9  
-/* app_source value constants */  
+#ifdef __METASTACK_OPT_APP_9 
+/*  
+ * app_source identifies HOW the app information was attached to a job:  
+ *   USER(0)        - User explicitly specified --app=X on command line  
+ *   AUTO(1)        - cli_filter.lua auto-recognized the application type  
+ *   PORTAL(2)      - Set by web portal integration (preserved across validation)  
+ *   MARKETPLACE(3) - Set by marketplace integration (preserved across validation)  
+ *  
+ * PORTAL and MARKETPLACE are "external" sources: once set, they are NOT  
+ * overwritten by the slurmctld validation logic (see _job_create).  
+ */ 
 #define APP_SOURCE_USER        0  
 #define APP_SOURCE_AUTO        1  
 #define APP_SOURCE_PORTAL      2  
@@ -2544,11 +2553,10 @@ typedef struct job_info {
 	uint32_t pending_order;
 #endif
 #ifdef __METASTACK_OPT_APP_3  
-	char *app_name;  
-	char *app_version;  
-	uint8_t app_source;  
+	char *app_name;      /* application name, e.g. "vasp" */  
+	char *app_version;   /* application version, e.g. "5.7.1" */  
+	uint8_t app_source;  /* how app was determined, see APP_SOURCE_* */  
 #endif
-} slurm_job_info_t;
 
 typedef slurm_job_info_t job_info_t;
 
@@ -3246,7 +3254,20 @@ typedef struct {
 
 } watch_dog_record_t;
 #endif
-#ifdef __METASTACK_OPT_APP_1  
+#ifdef __METASTACK_OPT_APP_1
+/*  
+ * app_record_t - Core application record.  
+ *  
+ * Represents a registered application (e.g. "vasp-5.7.1") in the system.  
+ * Managed by slurmctld; stored in both app_list (ownership) and  
+ * app_hash_table (O(1) lookup by combined_name, references only).  
+ *  
+ * Lifecycle: created by slurm.conf parsing or scontrol create app,  
+ * persisted to app_state file, recovered on slurmctld restart.  
+ *  
+ * Memory ownership: app_list owns the records via _list_delete_app;  
+ * app_hash_table holds non-owning references (freefunc=NULL).  
+ */
 typedef struct {  
 	char    *app_name;      /* application name, required */  
 	char    *version;       /* version string, required */  
@@ -3302,10 +3323,13 @@ typedef struct resource_allocation_response_msg {
 	void *working_cluster_rec; /* Cluster to direct remaining messages to.
 				    * slurmdb_cluster_rec_t* because slurm.h
 				    * doesn't know about slurmdb.h. */
-#ifdef __METASTACK_OPT_APP_7
-	char *app_name;         /* allocation app name */  
-	char *app_version;      /* allocation app version */  
-	uint8_t app_source;     /* 0=user, 1=auto, 2=portal, 3=marketplace */
+#ifdef __METASTACK_OPT_APP_7  
+	/* App info propagated to srun/salloc for environment injection.  
+	 * Set by slurmctld in _fill_job_alloc_info, consumed by  
+	 * setup_env() to set SLURM_JOB_APP_NAME/VERSION/SOURCE. */  
+	char *app_name;  
+	char *app_version;  
+	uint8_t app_source;  
 #endif
 } resource_allocation_response_msg_t;
 
@@ -3330,8 +3354,15 @@ typedef struct slurm_ctl_conf_info_msg_app {
 	app_record_t *app_array;  
 } slurm_ctl_conf_info_msg_app_t;  
 #endif
-#ifdef __METASTACK_OPT_APP_2  
-/* Message for create/update app */  
+#ifdef __METASTACK_OPT_APP_2
+/*  
+ * app_desc_msg_t - RPC message for create/update app.  
+ *  
+ * Used by both REQUEST_CREATE_APP and REQUEST_UPDATE_APP.  
+ * For update: fields set to NULL mean "don't change".  
+ * default_flag uses tri-state: 0=set non-default, 1=set default,  
+ * 0xff=not specified (don't change, initialized by slurm_init_app_desc_msg).  
+ */
 typedef struct app_desc_msg {  
 	char *app_name;  
 	char *version;  

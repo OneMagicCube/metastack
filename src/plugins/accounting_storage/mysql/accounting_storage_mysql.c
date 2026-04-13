@@ -1550,6 +1550,27 @@ extern int create_cluster_tables(mysql_conn_t *mysql_conn, char *cluster_name)
 		{ NULL, NULL}
 	};
 
+/*  
+ * job_app_table - Per-job application metadata, one row per job.  
+ *  
+ * Table: <cluster_name>_job_app_table  
+ * Primary key: job_db_inx (1:1 with job_table)  
+ * Index: idx_app_name for sacct --app-name queries  
+ *  
+ * Fields:  
+ *   app_name    - Application name (e.g. "vasp"), from --app or auto-recognition  
+ *   app_version - Version string (e.g. "5.7.1"), empty if auto-recognized  
+ *   app_runtime - Reserved for future use (runtime metrics)  
+ *   app_source  - How app was determined (0=user, 1=auto, 2=portal, 3=marketplace)  
+ *   extra       - Reserved for future extensibility  
+ *  
+ * Populated in as_mysql_job_start via INSERT ... ON DUPLICATE KEY UPDATE.  
+ * Queried by sacct via LEFT JOIN when JOBCOND_FLAG_APP is set.  
+ * Archived/purged alongside job_table records.  
+ *  
+ * Fault isolation: write failures use independent app_rc, logged but  
+ * not propagated to the main job_start rc.  
+ */
 #ifdef __METASTACK_OPT_APP_5
 	storage_field_t job_app_table_fields[] = {  
 		{ "job_db_inx", "bigint unsigned not null" },  

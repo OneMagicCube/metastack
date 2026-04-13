@@ -322,6 +322,14 @@ int main(int argc, char **argv)
 	parse_command_line(argc, argv);
 
 #ifdef __METASTACK_OPT_APP_6  
+	/*  
+	* Lazy LEFT JOIN optimization: only join job_app_table when the user  
+	* actually requests app-related output fields (AppName, AppVersion,  
+	* AppSource) or filters (--app-name, --app-version, --app-source).  
+	* This avoids unnecessary table joins for the common case where  
+	* app info is not needed, keeping sacct queries fast.  
+	*/
+
 	/* If user requested any app field in --format, set APPTYPE flag  
 	 * so the accounting plugin knows to LEFT JOIN job_app_table */  
 	{  

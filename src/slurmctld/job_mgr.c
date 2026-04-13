@@ -7822,6 +7822,25 @@ static int _job_create(job_desc_msg_t *job_desc, int allocate, int will_run,
 	}
 #endif
 
+/*  
+ * App validation and auto-fill logic during job creation.  
+ *  
+ * Decision tree:  
+ *   1. User specified --app=X:  
+ *      - Validate X exists in app registry (reject job if not found)  
+ *      - Auto-fill app_name and app_version from registry  
+ *      - Set app_source: preserve portal/marketplace if set, else USER  
+ *      - Inherit app's watchdog if user didn't specify one  
+ *  
+ *   2. User did NOT specify --app:  
+ *      a. cli_filter.lua auto-recognized apptype (e.g. "vasp"):  
+ *         - Set app_name from apptype, app_version=NULL, source=AUTO  
+ *      b. Default app has a watchdog:  
+ *         - Apply default app's watchdog if user didn't specify one  
+ *  
+ * app_source priority (highest wins):  
+ *   portal/marketplace (set by external system) > user > auto  
+ */
 #ifdef __METASTACK_OPT_APP_3  
     /* Validate --app and auto-fill app_name, app_version */  
     if (job_desc->app && job_desc->app[0]) {  

@@ -1096,7 +1096,16 @@ static void _list_delete_app(void *app_entry)
 	xfree(app_ptr->watchdog);  
 	xfree(app_ptr);  
 }  
-  
+
+/*  
+ * init_app_conf - Reset app subsystem to empty state.  
+ *  
+ * Called during initial config load and before rebuilding from state file.  
+ * Order matters: free hash table first (non-owning references), then  
+ * flush list (which frees the actual app_record_t memory via  
+ * _list_delete_app). Reversing this order would leave dangling  
+ * pointers in the hash table.  
+ */
 void init_app_conf(void)  
 {  
 	last_app_update = time(NULL);  
@@ -1419,8 +1428,23 @@ static buf_t *_open_app_state_file(char **state_file)
 	      "App config changes may be lost");  
 	xstrcat(*state_file, ".old");  
 	return create_mmap_buf(*state_file);  
-}  
-  
+}
+
+/*  
+ * load_all_app_state - Recover app records from state file on slurmctld start.  
+ *  
+ * State file takes precedence over slurm.conf: init_app_conf() clears  
+ * config-loaded records, then state file records are rebuilt. This ensures  
+ * dynamically created/modified/deleted apps (via scontrol) are preserved  
+ * across restarts.  
+ *  
+ * On reconfigure (recover==0): only loads state if RECONFIG_KEEP_APP_INFO  
+ * flag is set; otherwise discards dynamic changes and uses config only.  
+ *  
+ * Error handling: unpack failures go to unpack_error which frees tmp_app  
+ * members and buffer. With ignore_state_errors=false, incompatible versions  
+ * cause fatal(); otherwise logs error and continues with partial data.  
+ */
 extern int load_all_app_state(uint16_t reconfig_flags) 
 {  
 	char *state_file, *ver_str = NULL;  
@@ -1571,8 +1595,23 @@ extern buf_t *pack_all_app(uid_t uid, uint16_t protocol_version)
 	set_buf_offset(pack_app_info.buffer, tmp_offset);  
   
 	return pack_app_info.buffer;  
-}  
-  
+}
+
+/*  
+ * update_app - Create or update an app record (scontrol RPC handler).  
+ *  
+ * IN app_desc   - App description from RPC message.  
+ * IN create_flag - true=create new, false=update existing.  
+ * RET SLURM_SUCCESS or ESLURM_* error code.  
+ *  
+ * On create: validates uniqueness, creates record, sets default if requested.  
+ * On update: modifies description/watchdog/default_flag of existing record.  
+ * Both paths: update last_app_update timestamp and schedule state file save.  
+ *  
+ * Default app management: at most one app can be default. Setting a new  
+ * default clears the old one. default_app_name (string) and default_app_loc  
+ * (pointer) are always kept in sync.  
+ */ 
 extern int update_app(app_desc_msg_t *app_desc, bool create_flag)  
 {  
 	app_record_t *app_ptr = NULL;  
@@ -1671,7 +1710,16 @@ extern int update_app(app_desc_msg_t *app_desc, bool create_flag)
 	}  
 	return SLURM_SUCCESS;  
 }
-  
+
+/*  
+ * delete_app - Remove an app record by combined name.  
+ *  
+ * Deletion order: remove from hash table first (O(1), non-owning),  
+ * then remove from list (which triggers _list_delete_app to free memory).  
+ * The find_key[] pointers reference app_ptr members that are still valid  
+ * during list_delete_first's find phase; they are freed only after the  
+ * match is found and the destructor runs.  
+ */
 extern int delete_app(delete_app_msg_t *app_msg)  
 {  
 	app_record_t *app_ptr;  

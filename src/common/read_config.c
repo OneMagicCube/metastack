@@ -2036,6 +2036,19 @@ static int _parse_watch_dog_name(void **dest, slurm_parser_enum_t type,
 }
 #endif
 
+/*  
+ * _parse_app_name - Parse an "AppName=xxx Version=... ..." line from slurm.conf.  
+ *  
+ * This is a s_p_parse callback registered for the "AppName" key.  
+ * Returns 1 on success (*dest set to app_record_t*), 0 to skip the line.  
+ *  
+ * Error handling: all error paths free allocated resources (tbl, p) and  
+ * advance *leftover to end-of-string to prevent the main parser from  
+ * misinterpreting remaining tokens as top-level config keys.  
+ *  
+ * non-slurmctld processes (sbatch, srun, etc.) skip this  
+ * line entirely to avoid unnecessary parsing and potential errors.  
+ */
 #ifdef __METASTACK_OPT_APP_1  
 static int _parse_app_name(void **dest, slurm_parser_enum_t type,  
                            const char *key, const char *value,  

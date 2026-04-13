@@ -381,7 +381,23 @@ extern List watch_dog_list;			/* watch dog list */
 extern time_t last_watch_dog_update;	/* time of last update to watch_dog records */
 #endif
 
-#ifdef __METASTACK_OPT_APP_1  
+#ifdef __METASTACK_OPT_APP_1
+/*  
+ * App subsystem global state (slurmctld only).  
+ *  
+ * Dual data structure design:  
+ *   app_list       - Authoritative owner of all app_record_t instances.  
+ *                    Destructor _list_delete_app frees all members.  
+ *   app_hash_table - Non-owning hash index keyed by combined_name  
+ *                    ("name-version") for O(1) lookup. freefunc=NULL.  
+ *  
+ * Invariant: every record in app_hash_table has a corresponding entry  
+ * in app_list. On cleanup, free hash table FIRST (drops references),  
+ * then flush/free list (frees actual memory).  
+ *  
+ * default_app_name / default_app_loc track the app with Default=yes.  
+ * At most one app can be the default at any time.  
+ */
 extern List app_list;                   /* app preset list */  
 extern xhash_t *app_hash_table;        /* hash table indexed by combined_name */  
 extern time_t last_app_update;          /* time of last update to app records */  
