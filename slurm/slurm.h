@@ -2557,6 +2557,7 @@ typedef struct job_info {
 	char *app_version;   /* application version, e.g. "5.7.1" */  
 	uint8_t app_source;  /* how app was determined, see APP_SOURCE_* */  
 #endif
+} slurm_job_info_t;
 
 typedef slurm_job_info_t job_info_t;
 
