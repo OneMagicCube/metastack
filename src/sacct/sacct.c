@@ -170,7 +170,7 @@ print_field_t fields[] = {
 #ifdef __METASTACK_OPT_APP_6  
 	{12, "AppName", print_fields_str, PRINT_APPNAME, 0},  
 	{12, "AppVersion", print_fields_str, PRINT_APPVERSION, 0},  
-	{10, "AppSource", print_fields_str, PRINT_APPSOURCE, 0},  
+	{11, "AppSource", print_fields_str, PRINT_APPSOURCE, 0},  
 #endif 
 	{0,  NULL, NULL, 0, 0}
 };
@@ -301,7 +301,7 @@ print_field_t fields[] = {
 #ifdef __METASTACK_OPT_APP_6  
 	{12, "AppName", print_fields_str, PRINT_APPNAME},  
 	{12, "AppVersion", print_fields_str, PRINT_APPVERSION},  
-	{10, "AppSource", print_fields_str, PRINT_APPSOURCE},  
+	{11, "AppSource", print_fields_str, PRINT_APPSOURCE},  
 #endif 
 	{0,  NULL, NULL, 0}
 };
