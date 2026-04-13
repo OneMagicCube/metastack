@@ -289,23 +289,22 @@ static void _free_local_job_app_members(local_job_app_t *object)
 		xfree(object->job_db_inx);  
 		xfree(object->app_name);  
 		xfree(object->app_version);  
-		xfree(object->app_source);  
-		xfree(object->mod_time);  
-	}  
-}  
-#endif
-
-static void _free_local_job_script_members(local_job_script_t *object)
-{
-	if (object) {  
-		xfree(object->job_db_inx);  
-		xfree(object->app_name);  
-		xfree(object->app_version);  
 		xfree(object->app_runtime);  
 		xfree(object->app_source);  
 		xfree(object->mod_time);  
 		xfree(object->extra);  
 		xfree(object->deleted);  
+	}
+}  
+#endif
+
+static void _free_local_job_script_members(local_job_script_t *object)
+{
+	if (object) {
+		xfree(object->hash_inx);
+		xfree(object->last_used);
+		xfree(object->script_hash);
+		xfree(object->batch_script);
 	}
 }
 
