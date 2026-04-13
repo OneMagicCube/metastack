@@ -1698,7 +1698,7 @@ extern int create_cluster_tables(mysql_conn_t *mysql_conn, char *cluster_name)
 	if (mysql_db_create_table(mysql_conn, table_name,  
 				  job_app_table_fields,  
 				  ", primary key (job_db_inx), "  
-				  "key idx_app_name (app_name))"
+				  "key idx_app_name (app_name))")
 	    == SLURM_ERROR)  
 		return SLURM_ERROR;  
 #endif
