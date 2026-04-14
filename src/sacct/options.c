@@ -457,9 +457,9 @@ sacct [<OPTION>]                                                            \n \
      --app-version:                                                           \n\
                    Filter by application version(s), comma separated.        \n\
                    Must be used with --appname.                              \n\
-	 --app-source:                                                              \n\  
-                   Filter by application source(s), comma separated.           \n\  
-                   Valid values: user, auto, portal, marketplace.             \n\ 
+	 --app-source:                                                              \n\
+                   Filter by application source(s), comma separated.           \n\
+                   Valid values: user, auto, portal, marketplace.             \n\
      --whole-hetjob[=yes|no]:                                               \n\
 		   If set to 'yes' (or no argument), then information about \n\
 		   all the heterogeneous components will be retrieved. If   \n\
