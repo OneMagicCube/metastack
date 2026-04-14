@@ -281,7 +281,12 @@ static void _free_local_job_script_members(local_job_script_t *object)
 	}
 }
 
-#ifdef __METASTACK_OPT_APP_10  
+#ifdef __METASTACK_OPT_APP_10
+/*  
+ * job_app_inx / JOB_APP_* enum — Column index mapping for the  
+ * <cluster>_job_app_table in KingBase. Mirrors the MySQL counterpart  
+ * in as_mysql_archive.c. Keep both in sync when adding columns.  
+ */  
 typedef struct {  
 	char *job_db_inx;  
 	char *app_name;  

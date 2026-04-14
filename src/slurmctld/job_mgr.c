@@ -9306,7 +9306,9 @@ static int _copy_job_desc_to_job_record(job_desc_msg_t *job_desc,
 	job_ptr->warn_signal = job_desc->warn_signal;
 	job_ptr->warn_time   = job_desc->warn_time;
 
-#ifdef __METASTACK_OPT_APP_3  
+#ifdef __METASTACK_OPT_APP_3
+	/* Copy user-specified app identity from job submission to job record.  
+	 * These fields originate from --app/--app-name/--app-version CLI options. */
 	job_ptr->app_name = xstrdup(job_desc->app_name);  
 	job_ptr->app_version = xstrdup(job_desc->app_version);  
 	job_ptr->app_source = job_desc->app_source;  

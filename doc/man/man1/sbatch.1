@@ -79,18 +79,15 @@ Specify the application for this job in the combined format "name\-version"
 If only a name is provided without a version, only AppName is set.  
 The application must be pre\-configured via \fBscontrol create app\fR.  
 .IP  
-  
+
 .TP  
-\fB\-\-app\-name\fR=<\fIname\fR>  
-Specify the application name for this job (e.g. "vasp").  
-Can be used together with \fB\-\-app\-version\fR as an alternative to \fB\-\-app\fR.  
-.IP  
-  
-.TP  
-\fB\-\-app\-version\fR=<\fIversion\fR>  
-Specify the application version for this job (e.g. "5.7.1").  
-Must be used together with \fB\-\-app\-name\fR.  
-.IP  
+\fB\-\-app\-source\fR=<\fIsource\fR>  
+Specify the source of the application assignment. Valid values are:  
+\fBuser\fR (explicitly specified), \fBportal\fR (web portal submission),  
+\fBmarketplace\fR (app store submission). The value \fBauto\fR is reserved  
+for system use and cannot be specified by users.  
+.IP
+
 .\" __METASTACK_OPT_APP_3
 
 .TP
@@ -3562,6 +3559,25 @@ Set to count of components in heterogeneous job.
 \fBSLURM_JOB_ACCOUNT\fR
 Account name associated of the job allocation.
 .IP
+
+.\" __METASTACK_OPT_APP_7  
+.TP  
+\fBSLURM_JOB_APP_NAME\fR  
+Set to the application name if the job has an associated application.  
+.IP  
+  
+.TP  
+\fBSLURM_JOB_APP_VERSION\fR  
+Set to the application version if the job has an associated application  
+with a version specified.  
+.IP  
+  
+.TP  
+\fBSLURM_JOB_APP_SOURCE\fR  
+Set to the numeric source indicator of the application assignment  
+(0=user, 1=auto, 2=portal, 3=marketplace).  
+.IP  
+.\" __METASTACK_OPT_APP_7
 
 .TP
 \fBSLURM_JOB_CPUS_PER_NODE\fR

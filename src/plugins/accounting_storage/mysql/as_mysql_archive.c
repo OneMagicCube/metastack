@@ -271,7 +271,12 @@ typedef struct {
 	char *batch_script;
 } local_job_script_t;
 
-#ifdef __METASTACK_OPT_APP_5  
+#ifdef __METASTACK_OPT_APP_5
+/*  
+ * local_job_app_t — Intermediate struct for archiving/purging rows from  
+ * the <cluster>_job_app_table. Maps 1:1 to the DB columns.  
+ * Used by archive dump/load functions alongside local_job_t.  
+ */   
 typedef struct {  
 	char *job_db_inx;  
 	char *app_name;  

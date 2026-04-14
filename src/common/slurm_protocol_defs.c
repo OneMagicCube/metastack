@@ -4273,7 +4273,7 @@ extern void slurm_free_ctl_conf_watch_dog(slurm_ctl_conf_info_msg_watch_dog_t * 
 
 #endif
 
-#ifdef __METASTACK_OPT_APP_2  
+#ifdef __METASTACK_OPT_APP_2
 extern void slurm_free_app_info_members(app_record_t *app)  
 {  
 	if (app) {  
@@ -4323,7 +4323,15 @@ extern void slurm_init_app_desc_msg(app_desc_msg_t *msg)
 }  
 #endif
 
-#ifdef __METASTACK_OPT_APP_9  
+#ifdef __METASTACK_OPT_APP_9
+/*  
+ * app_source — Indicates how the app identity was assigned to a job.  
+ *   APP_SOURCE_USER        — User explicitly specified via --app/--app-name  
+ *   APP_SOURCE_AUTO        — Automatically detected by the system  
+ *   APP_SOURCE_PORTAL      — Set by web portal submission  
+ *   APP_SOURCE_MARKETPLACE — Set by marketplace/app-store submission  
+ * Used in job_record, squeue/sacct filtering, and environment variables.  
+ */
 extern const char *app_source_to_str(uint8_t source)  
 {  
 	switch (source) {  

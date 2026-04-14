@@ -3348,7 +3348,12 @@ typedef struct slurm_ctl_conf_info_msg_watch_dog {
 } slurm_ctl_conf_info_msg_watch_dog_t;
 #endif
 
-#ifdef __METASTACK_OPT_APP_1  
+#ifdef __METASTACK_OPT_APP_1
+/*  
+ * slurm_ctl_conf_info_msg_app_t — Response message for REQUEST_BUILD_APP_INFO.  
+ * Contains an array of app_record_t returned by slurmctld to client commands  
+ * (scontrol show app). Freed by slurm_free_app_info_msg().  
+ */  
 typedef struct slurm_ctl_conf_info_msg_app {  
 	time_t last_update;  
 	uint32_t record_count;  
@@ -3382,7 +3387,15 @@ extern int slurm_load_app(time_t update_time,
                           slurm_ctl_conf_info_msg_app_t **app_info_ptr);  
 extern int slurm_create_app(app_desc_msg_t *app_msg);  
 extern int slurm_update_app(app_desc_msg_t *app_msg);  
-extern int slurm_delete_app(delete_app_msg_t *app_msg);  
+extern int slurm_delete_app(delete_app_msg_t *app_msg); 
+/*  
+ * App message memory management functions.  
+ * slurm_free_app_info_members — free internal strings of a single app_record_t  
+ * slurm_free_app_info_msg     — free the entire RESPONSE_BUILD_APP_INFO message  
+ * slurm_free_app_desc_msg     — free a REQUEST_CREATE/UPDATE_APP message  
+ * slurm_free_delete_app_msg   — free a REQUEST_DELETE_APP message  
+ * slurm_init_app_desc_msg     — zero-initialize with default_flag=0xff (unset)  
+ */   
 extern void slurm_free_app_info_msg(slurm_ctl_conf_info_msg_app_t *msg);  
 extern void slurm_free_app_info_members(app_record_t *app);  
 extern void slurm_free_app_desc_msg(app_desc_msg_t *msg);  

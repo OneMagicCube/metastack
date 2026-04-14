@@ -913,6 +913,11 @@ static int _parse_app_options(int argc, char **argv, app_desc_msg_t *app_msg)
 	return update_cnt;    
 }
 
+/*  
+ * scontrol_create_app — Handle "scontrol create app AppName=X Version=Y ..."  
+ * Validates required fields (AppName, Version), sends REQUEST_CREATE_APP  
+ * to slurmctld, and prints the created app's combined name on success.  
+ */
 int scontrol_create_app(int argc, char **argv)    
 {    
 	int rc = SLURM_SUCCESS;    
@@ -952,7 +957,11 @@ cleanup:
 	xfree(app_msg.watchdog);    
 	return rc;
 }    
-  
+
+/*  
+ * scontrol_update_app — Handle "scontrol update app AppName=X Version=Y ..."  
+ * Sends REQUEST_UPDATE_APP to slurmctld. Only specified fields are modified.  
+ */
 int scontrol_update_app(int argc, char **argv)    
 {    
 	int rc = SLURM_SUCCESS;    

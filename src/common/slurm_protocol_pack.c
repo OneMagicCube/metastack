@@ -6825,7 +6825,12 @@ unpack_error:
 	*msg = NULL;  
 	return SLURM_ERROR;  
 }  
-  
+
+/*  
+ * _pack_app_desc_msg / _unpack_app_desc_msg  
+ * Serialize/deserialize app_desc_msg_t for REQUEST_CREATE_APP and  
+ * REQUEST_UPDATE_APP RPCs between scontrol and slurmctld.  
+ */
 static void _pack_app_desc_msg(app_desc_msg_t *msg, buf_t *buffer,  
                                uint16_t protocol_version)  
 {  

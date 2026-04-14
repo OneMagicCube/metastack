@@ -1571,7 +1571,18 @@ unpack_error:
 	FREE_NULL_BUFFER(buffer);  
 	return EFAULT;  
 }
-  
+
+/*  
+ * pack_all_app — Serialize all app records for RESPONSE_BUILD_APP_INFO.  
+ *  
+ * Called by slurmctld when handling "scontrol show app" requests.  
+ * Format: [record_count (uint32)] [timestamp] [app_record]*  
+ * Each app_record is packed by pack_app().  
+ *  
+ * IN uid              - requesting user (reserved for future ACL use)  
+ * IN protocol_version - RPC protocol version for pack format selection  
+ * RET buf_t containing the serialized app info message  
+ */
 extern buf_t *pack_all_app(uid_t uid, uint16_t protocol_version)  
 {  
 	time_t now = time(NULL);  
