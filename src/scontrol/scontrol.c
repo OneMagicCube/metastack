@@ -912,7 +912,7 @@ static int _parse_app_options(int argc, char **argv, app_desc_msg_t *app_msg)
 int scontrol_create_app(int argc, char **argv)    
 {    
 	int rc = SLURM_SUCCESS;    
-	app_desc_msg_t app_msg = NULL;    
+	app_desc_msg_t app_msg;   
 	slurm_init_app_desc_msg(&app_msg);    
   
 	if (_parse_app_options(argc, argv, &app_msg) == 0) {    
@@ -952,7 +952,7 @@ cleanup:
 int scontrol_update_app(int argc, char **argv)    
 {    
 	int rc = SLURM_SUCCESS;    
-	app_desc_msg_t app_msg = NULL;    
+	app_desc_msg_t app_msg;    
 	slurm_init_app_desc_msg(&app_msg);    
   
 	if (_parse_app_options(argc, argv, &app_msg) == 0) {    
