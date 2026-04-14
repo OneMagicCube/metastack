@@ -1461,8 +1461,8 @@ extern int load_all_app_state(uint16_t reconfig_flags)
 		return SLURM_SUCCESS;  
 	}  
 	
-	/* recover >= 1 (startup): always try to load state file.  
-	* recover == 0 with KEEP_APPTYPE_INFO: also load state file. */
+	/* recover > 1 (full recovery): load state file.    
+	 * recover == 0 with RECONFIG_KEEP_APP_INFO: also load state file. */
   
 	/* read the file */  
 	lock_state_files();  
@@ -2943,10 +2943,10 @@ extern int read_slurm_conf(int recover)
 		list_flush(app_list);  
 	_build_all_app_info();  
   
-	/* Then optionally overlay state file data.  
-	 * On startup (recover >= 1): always restore from state file.  
-	 * On reconfigure (recover == 0): only restore if  
-	 *   RECONFIG_KEEP_APP_INFO is set. */  
+	/* Then optionally overlay state file data.    
+	 * On full recovery (recover > 1): restore from state file.    
+	 * On normal startup (recover == 1) or reconfigure (recover == 0):    
+	 *   rebuild from config file only, dynamic changes are discarded. */
 	(void)load_all_app_state(reconfig_flags);
 #endif
 
