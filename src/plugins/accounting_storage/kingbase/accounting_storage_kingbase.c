@@ -162,6 +162,9 @@ char *wckey_day_table = "wckey_usage_day_table";
 char *wckey_hour_table = "wckey_usage_hour_table";
 char *wckey_month_table = "wckey_usage_month_table";
 char *wckey_table = "wckey_table";
+#ifdef __METASTACK_OPT_APP  
+char *job_app_table = "job_app_table"; 
+#endif
 
 char *event_view = "event_view";
 char *event_ext_view = "event_ext_view";
@@ -1706,6 +1709,41 @@ extern int create_cluster_tables(kingbase_conn_t *kingbase_conn, char *cluster_n
 		{ NULL, NULL}
 	};
 
+/*  
+ * job_app_table - Per-job application metadata, one row per job.  
+ *  
+ * Table: <cluster_name>_job_app_table  
+ * Primary key: job_db_inx (1:1 with job_table)  
+ * Index: idx_app_name for sacct --app-name queries  
+ *  
+ * Fields:  
+ *   app_name    - Application name (e.g. "vasp"), from --app or auto-recognition  
+ *   app_version - Version string (e.g. "5.7.1"), empty if auto-recognized  
+ *   app_runtime - Reserved for future use (runtime metrics)  
+ *   app_source  - How app was determined (0=user, 1=auto, 2=portal, 3=marketplace)  
+ *   extra       - Reserved for future extensibility  
+ *  
+ * Populated in as_mysql_job_start via INSERT ... ON DUPLICATE KEY UPDATE.  
+ * Queried by sacct via LEFT JOIN when JOBCOND_FLAG_APP is set.  
+ * Archived/purged alongside job_table records.  
+ *  
+ * Fault isolation: write failures use independent app_rc, logged but  
+ * not propagated to the main job_start rc.  
+ */
+#ifdef __METASTACK_OPT_APP  
+	storage_field_t job_app_table_fields[] = {  
+		{ "job_db_inx", "bigint not null" },  
+		{ "app_name", "varchar(128) not null default ''" },  
+		{ "app_version", "varchar(64) not null default ''" },  
+		{ "app_runtime", "tinytext not null default ''" },  
+		{ "app_source", "tinyint default 0 not null" },
+		{ "mod_time", "bigint default 0 not null" },  
+		{ "extra", "text not null default ''" },  
+		{ "deleted", "tinyint default 0 not null" },  
+		{ NULL, NULL}  
+	};  
+#endif
+
 	char table_name[200];
 	char *end = NULL;
 
@@ -1973,6 +2011,22 @@ extern int create_cluster_tables(kingbase_conn_t *kingbase_conn, char *cluster_n
 		}
 	xfree(end);
 	
+#ifdef __METASTACK_OPT_APP  
+	snprintf(table_name, sizeof(table_name), "%s_%s",  
+				cluster_name, job_app_table);  
+	xstrfmtcat(end, ", primary key (job_db_inx));"  
+				"create index idx_app_name_%s_%s on %s_%s (app_name);",  
+				cluster_name, job_app_table,  
+				cluster_name, job_app_table);  
+	if (kingbase_db_create_table(kingbase_conn, table_name,  
+									job_app_table_fields, end)  
+		== SLURM_ERROR) {  
+		xfree(end);  
+		return SLURM_ERROR;  
+	}  
+	xfree(end);  
+#endif
+
 	snprintf(table_name, sizeof(table_name), "%s_%s",
 		 cluster_name, wckey_day_table);
 	xstrfmtcat(end, ", primary key (id, id_tres, time_start));"
@@ -2049,6 +2103,9 @@ extern int remove_cluster_tables(kingbase_conn_t *kingbase_conn, char *cluster_n
 #ifdef __METASTACK_NEW_AUTO_SUPPLEMENT_AVAIL_NODES
 		   "`%s_%s`, "
 #endif
+#ifdef __METASTACK_OPT_APP  
+		   "`%s_%s`, "  
+#endif
 		   "`%s_%s`, `%s_%s`, `%s_%s`, `%s_%s`;",
 		   cluster_name, assoc_table,
 		   cluster_name, assoc_day_table,
@@ -2068,6 +2125,9 @@ extern int remove_cluster_tables(kingbase_conn_t *kingbase_conn, char *cluster_n
 		   cluster_name, resv_table,
 		   cluster_name, step_table,
 		   cluster_name, suspend_table,
+#ifdef __METASTACK_OPT_APP  
+		   cluster_name, job_app_table,  
+#endif
 		   cluster_name, wckey_table,
 		   cluster_name, wckey_day_table,
 		   cluster_name, wckey_hour_table,

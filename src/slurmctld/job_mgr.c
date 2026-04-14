@@ -3871,7 +3871,11 @@ extern job_record_t *job_array_split(job_record_t *job_ptr)
 	job_ptr_pend->user_name = xstrdup(job_ptr->user_name);
 	job_ptr_pend->wckey = xstrdup(job_ptr->wckey);
 	job_ptr_pend->deadline = job_ptr->deadline;
-
+#ifdef __METASTACK_OPT_APP  
+	job_ptr_pend->app_name = xstrdup(job_ptr->app_name);  
+	job_ptr_pend->app_version = xstrdup(job_ptr->app_version);  
+	job_ptr_pend->app_source = job_ptr->app_source;  
+#endif
 	job_details = job_ptr->details;
 	details_new = job_ptr_pend->details;
 	memcpy(details_new, job_details, sizeof(job_details_t));
@@ -7803,6 +7807,114 @@ static int _job_create(job_desc_msg_t *job_desc, int allocate, int will_run,
 		goto cleanup_fail;
 
 #endif
+
+#ifdef __METASTACK_OPT_APP  
+	/* --app-source requires --app to be specified */  
+	if ((!job_desc->app || !job_desc->app[0]) &&  
+		job_desc->app_source != NO_VAL8) {  
+		info("%s: --app-source requires --app to be specified", __func__);  
+		if (err_msg) {  
+			xfree(*err_msg);  
+			xstrfmtcat(*err_msg,  "--app-source option requires --app specification");  
+		}  
+		error_code = ESLURM_INVALID_APP_NAME;  
+		goto cleanup_fail;  
+	}
+#endif
+
+/*  
+ * App validation and auto-fill logic during job creation.  
+ *  
+ * Decision tree:  
+ *   1. User specified --app=X:  
+ *      - Validate X exists in app registry (reject job if not found)  
+ *      - Auto-fill app_name and app_version from registry  
+ *      - Set app_source: preserve portal/marketplace if set, else USER  
+ *      - Inherit app's watchdog if user didn't specify one  
+ *  
+ *   2. User did NOT specify --app:  
+ *      a. cli_filter.lua auto-recognized apptype (e.g. "vasp"):  
+ *         - Set app_name from apptype, app_version=NULL, source=AUTO  
+ *      b. Default app has a watchdog:  
+ *         - Apply default app's watchdog if user didn't specify one  
+ *  
+ * app_source priority (highest wins):  
+ *   portal/marketplace (set by external system) > user > auto  
+ */
+#ifdef __METASTACK_OPT_APP  
+    /* Validate --app and auto-fill app_name, app_version */  
+    if (job_desc->app && job_desc->app[0]) {  
+        /* User explicitly specified --app=xxx */  
+        app_record_t *app_ptr = find_app_record_by_combined(job_desc->app);  
+        if (!app_ptr) {  
+            info("%s: invalid app specified: %s",  
+                 __func__, job_desc->app);  
+            if (err_msg) {  
+                xfree(*err_msg);  
+                xstrfmtcat(*err_msg,  
+                           "invalid app specified: %s",  
+                           job_desc->app);  
+            }  
+            error_code = ESLURM_INVALID_APP_NAME;  
+            goto cleanup_fail;  
+        }  
+        /* Auto-fill app_name and app_version */  
+        xfree(job_desc->app_name);  
+        job_desc->app_name = xstrdup(app_ptr->app_name);  
+        xfree(job_desc->app_version);  
+        job_desc->app_version = xstrdup(app_ptr->version);  
+        /* Preserve --app-source if explicitly set by user (portal/marketplace),  
+         * otherwise default to APP_SOURCE_USER */  
+        if (job_desc->app_source != APP_SOURCE_PORTAL &&  
+            job_desc->app_source != APP_SOURCE_MARKETPLACE)  
+            job_desc->app_source = APP_SOURCE_USER;
+        /* If the app has a bound watchdog and user didn't specify one,  
+         * use the app's watchdog */  
+        if (app_ptr->watchdog && app_ptr->watchdog[0] &&  
+            (!job_desc->watch_dog || !job_desc->watch_dog[0])) {  
+            xfree(job_desc->watch_dog);  
+            job_desc->watch_dog = xstrdup(app_ptr->watchdog);  
+            watch_dog_ptr = NULL;  
+            error_code = _get_job_watch_dogs_and_check(  
+                job_desc->watch_dog, &watch_dog_ptr, err_msg);  
+            if (error_code != SLURM_SUCCESS)  
+                goto cleanup_fail;  
+        }  
+    } else {  
+        /* User did NOT specify --app.  
+         * Check if auto-recognition (apptype from cli_filter.lua) provided a value. */  
+#ifdef __METASTACK_NEW_APPTYPE_RECOGNITION  
+        if (job_desc->apptype && job_desc->apptype[0] &&  
+            xstrcmp(job_desc->apptype, "unset") != 0) {  
+            /* cli_filter.lua recognized an application type.  
+             * Set app_name from apptype, leave app_version empty,  
+             * and mark source as auto (1). */  
+            xfree(job_desc->app_name);  
+            job_desc->app_name = xstrdup(job_desc->apptype);  
+            xfree(job_desc->app_version);  
+            job_desc->app_version = NULL; /* no version from auto-recognition */  
+			if (job_desc->app_source != APP_SOURCE_PORTAL &&  
+				job_desc->app_source != APP_SOURCE_MARKETPLACE)  
+				job_desc->app_source = APP_SOURCE_AUTO;  
+        }  
+#endif  
+        /* If default app exists with watchdog and user didn't specify one,  
+         * apply the default app's watchdog regardless of auto-recognition. */  
+        if (default_app_loc && default_app_loc->watchdog &&  
+            default_app_loc->watchdog[0]) {  
+            if (!job_desc->watch_dog || !job_desc->watch_dog[0]) {  
+                xfree(job_desc->watch_dog);  
+                job_desc->watch_dog = xstrdup(default_app_loc->watchdog);  
+                watch_dog_ptr = NULL;  
+                error_code = _get_job_watch_dogs_and_check(  
+                    job_desc->watch_dog, &watch_dog_ptr, err_msg);  
+                if (error_code != SLURM_SUCCESS)  
+                    goto cleanup_fail;  
+            }  
+        }  
+    }  
+#endif
+
 	memset(&assoc_rec, 0, sizeof(assoc_rec));
 	assoc_rec.acct      = job_desc->account;
 	assoc_rec.partition = part_ptr->name;
@@ -9185,6 +9297,14 @@ static int _copy_job_desc_to_job_record(job_desc_msg_t *job_desc,
 	job_ptr->warn_flags  = job_desc->warn_flags;
 	job_ptr->warn_signal = job_desc->warn_signal;
 	job_ptr->warn_time   = job_desc->warn_time;
+
+#ifdef __METASTACK_OPT_APP
+	/* Copy user-specified app identity from job submission to job record.  
+	 * These fields originate from --app/--app-name/--app-version CLI options. */
+	job_ptr->app_name = xstrdup(job_desc->app_name);  
+	job_ptr->app_version = xstrdup(job_desc->app_version);  
+	job_ptr->app_source = job_desc->app_source;  
+#endif
 
 	detail_ptr = job_ptr->details;
 	detail_ptr->argc = job_desc->argc;
@@ -11449,7 +11569,285 @@ void pack_job(job_record_t *dump_job_ptr, uint16_t show_flags, buf_t *buffer,
 	xassert(!has_qos_lock || verify_assoc_lock(QOS_LOCK, READ_LOCK));
 
 #ifdef __META_PROTOCOL
-	if (protocol_version >= META_3_0_PROTOCOL_VERSION) {
+	if (protocol_version >= META_3_2_PROTOCOL_VERSION) {
+		detail_ptr = dump_job_ptr->details;
+		pack32(dump_job_ptr->array_job_id, buffer);
+		pack32(dump_job_ptr->array_task_id, buffer);
+		if (dump_job_ptr->array_recs) {
+			build_array_str(dump_job_ptr);
+			packstr(dump_job_ptr->array_recs->task_id_str, buffer);
+			pack32(dump_job_ptr->array_recs->max_run_tasks, buffer);
+		} else {
+			job_record_t *array_head = NULL;
+			packnull(buffer);
+			if (dump_job_ptr->array_job_id) {
+				array_head = find_job_record(
+					dump_job_ptr->array_job_id);
+			}
+			if (array_head && array_head->array_recs) {
+				pack32(array_head->array_recs->max_run_tasks,
+					buffer);
+			} else {
+				pack32(0, buffer);
+			}
+		}
+
+		pack32(dump_job_ptr->assoc_id, buffer);
+		packstr(dump_job_ptr->container, buffer);
+		packstr(dump_job_ptr->container_id, buffer);
+		pack32(dump_job_ptr->delay_boot, buffer);
+		packstr(dump_job_ptr->failed_node, buffer);
+		pack32(dump_job_ptr->job_id, buffer);
+		pack32(dump_job_ptr->user_id, buffer);
+		pack32(dump_job_ptr->group_id, buffer);
+		pack32(dump_job_ptr->het_job_id, buffer);
+		packstr(dump_job_ptr->het_job_id_set, buffer);
+		pack32(dump_job_ptr->het_job_offset, buffer);
+		pack32(dump_job_ptr->profile, buffer);
+
+		pack32(dump_job_ptr->job_state, buffer);
+		pack16(dump_job_ptr->batch_flag, buffer);
+		pack32(dump_job_ptr->state_reason, buffer);
+		pack8(0, buffer); /* was power_flags */
+		pack8(dump_job_ptr->reboot, buffer);
+		pack16(dump_job_ptr->restart_cnt, buffer);
+		pack16(show_flags, buffer);
+		pack_time(dump_job_ptr->deadline, buffer);
+
+		pack32(dump_job_ptr->alloc_sid, buffer);
+		if ((dump_job_ptr->time_limit == NO_VAL) &&
+			dump_job_ptr->part_ptr)
+			time_limit = dump_job_ptr->part_ptr->max_time;
+		else
+			time_limit = dump_job_ptr->time_limit;
+
+		pack32(time_limit, buffer);
+		pack32(dump_job_ptr->time_min, buffer);
+
+		if (dump_job_ptr->details) {
+			pack32(dump_job_ptr->details->nice, buffer);
+			pack_time(dump_job_ptr->details->submit_time, buffer);
+			/* Earliest possible begin time */
+			begin_time = dump_job_ptr->details->begin_time;
+			/* When we started accruing time for priority */
+			accrue_time = dump_job_ptr->details->accrue_time;
+		} else { /* Some job details may be purged after completion */
+			pack32(NICE_OFFSET, buffer); /* Best guess */
+			pack_time((time_t)0, buffer);
+		}
+
+		pack_time(begin_time, buffer);
+		pack_time(accrue_time, buffer);
+
+		if (IS_JOB_STARTED(dump_job_ptr)) {
+			/* Report actual start time, in past */
+			start_time = dump_job_ptr->start_time;
+			end_time = dump_job_ptr->end_time;
+		} else if (dump_job_ptr->start_time != 0) {
+			/*
+			* Report expected start time,
+			* making sure that time is not in the past
+			*/
+			start_time = MAX(dump_job_ptr->start_time, time(NULL));
+#ifdef __METASTACK_NEW_TIME_PREDICT
+			if ((dump_job_ptr->predict_job == 1) && dump_job_ptr->time_min) {
+				end_time = MAX(dump_job_ptr->end_time,
+					(start_time + (dump_job_ptr->time_min * 60)));
+			} else {
+				if (time_limit != NO_VAL) {
+					end_time = MAX(dump_job_ptr->end_time,
+						(start_time + time_limit * 60));
+				}
+			}
+#endif
+		} else if (begin_time > time(NULL)) {
+			/* earliest start time in the future */
+			start_time = begin_time;
+			if (time_limit != NO_VAL) {
+				end_time = MAX(dump_job_ptr->end_time,
+						(start_time + time_limit * 60));
+			}
+		}
+		pack_time(start_time, buffer);
+		pack_time(end_time, buffer);
+
+		pack_time(dump_job_ptr->suspend_time, buffer);
+		pack_time(dump_job_ptr->pre_sus_time, buffer);
+		pack_time(dump_job_ptr->resize_time, buffer);
+		pack_time(dump_job_ptr->last_sched_eval, buffer);
+		pack_time(dump_job_ptr->preempt_time, buffer);
+		pack32(dump_job_ptr->priority, buffer);
+		if (dump_job_ptr->part_prio) {
+			pack32_array(dump_job_ptr->part_prio->priority_array,
+					(dump_job_ptr->part_prio->priority_array) ?
+					list_count(dump_job_ptr->part_ptr_list) :
+					0, buffer);
+			packstr(dump_job_ptr->part_prio->priority_array_parts,
+				buffer);
+		} else {
+			packnull(buffer);
+			packnull(buffer);
+		}
+		packdouble(dump_job_ptr->billable_tres, buffer);
+
+		packstr(slurm_conf.cluster_name, buffer);
+		/*
+		* Only send the allocated nodelist since we are only sending
+		* the number of cpus and nodes that are currently allocated.
+		*/
+		if (!IS_JOB_COMPLETING(dump_job_ptr))
+			packstr(dump_job_ptr->nodes, buffer);
+		else {
+			nodelist = bitmap2node_name(
+				dump_job_ptr->node_bitmap_cg);
+			packstr(nodelist, buffer);
+			xfree(nodelist);
+		}
+
+		packstr(dump_job_ptr->sched_nodes, buffer);
+
+		if (!IS_JOB_PENDING(dump_job_ptr) && dump_job_ptr->part_ptr)
+			packstr(dump_job_ptr->part_ptr->name, buffer);
+		else
+			packstr(dump_job_ptr->partition, buffer);
+		packstr(dump_job_ptr->account, buffer);
+		packstr(dump_job_ptr->admin_comment, buffer);
+		pack32(dump_job_ptr->site_factor, buffer);
+		packstr(dump_job_ptr->network, buffer);
+		packstr(dump_job_ptr->comment, buffer);
+		packstr(dump_job_ptr->extra, buffer);
+		packstr(dump_job_ptr->container, buffer);
+		packstr(dump_job_ptr->batch_features, buffer);
+		packstr(dump_job_ptr->batch_host, buffer);
+		packstr(dump_job_ptr->burst_buffer, buffer);
+		packstr(dump_job_ptr->burst_buffer_state, buffer);
+		packstr(dump_job_ptr->system_comment, buffer);
+
+		if (!has_qos_lock)
+			assoc_mgr_lock(&locks);
+		if (dump_job_ptr->qos_ptr)
+			packstr(dump_job_ptr->qos_ptr->name, buffer);
+		else {
+			if (assoc_mgr_qos_list) {
+				packstr(slurmdb_qos_str(assoc_mgr_qos_list,
+							dump_job_ptr->qos_id),
+					buffer);
+			} else
+				packnull(buffer);
+		}
+
+		if (IS_JOB_STARTED(dump_job_ptr) &&
+			(slurm_conf.preempt_mode != PREEMPT_MODE_OFF) &&
+			(slurm_job_preempt_mode(dump_job_ptr) !=
+			PREEMPT_MODE_OFF)) {
+			time_t preemptable = acct_policy_get_preemptable_time(
+				dump_job_ptr);
+			pack_time(preemptable, buffer);
+		} else {
+			pack_time(0, buffer);
+		}
+		if (!has_qos_lock)
+			assoc_mgr_unlock(&locks);
+
+		packstr(dump_job_ptr->licenses, buffer);
+		packstr(dump_job_ptr->state_desc, buffer);
+		packstr(dump_job_ptr->resv_name, buffer);
+		packstr(dump_job_ptr->resv_ports, buffer);
+		packstr(dump_job_ptr->mcs_label, buffer);
+
+		pack32(dump_job_ptr->exit_code, buffer);
+		pack32(dump_job_ptr->derived_ec, buffer);
+
+		packstr(dump_job_ptr->gres_used, buffer);
+		if (show_flags & SHOW_DETAIL) {
+			pack_job_resources(dump_job_ptr->job_resrcs, buffer,
+					protocol_version);
+			_pack_job_gres(dump_job_ptr, buffer, protocol_version);
+		} else {
+			pack32(NO_VAL, buffer);
+			pack32((uint32_t)0, buffer);
+		}
+
+		packstr(dump_job_ptr->name, buffer);
+		packstr(dump_job_ptr->user_name, buffer);
+		packstr(dump_job_ptr->wckey, buffer);
+		pack32(dump_job_ptr->req_switch, buffer);
+		pack32(dump_job_ptr->wait4switch, buffer);
+
+		packstr(dump_job_ptr->alloc_node, buffer);
+		if (!IS_JOB_COMPLETING(dump_job_ptr))
+			pack_bit_str_hex(dump_job_ptr->node_bitmap, buffer);
+		else
+			pack_bit_str_hex(dump_job_ptr->node_bitmap_cg, buffer);
+
+		/* A few details are always dumped here */
+		_pack_default_job_details(dump_job_ptr, buffer,
+					protocol_version);
+
+		/*
+		* other job details are only dumped until the job starts
+		* running (at which time they become meaningless)
+		*/
+		if (detail_ptr)
+			_pack_pending_job_details(detail_ptr, buffer,
+						protocol_version);
+		else
+			_pack_pending_job_details(NULL, buffer,
+						protocol_version);
+		pack64(dump_job_ptr->bit_flags, buffer);
+		packstr(dump_job_ptr->tres_fmt_alloc_str, buffer);
+		packstr(dump_job_ptr->tres_fmt_req_str, buffer);
+		pack16(dump_job_ptr->start_protocol_ver, buffer);
+
+		if (dump_job_ptr->fed_details) {
+			packstr(dump_job_ptr->fed_details->origin_str, buffer);
+			pack64(dump_job_ptr->fed_details->siblings_active,
+				buffer);
+			packstr(dump_job_ptr->fed_details->siblings_active_str,
+				buffer);
+			pack64(dump_job_ptr->fed_details->siblings_viable,
+				buffer);
+			packstr(dump_job_ptr->fed_details->siblings_viable_str,
+				buffer);
+		} else {
+			packnull(buffer);
+			pack64((uint64_t)0, buffer);
+			packnull(buffer);
+			pack64((uint64_t)0, buffer);
+			packnull(buffer);
+		}
+
+		packstr(dump_job_ptr->cpus_per_tres, buffer);
+		packstr(dump_job_ptr->mem_per_tres, buffer);
+		packstr(dump_job_ptr->tres_bind, buffer);
+		packstr(dump_job_ptr->tres_freq, buffer);
+		packstr(dump_job_ptr->tres_per_job, buffer);
+		packstr(dump_job_ptr->tres_per_node, buffer);
+		packstr(dump_job_ptr->tres_per_socket, buffer);
+		packstr(dump_job_ptr->tres_per_task, buffer);
+
+		pack16(dump_job_ptr->mail_type, buffer);
+		packstr(dump_job_ptr->mail_user, buffer);
+
+		packstr(dump_job_ptr->selinux_context, buffer);
+#ifdef __METASTACK_NEW_PENDING_ORDER
+		pack32(dump_job_ptr->pending_order, buffer);
+#endif
+#ifdef __METASTACK_OPT_MSG_OUTPUT
+		if (enable_reason_detail && dump_job_ptr->reason_detail) {
+			packstr(dump_job_ptr->reason_detail, buffer);
+		} else 
+			packnull(buffer);
+#endif
+#ifdef __METASTACK_NEW_TIME_PREDICT
+		pack16(dump_job_ptr->predict_job, buffer);
+#endif
+#ifdef __METASTACK_OPT_APP  
+		packstr(dump_job_ptr->app_name, buffer);  
+		packstr(dump_job_ptr->app_version, buffer);  
+		pack8(dump_job_ptr->app_source, buffer);  
+#endif
+	} else if (protocol_version >= META_3_0_PROTOCOL_VERSION) {
 		detail_ptr = dump_job_ptr->details;
 		pack32(dump_job_ptr->array_job_id, buffer);
 		pack32(dump_job_ptr->array_task_id, buffer);

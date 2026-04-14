@@ -144,6 +144,9 @@ static s_p_hashtbl_t *default_partition_tbl;
 static s_p_hashtbl_t *default_watch_dog_tbl = NULL;
 #endif
 static list_t *config_files = NULL;
+#ifdef __METASTACK_OPT_APP  
+static s_p_hashtbl_t *default_app_tbl = NULL;  
+#endif
 
 inline static void _normalize_debug_level(uint16_t *level);
 static int _init_slurm_conf(const char *file_name);
@@ -199,6 +202,14 @@ static int _parse_watch_dog_name(void **dest, slurm_parser_enum_t type,
 static watch_dog_record_t *_create_conf_watch_dog(void);
 static void _init_conf_watch_dog(watch_dog_record_t *conf_watch_dog);
 static void _destroy_watch_dog(void *ptr);
+#endif
+#ifdef __METASTACK_OPT_APP  
+static int _parse_app_name(void **dest, slurm_parser_enum_t type,  
+			   const char *key, const char *value,  
+			   const char *line, char **leftover);  
+static app_record_t *_create_conf_app(void);  
+static void _init_conf_app(app_record_t *conf_app);  
+static void _destroy_app_name(void *ptr);  
 #endif
 static void _init_conf_part(slurm_conf_partition_t *conf_part);
 static void _destroy_partitionname(void *ptr);
@@ -544,7 +555,10 @@ s_p_options_t slurm_conf_options[] = {
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
 	 {"WatchDogName", S_P_ARRAY, _parse_watch_dog_name,
 	  _destroy_watch_dog},
- #endif
+#endif
+#ifdef __METASTACK_OPT_APP  
+	{"AppName", S_P_ARRAY, _parse_app_name, _destroy_app_name},  
+#endif 
 	{NULL}
 };
 
@@ -2022,6 +2036,112 @@ static int _parse_watch_dog_name(void **dest, slurm_parser_enum_t type,
 }
 #endif
 
+/*  
+ * _parse_app_name - Parse an "AppName=xxx Version=... ..." line from slurm.conf.  
+ *  
+ * This is a s_p_parse callback registered for the "AppName" key.  
+ * Returns 1 on success (*dest set to app_record_t*), 0 to skip the line.  
+ *  
+ * Error handling: all error paths free allocated resources (tbl, p) and  
+ * advance *leftover to end-of-string to prevent the main parser from  
+ * misinterpreting remaining tokens as top-level config keys.  
+ *  
+ * non-slurmctld processes (sbatch, srun, etc.) skip this  
+ * line entirely to avoid unnecessary parsing and potential errors.  
+ */
+#ifdef __METASTACK_OPT_APP  
+static int _parse_app_name(void **dest, slurm_parser_enum_t type,  
+                           const char *key, const char *value,  
+                           const char *line, char **leftover)  
+{  
+    s_p_hashtbl_t *tbl = NULL;  
+    static s_p_options_t _app_name_options[] = {  
+        {"Version", S_P_STRING},  
+        {"Description", S_P_STRING},  
+        {"Watchdog", S_P_STRING},  
+        {"Default", S_P_BOOLEAN},  
+        {NULL}  
+    };  
+
+	if (!running_in_slurmctld()) {
+		*leftover += strlen(*leftover);
+		return 0;
+	}
+
+    tbl = s_p_hashtbl_create(_app_name_options);  
+    if (!s_p_parse_line(tbl, *leftover, leftover)) {  
+		/* Unrecognized key in AppName line — skip entire line.  
+		* Advance leftover to end of string so the main parser  
+		* doesn't try to parse the remaining keys as top-level config. */  
+		error("AppName=%s has invalid configuration (unrecognized key), "  
+			"ignoring entire line", value ? value : "?");  
+		s_p_hashtbl_destroy(tbl);  
+		*leftover += strlen(*leftover);  
+		return 0;  
+	}
+  
+    app_record_t *p = _create_conf_app();  
+  
+    if (value == NULL) {  
+		error("AppName line missing name value, ignoring");
+		_destroy_app_name(p);  
+		s_p_hashtbl_destroy(tbl);  
+		return 0;  
+	}
+	p->app_name = xstrdup(value);  
+  
+    if (!s_p_get_string(&p->version, "Version", tbl)) {  
+        error("AppName=%s missing required Version, ignoring",  
+              p->app_name ? p->app_name : "?");  
+        _destroy_app_name(p);  
+        s_p_hashtbl_destroy(tbl);  
+        return 0; 
+    }  
+  
+    s_p_get_string(&p->description, "Description", tbl);  
+    s_p_get_string(&p->watchdog, "Watchdog", tbl);  
+  
+    if (!s_p_get_boolean(&p->default_flag, "Default", tbl))  
+        p->default_flag = false;  
+  
+    s_p_hashtbl_destroy(tbl);  
+    *dest = (void *)p;  
+    return 1;  
+}
+  
+static void _init_conf_app(app_record_t *conf_app)  
+{  
+	if (conf_app == NULL)  
+		return;  
+	conf_app->app_name = NULL;  
+	conf_app->version = NULL;  
+	conf_app->description = NULL;  
+	conf_app->watchdog = NULL;
+	conf_app->combined_name = NULL;
+	conf_app->default_flag = false;  
+}  
+  
+static app_record_t *_create_conf_app(void)  
+{  
+	app_record_t *p = xmalloc(sizeof(app_record_t));  
+	_init_conf_app(p);  
+	return p;  
+}  
+  
+static void _destroy_app_name(void *ptr)  
+{  
+	if (ptr == NULL)  
+		return;  
+	app_record_t *p = (app_record_t *)ptr;  
+	xfree(p->app_name);  
+	xfree(p->version);  
+	xfree(p->combined_name);  
+	xfree(p->description);  
+	xfree(p->watchdog);  
+	xfree(ptr);  
+}
+#endif
+
 static int _parse_partitionname(void **dest, slurm_parser_enum_t type,
 			       const char *key, const char *value,
 			       const char *line, char **leftover)
@@ -2884,6 +3004,23 @@ int slurm_conf_watch_dog_array(watch_dog_record_t **watr_array[])
 		return 0;
 	}
 }
+#endif
+
+#ifdef __METASTACK_OPT_APP  
+int slurm_conf_app_array(app_record_t **app_array[])  
+{  
+	int count = 0;  
+	app_record_t **ptr = NULL;  
+  
+	if (s_p_get_array((void ***)&ptr, &count, "AppName",  
+			  conf_hashtbl)) {  
+		*app_array = ptr;  
+		return count;  
+	} else {  
+		*app_array = NULL;  
+		return 0;  
+	}  
+}  
 #endif
 
 int slurm_conf_partition_array(slurm_conf_partition_t **ptr_array[])
@@ -4210,6 +4347,12 @@ _destroy_slurm_conf(void)
 		s_p_hashtbl_destroy(default_watch_dog_tbl);
 		default_watch_dog_tbl = NULL;
 	}
+#endif
+#ifdef __METASTACK_OPT_APP  
+	if (default_app_tbl != NULL) {  
+		s_p_hashtbl_destroy(default_app_tbl);  
+		default_app_tbl = NULL;  
+	}  
 #endif
 	free_slurm_conf(conf_ptr, true);
 	memset(conf_ptr, 0, sizeof(slurm_conf_t));
@@ -7295,6 +7438,13 @@ extern char * reconfig_flags2str(uint16_t reconfig_flags)
 			xstrcat(rc, ",");
 		xstrcat(rc, "KeepPowerSaveSettings");
 	}
+#ifdef __METASTACK_OPT_APP  
+	if (reconfig_flags & RECONFIG_KEEP_APP_INFO) {  
+		if (rc)  
+			xstrcat(rc, ",");  
+		xstrcat(rc, "KeepAppInfo");  
+	}  
+#endif  
 
 	return rc;
 }
@@ -7321,6 +7471,10 @@ extern uint16_t reconfig_str2flags(char *reconfig_flags)
 			rc |= RECONFIG_KEEP_PART_STAT;
 		else if (xstrcasecmp(tok, "KeepPowerSaveSettings") == 0)
 			rc |= RECONFIG_KEEP_POWER_SAVE_SETTINGS;
+#ifdef __METASTACK_OPT_APP  
+		else if (xstrcasecmp(tok, "KeepAppInfo") == 0)  
+			rc |= RECONFIG_KEEP_APP_INFO;  
+#endif 
 		else {
 			error("Invalid ReconfigFlag: %s", tok);
 			rc = NO_VAL16;

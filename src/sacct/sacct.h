@@ -67,6 +67,9 @@
 #define BRIEF_COMP_FIELDS "jobid,uid,state"
 #define DEFAULT_FIELDS "jobid,jobname,partition,account,alloccpus,state,exitcode"
 #define DEFAULT_COMP_FIELDS "jobid,uid,jobname,partition,nnodes,nodelist,state,end"
+#ifdef __METASTACK_OPT_APP  
+#define DEFAULT_APP_FIELDS "jobid,jobname,appname,appversion,appsource,state"  
+#endif
 //NOTE: add /command/stdout/stderr to long-fileld formats while ALL addon fields enabled
 //#ifdef __METASTACK_OPT_RESC_NODEDETAIL
 #if (defined __METASTACK_OPT_RESC_NODEDETAIL) && (defined __METASTACK_OPT_SACCT_COMMAND) && (defined __METASTACK_OPT_SACCT_OUTPUT)
@@ -213,6 +216,11 @@ typedef enum {
 		PRINT_COMMAND,
 #endif
 		PRINT_WCKEYID,
+#ifdef __METASTACK_OPT_APP  
+		PRINT_APPNAME,  
+		PRINT_APPVERSION,  
+		PRINT_APPSOURCE,  
+#endif  
 		PRINT_WORK_DIR
 } sacct_print_types_t;
 

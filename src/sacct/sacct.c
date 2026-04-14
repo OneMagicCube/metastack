@@ -167,6 +167,11 @@ print_field_t fields[] = {
 #ifdef __METASTACK_OPT_SACCT_COMMAND
 	{32, "Command", print_fields_str, PRINT_COMMAND, 0},
 #endif
+#ifdef __METASTACK_OPT_APP  
+	{12, "AppName", print_fields_str, PRINT_APPNAME, 0},  
+	{12, "AppVersion", print_fields_str, PRINT_APPVERSION, 0},  
+	{11, "AppSource", print_fields_str, PRINT_APPSOURCE, 0},  
+#endif 
 	{0,  NULL, NULL, 0, 0}
 };
 #else
@@ -293,6 +298,11 @@ print_field_t fields[] = {
 #ifdef __METASTACK_OPT_SACCT_COMMAND
 	{32, "Command", print_fields_str, PRINT_COMMAND},
 #endif
+#ifdef __METASTACK_OPT_APP  
+	{12, "AppName", print_fields_str, PRINT_APPNAME},  
+	{12, "AppVersion", print_fields_str, PRINT_APPVERSION},  
+	{11, "AppSource", print_fields_str, PRINT_APPSOURCE},  
+#endif 
 	{0,  NULL, NULL, 0}
 };
 #endif
@@ -310,6 +320,32 @@ int main(int argc, char **argv)
 	slurm_init(NULL);
 	sacct_init();
 	parse_command_line(argc, argv);
+
+#ifdef __METASTACK_OPT_APP  
+	/*  
+	* Lazy LEFT JOIN optimization: only join job_app_table when the user  
+	* actually requests app-related output fields (AppName, AppVersion,  
+	* AppSource) or filters (--app-name, --app-version, --app-source).  
+	* This avoids unnecessary table joins for the common case where  
+	* app info is not needed, keeping sacct queries fast.  
+	*/
+
+	/* If user requested any app field in --format, set APPTYPE flag  
+	 * so the accounting plugin knows to LEFT JOIN job_app_table */  
+	{  
+		list_itr_t *fmt_itr = list_iterator_create(print_fields_list);  
+		print_field_t *field;  
+		while ((field = list_next(fmt_itr))) {  
+			if (field->type == PRINT_APPNAME ||  
+			    field->type == PRINT_APPVERSION ||  
+			    field->type == PRINT_APPSOURCE) {  
+				params.job_cond->flags |= JOBCOND_FLAG_APP;  
+				break;  
+			}  
+		}  
+		list_iterator_destroy(fmt_itr);  
+	}  
+#endif
 
 	/* What are we doing? Requests for help take highest priority,
 	 * but then check for illogical switch combinations.

@@ -102,6 +102,11 @@ typedef struct env_options {
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
 	char *watch_dog;        /*submit job's watch dog */
 #endif
+#ifdef __METASTACK_OPT_APP  
+	char *app_name;         /* job's app name */  
+	char *app_version;      /* job's app version */  
+	uint8_t app_source;     /* 0=user, 1=auto, 2=portal, 3=marketplace */
+#endif
 } env_t;
 
 

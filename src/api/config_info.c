@@ -103,7 +103,13 @@ _reset_period_str(uint16_t reset_period)
  * IN node_info_ptr - pointer to node table of information
  * IN part_info_ptr - pointer to partition information
  */
-#ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
+#if defined(__METASTACK_OPT_APP)  
+extern void slurm_write_ctl_conf(slurm_conf_t *slurm_ctl_conf_ptr,  
+                                 node_info_msg_t *node_info_ptr,  
+                                 partition_info_msg_t *part_info_ptr,  
+                                 slurm_ctl_conf_info_msg_watch_dog_t *slurm_watch_dog_ptr,  
+                                 slurm_ctl_conf_info_msg_app_t *slurm_app_ptr)
+#elif defined(__METASTACK_NEW_CUSTOM_EXCEPTION)
 void slurm_write_ctl_conf ( slurm_ctl_conf_info_msg_t * slurm_ctl_conf_ptr,
 			    node_info_msg_t * node_info_ptr,
 			    partition_info_msg_t * part_info_ptr,
@@ -584,6 +590,36 @@ void slurm_write_ctl_conf ( slurm_ctl_conf_info_msg_t * slurm_ctl_conf_ptr,
 			}
 	}
 #endif
+
+#ifdef __METASTACK_OPT_APP  
+	if (slurm_app_ptr) {  
+		fprintf(fp,  
+			"###############################################\n");  
+		fprintf(fp, "#              APP PRESETS                    #\n");  
+		fprintf(fp,  
+			"###############################################\n");  
+		fprintf(fp, "#\n#\n");  
+  
+		app_record_t *write_app = slurm_app_ptr->app_array;  
+		for (i = 0; i < slurm_app_ptr->record_count; i++) {  
+			if (!write_app[i].app_name)  
+				continue;  
+			fprintf(fp, "AppName=%s", write_app[i].app_name);  
+			if (write_app[i].version)  
+				fprintf(fp, " Version=%s", write_app[i].version);  
+			if (write_app[i].description)  
+				fprintf(fp, " Description=\"%s\"",  
+				        write_app[i].description);  
+			if (write_app[i].watchdog)  
+				fprintf(fp, " Watchdog=%s",  
+				        write_app[i].watchdog);  
+			if (write_app[i].default_flag)  
+				fprintf(fp, " Default=YES");  
+			fprintf(fp, "\n");  
+		}  
+	}  
+#endif
+
 	fprintf(stdout, "Slurm config saved to %s\n", path);
 
 	xfree(path);
@@ -2333,6 +2369,89 @@ int slurm_load_ctl_conf_watch_dog(time_t update_time, slurm_ctl_conf_info_msg_wa
 }
 
 #endif
+
+#ifdef __METASTACK_OPT_APP  
+int slurm_load_app(time_t update_time,  
+                   slurm_ctl_conf_info_msg_app_t **confp)  
+{  
+	int rc = SLURM_SUCCESS;  
+	slurm_msg_t req_msg;  
+	slurm_msg_t resp_msg;  
+	last_update_msg_t req;  
+  
+	slurm_msg_t_init(&req_msg);  
+	slurm_msg_t_init(&resp_msg);  
+  
+	memset(&req, 0, sizeof(req));  
+	req_msg.protocol_version = SLURM_PROTOCOL_VERSION;  
+	req.last_update  = update_time;  
+	req_msg.msg_type = REQUEST_BUILD_APP_INFO;  
+	req_msg.data     = &req;  
+  
+	if (slurm_send_recv_controller_msg(&req_msg, &resp_msg,  
+	                                   working_cluster_rec) < 0)  
+		return SLURM_ERROR;  
+  
+	switch (resp_msg.msg_type) {  
+	case RESPONSE_BUILD_APP_INFO:  
+		*confp = (slurm_ctl_conf_info_msg_app_t *)resp_msg.data;  
+		break;  
+	case RESPONSE_SLURM_RC:  
+		rc = ((return_code_msg_t *)resp_msg.data)->return_code;  
+		slurm_free_return_code_msg(resp_msg.data);  
+		if (rc)  
+			slurm_seterrno_ret(rc);  
+		break;  
+	default:  
+		slurm_seterrno_ret(SLURM_UNEXPECTED_MSG_ERROR);  
+		break;  
+	}  
+	return SLURM_SUCCESS;  
+}  
+  
+/*  
+ * slurm_print_app_info - format a single app record for display  
+ */  
+char *slurm_sprint_app_info(app_record_t *app_ptr, int one_liner)  
+{  
+	if (!app_ptr)  
+		return NULL;  
+  
+	char *out = NULL;  
+	char *line_end = (one_liner) ? " " : "\n   ";  
+  
+	xstrfmtcat(out, "AppName=%s", app_ptr->app_name);  
+	xstrfmtcat(out, " Version=%s", app_ptr->version);  
+	xstrcat(out, line_end);  
+  
+	if (app_ptr->description)  
+		xstrfmtcat(out, "Description=\"%s\"", app_ptr->description);  
+	if (app_ptr->watchdog)  
+		xstrfmtcat(out, " Watchdog=%s", app_ptr->watchdog);  
+	if (app_ptr->default_flag)  
+		xstrcat(out, " Default=YES");  
+	else  
+		xstrcat(out, " Default=NO");  
+  
+	if (one_liner)  
+		xstrcat(out, "\n");  
+	else  
+		xstrcat(out, "\n\n");  
+  
+	return out;  
+}  
+  
+void slurm_print_app_info(FILE *out, app_record_t *app_ptr, int one_liner)  
+{  
+	if (!app_ptr)  
+		return;  
+	char *print_this = slurm_sprint_app_info(app_ptr, one_liner);  
+	if (!print_this)  
+		return;  
+	fprintf(out, "%s", print_this);  
+	xfree(print_this);  
+}  
+#endif /* __METASTACK_OPT_APP */
 
 /*
  * slurm_load_ctl_conf - issue RPC to get slurm control configuration

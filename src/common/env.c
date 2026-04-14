@@ -853,6 +853,42 @@ int setup_env(env_t *env, bool preserve_env)
 			rc = SLURM_ERROR;
 		}
 	}
+
+#ifdef __METASTACK_OPT_APP
+	/*  
+	 * Inject app identity into the job/step environment:  
+	 *   SLURM_JOB_APP_NAME    — registered application name  
+	 *   SLURM_JOB_APP_VERSION — application version string  
+	 *   SLURM_JOB_APP_SOURCE  — numeric source indicator (see app_source enum)  
+	 * These are available to batch scripts, srun tasks, and watchdog scripts.  
+	 */
+	if (env->app_name) {    
+		if (setenvf(&env->env,    
+			    "SLURM_JOB_APP_NAME",    
+			    "%s",    
+			    env->app_name)) {    
+			error("%s: can't set SLURM_JOB_APP_NAME env variable",    
+			      __func__);    
+		}    
+	}    
+	if (env->app_version) {    
+		if (setenvf(&env->env,    
+			    "SLURM_JOB_APP_VERSION",    
+			    "%s",    
+			    env->app_version)) {    
+			error("%s: can't set SLURM_JOB_APP_VERSION env variable",    
+			      __func__);    
+		}    
+	}    
+	if (env->app_name) {    
+		if (setenvf(&env->env, "SLURM_JOB_APP_SOURCE", "%u",    
+			    env->app_source)) {    
+			error("%s: can't set SLURM_JOB_APP_SOURCE env variable",    
+			      __func__);    
+		}    
+	} 
+#endif
+
 	if (env->qos) {
 		if (setenvf(&env->env,
 			    "SLURM_JOB_QOS",
@@ -1147,6 +1183,25 @@ extern int env_array_for_job(char ***dest,
 					    het_job_offset, "%s",
 					    alloc->account);
 	}
+#ifdef __METASTACK_OPT_APP
+	/* Propagate app identity from allocation response to salloc/srun  
+	 * environment. Supports het-job offset for heterogeneous jobs. */
+	if (alloc->app_name) {  
+		env_array_overwrite_het_fmt(dest, "SLURM_JOB_APP_NAME",  
+					    het_job_offset, "%s",  
+					    alloc->app_name);  
+	}  
+	if (alloc->app_version) {  
+		env_array_overwrite_het_fmt(dest, "SLURM_JOB_APP_VERSION",  
+					    het_job_offset, "%s",  
+					    alloc->app_version);  
+	}
+	if (alloc->app_name) {  
+		env_array_overwrite_het_fmt(dest, "SLURM_JOB_APP_SOURCE",    
+					    het_job_offset, "%u",    
+					    alloc->app_source);
+	} 
+#endif
 	if (alloc->qos) {
 		env_array_overwrite_het_fmt(dest, "SLURM_JOB_QOS",
 					    het_job_offset,
@@ -1429,6 +1484,18 @@ env_array_for_batch_job(char ***dest, const batch_job_launch_msg_t *batch,
 					"%s",
 					batch->account);
 	}
+
+#ifdef __METASTACK_OPT_APP
+	/* Set app identity environment variables for batch job scripts.  
+	 * batch->app_name/version/source are populated by slurmctld  
+	 * from the job_record when launching the batch step. */
+	if (batch->app_name) {  
+		env_array_overwrite_fmt(dest, "SLURM_JOB_APP_NAME", "%s", batch->app_name);  
+		if (batch->app_version)  
+			env_array_overwrite_fmt(dest, "SLURM_JOB_APP_VERSION", "%s", batch->app_version);  
+		env_array_overwrite_fmt(dest, "SLURM_JOB_APP_SOURCE", "%u", batch->app_source);  
+	}
+#endif
 
 	if (batch->qos) {
 		env_array_overwrite_fmt(dest,

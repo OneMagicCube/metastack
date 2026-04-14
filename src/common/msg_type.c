@@ -280,6 +280,13 @@ const static entry_t msg_types[] = {
 	ENTRY(REQUEST_BUILD_WATCH_DOG_INFO),
 	ENTRY(RESPONSE_BUILD_WATCH_DOG_INFO),
 #endif
+#ifdef __METASTACK_OPT_APP  
+	ENTRY(REQUEST_BUILD_APP_INFO),
+	ENTRY(RESPONSE_BUILD_APP_INFO),
+	ENTRY(REQUEST_CREATE_APP),
+	ENTRY(REQUEST_UPDATE_APP),
+	ENTRY(REQUEST_DELETE_APP),
+#endif
 };
 
 extern const char *rpc_num2string(uint16_t msg_type)

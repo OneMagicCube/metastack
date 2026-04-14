@@ -80,6 +80,10 @@
 #define OPT_LONG_CACHE        0x200
 #define OPT_LONG_NOCACHE        0x201
 #endif
+#ifdef __METASTACK_OPT_APP  
+#define OPT_LONG_APP_SOURCE   0x202
+#define OPT_LONG_APP_NAME     0x203 
+#endif
 
 /* FUNCTIONS */
 static list_t *_build_job_list(char *str);
@@ -459,6 +463,10 @@ extern void parse_command_line(int argc, char **argv)
 		{"version",    no_argument,       0, 'V'},
 		{"json", optional_argument, 0, OPT_LONG_JSON},
 		{"yaml", optional_argument, 0, OPT_LONG_YAML},
+#ifdef __METASTACK_OPT_APP  
+		{"app-source", required_argument, 0, OPT_LONG_APP_SOURCE},
+		{"app-name",   required_argument, 0, OPT_LONG_APP_NAME},  
+#endif 
 		{NULL,         0,                 0, 0}
 	};
 
@@ -724,6 +732,34 @@ extern void parse_command_line(int argc, char **argv)
 		case OPT_LONG_NOCACHE:
 			params.nocache_query = true;
 			params.cache_query = false;
+			break;
+#endif
+#ifdef __METASTACK_OPT_APP  
+		case OPT_LONG_APP_SOURCE:  
+		{  
+			char *tmp = xstrdup(optarg);  
+			char *save_ptr = NULL;  
+			char *tok = strtok_r(tmp, ",", &save_ptr);  
+			if (!params.app_source_list)  
+				params.app_source_list = list_create(xfree_ptr);  
+			while (tok) {  
+				uint8_t val = app_source_from_str(tok);  
+				if (val == NO_VAL8) {  
+					error("Invalid --app-source value: '%s'", tok);  
+					exit(1);  
+				}  
+				uint8_t *p = xmalloc(sizeof(uint8_t));  
+				*p = val;  
+				list_append(params.app_source_list, p);  
+				tok = strtok_r(NULL, ",", &save_ptr);  
+			}  
+			xfree(tmp);  
+			break;  
+		}
+		case OPT_LONG_APP_NAME:  
+			if (!params.app_name_list)  
+				params.app_name_list = list_create(xfree_ptr);  
+			slurm_addto_char_list(params.app_name_list, optarg);  
 			break;
 #endif
 		}
@@ -1066,6 +1102,10 @@ static fmt_data_job_t fmt_data_job[] = {
 	{"WorkDir", 'Z', _print_job_work_dir, 0},
 #ifdef __METASTACK_NEW_PENDING_ORDER
 	{"Order", 0, _print_job_order, 0},
+#endif
+#ifdef __METASTACK_OPT_APP  
+	{"App", 0, _print_job_app, 0},  
+	{"AppSource", 0, _print_job_app_source, 0},
 #endif
 	{NULL, 0, NULL, 0},
 };

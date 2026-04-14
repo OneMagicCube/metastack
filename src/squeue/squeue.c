@@ -404,15 +404,35 @@ static int _print_job(bool clear_old, bool log_cluster_name, int argc,
 		if (log_cluster_name)
 			xstrcat(params.format_long, "cluster:10 ,");
 		if (params.long_list) {
-			xstrcat(params.format_long,
-				"jobarrayid:.18 ,partition:.9 ,name:.8 ,"
-				"username:.8 ,state:.8 ,timeused:.10 ,"
-				"timelimit:.9 ,numnodes:.6 ,reasonlist:0");
+#ifdef __METASTACK_OPT_APP  
+			if (params.app_name_list || params.app_source_list) {  
+				xstrcat(params.format_long,  
+					"jobarrayid:.18 ,partition:.9 ,name:.8 ,"  
+					"username:.8 ,state:.8 ,timeused:.10 ,"  
+					"timelimit:.9 ,numnodes:.6 ,App:.15 ,AppSource:.12 ,reasonlist:0");  
+			} else  
+#endif  
+			{  
+				xstrcat(params.format_long,  
+					"jobarrayid:.18 ,partition:.9 ,name:.8 ,"  
+					"username:.8 ,state:.8 ,timeused:.10 ,"  
+					"timelimit:.9 ,numnodes:.6 ,reasonlist:0");  
+			}
 		} else {
-			xstrcat(params.format_long,
-				"jobarrayid:.18 ,partition:.9 ,name:.8 ,"
-				"username:.8 ,statecompact:.2 ,timeused:.10 ,"
-				"numnodes:.6 ,reasonlist:0");
+#ifdef __METASTACK_OPT_APP  
+			if (params.app_name_list || params.app_source_list) {  
+				xstrcat(params.format_long,  
+					"jobarrayid:.18 ,partition:.9 ,name:.8 ,"  
+					"username:.8 ,statecompact:.2 ,timeused:.10 ,"  
+					"numnodes:.6 ,App:.15 ,AppSource:.12 ,reasonlist:0");  
+			} else  
+#endif  
+			{  
+				xstrcat(params.format_long,  
+					"jobarrayid:.18 ,partition:.9 ,name:.8 ,"  
+					"username:.8 ,statecompact:.2 ,timeused:.10 ,"  
+					"numnodes:.6 ,reasonlist:0");  
+			}
 		}
 	}
 

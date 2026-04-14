@@ -548,6 +548,11 @@ struct job_record {
 	bool comp_batch_flag;		/* true if job is processed compute batch job message */
 	bool enable_stepd_send_term_job; /* true if stepd send terminal job message */
 #endif
+#ifdef __METASTACK_OPT_APP  
+	char *app_name;      /* application name from --app */  
+	char *app_version;   /* application version from --app */  
+	uint8_t app_source;  /* 0=user, 1=auto, 2=portal, 3=marketplace */
+#endif
 };
 
 #ifdef __METASTACK_OPT_REDUCE_REPEAT_SCHED

@@ -72,6 +72,9 @@
 #include "src/common/xmalloc.h"
 
 #include "src/interfaces/cred.h"
+#ifdef __METASTACK_OPT_APP
+#include "src/common/xhash.h"
+#endif
 
 /*****************************************************************************\
  *  GENERAL CONFIGURATION parameters and data structures
@@ -377,6 +380,41 @@ extern List part_list;			/* list of part_record entries */
 extern List watch_dog_list;			/* watch dog list */
 extern time_t last_watch_dog_update;	/* time of last update to watch_dog records */
 #endif
+
+#ifdef __METASTACK_OPT_APP
+/*  
+ * App subsystem global state (slurmctld only).  
+ *  
+ * Dual data structure design:  
+ *   app_list       - Authoritative owner of all app_record_t instances.  
+ *                    Destructor _list_delete_app frees all members.  
+ *   app_hash_table - Non-owning hash index keyed by combined_name  
+ *                    ("name-version") for O(1) lookup. freefunc=NULL.  
+ *  
+ * Invariant: every record in app_hash_table has a corresponding entry  
+ * in app_list. On cleanup, free hash table FIRST (drops references),  
+ * then flush/free list (frees actual memory).  
+ *  
+ * default_app_name / default_app_loc track the app with Default=yes.  
+ * At most one app can be the default at any time.  
+ */
+extern List app_list;                   /* app preset list */  
+extern xhash_t *app_hash_table;        /* hash table indexed by combined_name */  
+extern time_t last_app_update;          /* time of last update to app records */  
+extern char *default_app_name;          /* combined name of default app, e.g. "general-1.0" */  
+extern app_record_t *default_app_loc;   /* pointer to default app record */  
+/* Save the state of all app records to file */  
+extern int dump_all_app_state(void);  
+  
+/*  
+ * Load app state from file, recover on slurmctld restart.  
+ * IN recover - 0 = use config file only (reconfigure)  
+ *              1+ = recover saved state from disk  
+ * RET SLURM_SUCCESS or error code  
+ */  
+extern int load_all_app_state(uint16_t reconfig_flags);
+#endif
+
 #ifdef __METASTACK_OPT_HIGH_THROUGHPUT_SRUN_JOB_COM
 extern bool ignore_srun_job_complete;
 #endif
@@ -680,6 +718,43 @@ extern part_record_t *create_ctld_part_record(const char *name);
  * 
  */
 watch_dog_record_t *create_watch_dog_record(const char *name);
+#endif
+
+#ifdef __METASTACK_OPT_APP  
+/*  
+ * create_app_record - create an app record and add to app_list  
+ * IN name - app_name  
+ * IN version - version string  
+ * RET a pointer to the record or NULL if error  
+ */  
+extern app_record_t *create_app_record(const char *name, const char *version);  
+  
+/*  
+ * find_app_record - find an app record by app_name and version  
+ * IN app_name - application name  
+ * IN version - version string  
+ * RET pointer to app record or NULL if not found  
+ */  
+extern app_record_t *find_app_record(const char *app_name,  
+				     const char *version);  
+  
+/*  
+ * find_app_record_by_combined - find an app record by combined name  
+ *   (e.g. "vasp-5.7.1"). Iterates through app_list and compares  
+ *   "appname-version" concatenation against the input string.  
+ * IN combined_name - combined app name string  
+ * RET pointer to app record or NULL if not found  
+ */  
+extern app_record_t *find_app_record_by_combined(const char *combined_name);  
+  
+extern void init_app_conf(void);  
+extern void app_fini(void);  
+extern int update_app(app_desc_msg_t *app_desc, bool create_flag);  
+extern int delete_app(delete_app_msg_t *app_msg);  
+extern buf_t *pack_all_app(uid_t uid, uint16_t protocol_version);  
+extern void pack_app(app_record_t *app_ptr, buf_t *buffer,  
+                     uint16_t protocol_version);  
+extern int list_find_app(void *x, void *key);  
 #endif
 
 /*
@@ -1992,6 +2067,12 @@ extern int pack_ctld_job_step_info_response_msg(
 extern buf_t *pack_all_watch_dog(uid_t uid, uint16_t protocol_version);
 #endif
 
+#ifdef __METASTACK_OPT_APP  
+extern buf_t *pack_all_app(uid_t uid, uint16_t protocol_version);  
+void pack_app(app_record_t *app_ptr, buf_t *buffer,  
+	      uint16_t protocol_version);  
+#endif
+
 /*
  * pack_all_part - dump all partition information for all partitions in
  *	machine independent form (for network transmission)
@@ -2097,6 +2178,10 @@ extern part_record_t **build_visible_parts_user(slurmdb_user_rec_t *user_ret,
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
 //extern watch_dog_record_t **build_visible_watch_dogs(uid_t uid, bool skip) ;
 extern void watch_dog_fini (void);
+#endif
+
+#ifdef __METASTACK_OPT_APP  
+extern void app_fini(void);  
 #endif
 
 /*

@@ -287,7 +287,10 @@ extern void slurm_cred_free_args(slurm_cred_arg_t *arg)
 	xfree(arg->step_mem_alloc_rep_count);
 
 	switch_g_free_stepinfo(arg->switch_step);
-
+#ifdef __METASTACK_OPT_APP
+	xfree(arg->job_app_name);  
+	xfree(arg->job_app_version);  
+#endif
 	xfree(arg);
 }
 
@@ -807,7 +810,11 @@ extern void setup_cred_arg(slurm_cred_arg_t *cred_arg, job_record_t *job_ptr)
 	cred_arg->job_selinux_context = job_ptr->selinux_context;
 	cred_arg->job_start_time = job_ptr->start_time;
 	cred_arg->uid = job_ptr->user_id;
-
+#ifdef __METASTACK_OPT_APP
+	cred_arg->job_app_name = job_ptr->app_name;  
+	cred_arg->job_app_version = job_ptr->app_version;  
+	cred_arg->job_app_source = job_ptr->app_source;  
+#endif 
 	if (job_ptr->details) {
 		cred_arg->job_constraints = job_ptr->details->features_use;
 		cred_arg->job_core_spec = job_ptr->details->core_spec;

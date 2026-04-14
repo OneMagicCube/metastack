@@ -1100,7 +1100,30 @@ slurm_sprint_job_info ( job_info_t * job_ptr, int one_liner )
 	}
 
 	xstrcat(out, line_end);
-
+#ifdef __METASTACK_OPT_APP    
+	/****** Line: App Info ******/    
+	if (job_ptr->app_name && job_ptr->app_name[0]) {    
+		char *app_combined = NULL;    
+		const char *source_str = "N/A";    
+  
+		if (job_ptr->app_version && job_ptr->app_version[0])    
+			xstrfmtcat(app_combined, "%s-%s",    
+				   job_ptr->app_name,    
+				   job_ptr->app_version);    
+		else    
+			app_combined = xstrdup(job_ptr->app_name);    
+    
+		source_str = app_source_to_str(job_ptr->app_source);    
+  
+		xstrfmtcat(out, "App=%s AppName=%s AppVersion=%s AppSource=%s",    
+			   app_combined,    
+			   job_ptr->app_name,    
+			   job_ptr->app_version ? job_ptr->app_version : "N/A",    
+			   source_str);    
+		xfree(app_combined);    
+		xstrcat(out, line_end);    
+	}
+#endif
 	/****** END OF JOB RECORD ******/
 	if (one_liner)
 		xstrcat(out, "\n");

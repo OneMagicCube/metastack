@@ -832,6 +832,48 @@ no_rollup_change:
 
 	xfree(query);
 
+#ifdef __METASTACK_OPT_APP  
+	/*  
+	* Fault isolation: app table write uses a separate app_rc variable.  
+	* Failure only logs an error and does NOT affect the main rc,  
+	* ensuring job_start succeeds even if app metadata persistence fails.  
+	*/
+
+	/* Insert/update app record into job_app_table */  
+	if (rc == SLURM_SUCCESS && job_ptr->db_index  
+	    && job_ptr->app_name && job_ptr->app_name[0]) {  
+		char *esc_app_name = slurm_add_slash_to_quotes(job_ptr->app_name);  
+		char *esc_app_version = slurm_add_slash_to_quotes(job_ptr->app_version);  
+  
+		query = xstrdup_printf(  
+			"insert into \"%s_%s\" "  
+			"(job_db_inx, app_name, app_version, app_source, mod_time) "  
+			"values (%"PRIu64", '%s', '%s', %u, UNIX_TIMESTAMP()) "  
+			"on duplicate key update "  
+			"app_name='%s', app_version='%s', "  
+			"app_source=%u, mod_time=UNIX_TIMESTAMP()",  
+			mysql_conn->cluster_name, job_app_table,  
+			job_ptr->db_index,  
+			esc_app_name ? esc_app_name : "",  
+			esc_app_version ? esc_app_version : "",  
+			job_ptr->app_source,  
+			esc_app_name ? esc_app_name : "",  
+			esc_app_version ? esc_app_version : "",  
+			job_ptr->app_source);  
+  
+		xfree(esc_app_name);  
+		xfree(esc_app_version);  
+  
+		DB_DEBUG(DB_JOB, mysql_conn->conn,  
+			 "app query\n%s", query);
+		int app_rc = mysql_db_query(mysql_conn, query);  
+		if (app_rc != SLURM_SUCCESS)  
+			error("Failed to insert app info for job db_index %"PRIu64,  
+			      job_ptr->db_index);
+		xfree(query);  
+	}  
+#endif
+
 	if (rc != SLURM_SUCCESS)
 		return rc;
 
