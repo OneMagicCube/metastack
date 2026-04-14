@@ -1276,10 +1276,10 @@ static void _usage(void)
 "              [--watch-dog]\n"
 #endif
 #ifdef __METASTACK_OPT_APP_3  
-"              [--app=name-version] [--app-name=name] [--app-version=version]\n"  
+"              [--app=name-version|list] [--app-name=name] [--app-version=version]\n"
 #endif  
 #ifdef __METASTACK_OPT_APP_9  
-"              [--app-source=source]\n"  
+"              [--app-source=source]\n"
 #endif
 "              executable [args...]\n");
 }
@@ -1374,6 +1374,9 @@ static void _help(void)
 "\n"
 "Application options:\n"
 "      --app=name-version      specify app in combined format (e.g. vasp-5.7.1)\n"
+"                              sets both app name and version; app must be\n"
+"                              pre-configured via 'scontrol create app'\n"
+"      --app=list              list all available app configurations and exit\n"
 #endif  
 #ifdef __METASTACK_OPT_APP_9  
 "      --app-source=source     source of app assignment (user, portal, marketplace)\n"

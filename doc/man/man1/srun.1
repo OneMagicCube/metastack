@@ -64,7 +64,9 @@ Specify the application for this job in the combined format "name\-version"
 (e.g. "vasp\-5.7.1"). This sets both the application name and version.  
 If only a name is provided without a version, only AppName is set.  
 The application must be pre\-configured via \fBscontrol create app\fR.  
-.IP  
+If the special value \fBlist\fR is given, all available app configurations  
+are printed and the command exits without submitting a job.  
+.IP
   
 .TP  
 \fB\-\-app\-name\fR=<\fIname\fR>  
