@@ -5164,8 +5164,8 @@ extern void slurmdb_pack_job_cond(void *in, uint16_t protocol_version,
 				  buf_t *buffer)
 {
 	slurmdb_job_cond_t *object = (slurmdb_job_cond_t *)in;
-
-	if (protocol_version >= SLURM_MIN_PROTOCOL_VERSION) {
+#ifdef __META_PROTOCOL
+	if (protocol_version >= META_3_2_PROTOCOL_VERSION) {
 		if (!object) {
 			pack32(NO_VAL, buffer);	/* count(acct_list) */
 			pack32(NO_VAL, buffer);	/* count(associd_list) */
@@ -5202,7 +5202,6 @@ extern void slurmdb_pack_job_cond(void *in, uint16_t protocol_version,
 #endif
 			return;
 		}
-
 		_pack_list_of_str(object->acct_list, buffer);
 		_pack_list_of_str(object->associd_list, buffer);
 		_pack_list_of_str(object->cluster_list, buffer);
@@ -5246,7 +5245,78 @@ extern void slurmdb_pack_job_cond(void *in, uint16_t protocol_version,
 		_pack_list_of_str(object->appversion_list, buffer);  
 		_pack_list_of_str(object->appsource_list, buffer);  
 #endif
+	} else if (protocol_version >= SLURM_MIN_PROTOCOL_VERSION) {
+		if (!object) {
+			pack32(NO_VAL, buffer);	/* count(acct_list) */
+			pack32(NO_VAL, buffer);	/* count(associd_list) */
+			pack32(NO_VAL, buffer);	/* count(cluster_list) */
+			pack32(NO_VAL, buffer);	/* count(constraint_list) */
+			pack32(0, buffer);	/* cpus_max */
+			pack32(0, buffer);	/* cpus_min */
+			pack32(SLURMDB_JOB_FLAG_NOTSET, buffer); /* db_flags */
+			pack32(0, buffer);	/* exitcode */
+			pack32(0, buffer);	/* job cond flags */
+			pack32(NO_VAL, buffer);	/* count(format_list) */
+			pack32(NO_VAL, buffer);	/* count(groupid_list) */
+			pack32(NO_VAL, buffer);	/* count(jobname_list) */
+			pack32(0, buffer);	/* nodes_max */
+			pack32(0, buffer);	/* nodes_min */
+			pack32(NO_VAL, buffer);	/* count(partition_list) */
+			pack32(NO_VAL, buffer);	/* count(qos_list) */
+			pack32(NO_VAL, buffer);	/* count(reason_list) */
+			pack32(NO_VAL, buffer);	/* count(resv_list) */
+			pack32(NO_VAL, buffer);	/* count(resvid_list) */
+			pack32(NO_VAL, buffer);	/* count(step_list) */
+			pack32(NO_VAL, buffer);	/* count(state_list) */
+			pack32(0, buffer);	/* timelimit_max */
+			pack32(0, buffer);	/* timelimit_min */
+			pack_time(0, buffer);	/* usage_end */
+			pack_time(0, buffer);	/* usage_start */
+			packnull(buffer);	/* used_nodes */
+			pack32(NO_VAL, buffer);	/* count(userid_list) */
+			pack32(NO_VAL, buffer);	/* count(wckey_list) */
+			return;
+		}
+		_pack_list_of_str(object->acct_list, buffer);
+		_pack_list_of_str(object->associd_list, buffer);
+		_pack_list_of_str(object->cluster_list, buffer);
+		_pack_list_of_str(object->constraint_list, buffer);
+
+		pack32(object->cpus_max, buffer);
+		pack32(object->cpus_min, buffer);
+		pack32(object->db_flags, buffer);
+		pack32((uint32_t)object->exitcode, buffer);
+		pack32(object->flags, buffer);
+
+		_pack_list_of_str(object->format_list, buffer);
+		_pack_list_of_str(object->groupid_list, buffer);
+		_pack_list_of_str(object->jobname_list, buffer);
+
+		pack32(object->nodes_max, buffer);
+		pack32(object->nodes_min, buffer);
+
+		_pack_list_of_str(object->partition_list, buffer);
+		_pack_list_of_str(object->qos_list, buffer);
+		_pack_list_of_str(object->reason_list, buffer);
+		_pack_list_of_str(object->resv_list, buffer);
+		_pack_list_of_str(object->resvid_list, buffer);
+
+		slurm_pack_list(object->step_list, slurm_pack_selected_step,
+				buffer, protocol_version);
+
+		_pack_list_of_str(object->state_list, buffer);
+
+		pack32(object->timelimit_max, buffer);
+		pack32(object->timelimit_min, buffer);
+		pack_time(object->usage_end, buffer);
+		pack_time(object->usage_start, buffer);
+
+		packstr(object->used_nodes, buffer);
+
+		_pack_list_of_str(object->userid_list, buffer);
+		_pack_list_of_str(object->wckey_list, buffer);
 	}
+#endif
 }
 
 extern int slurmdb_unpack_job_cond(void **object, uint16_t protocol_version,
@@ -5260,8 +5330,8 @@ extern int slurmdb_unpack_job_cond(void **object, uint16_t protocol_version,
 	slurm_selected_step_t *job = NULL;
 
 	*object = object_ptr;
-
-	if (protocol_version >= SLURM_MIN_PROTOCOL_VERSION) {
+#ifdef __META_PROTOCOL
+	if (protocol_version >= META_3_2_PROTOCOL_VERSION) {
 		safe_unpack32(&count, buffer);
 		if (count > NO_VAL)
 			goto unpack_error;
@@ -5523,8 +5593,234 @@ extern int slurmdb_unpack_job_cond(void **object, uint16_t protocol_version,
 			}  
 		}  
 #endif
+	} else if (protocol_version >= SLURM_MIN_PROTOCOL_VERSION) {
+		safe_unpack32(&count, buffer);
+		if (count > NO_VAL)
+			goto unpack_error;
+		if (count != NO_VAL) {
+			object_ptr->acct_list = list_create(xfree_ptr);
+			for (i = 0; i < count; i++) {
+				safe_unpackstr_xmalloc(&tmp_info, &uint32_tmp,
+						       buffer);
+				list_append(object_ptr->acct_list, tmp_info);
+			}
+		}
+
+		safe_unpack32(&count, buffer);
+		if (count > NO_VAL)
+			goto unpack_error;
+		if (count != NO_VAL) {
+			object_ptr->associd_list = list_create(xfree_ptr);
+			for (i = 0; i < count; i++) {
+				safe_unpackstr_xmalloc(&tmp_info, &uint32_tmp,
+						       buffer);
+				list_append(object_ptr->associd_list, tmp_info);
+			}
+		}
+
+		safe_unpack32(&count, buffer);
+		if (count > NO_VAL)
+			goto unpack_error;
+		if (count != NO_VAL) {
+			object_ptr->cluster_list = list_create(xfree_ptr);
+			for (i = 0; i < count; i++) {
+				safe_unpackstr_xmalloc(&tmp_info, &uint32_tmp,
+						       buffer);
+				list_append(object_ptr->cluster_list, tmp_info);
+			}
+		}
+
+		safe_unpack32(&count, buffer);
+		if (count > NO_VAL)
+			goto unpack_error;
+		if (count && (count != NO_VAL)) {
+			object_ptr->constraint_list = list_create(xfree_ptr);
+			for (i = 0; i < count; i++) {
+				safe_unpackstr_xmalloc(&tmp_info, &uint32_tmp,
+						       buffer);
+				list_append(object_ptr->constraint_list,
+					    tmp_info);
+			}
+		}
+
+		safe_unpack32(&object_ptr->cpus_max, buffer);
+		safe_unpack32(&object_ptr->cpus_min, buffer);
+		safe_unpack32(&object_ptr->db_flags, buffer);
+		safe_unpack32(&uint32_tmp, buffer);
+		object_ptr->exitcode = (int32_t)uint32_tmp;
+		safe_unpack32(&object_ptr->flags, buffer);
+
+		safe_unpack32(&count, buffer);
+		if (count > NO_VAL)
+			goto unpack_error;
+		if (count && (count != NO_VAL)) {
+			object_ptr->format_list = list_create(xfree_ptr);
+			for (i = 0; i < count; i++) {
+				safe_unpackstr_xmalloc(&tmp_info, &uint32_tmp,
+						       buffer);
+				list_append(object_ptr->format_list, tmp_info);
+			}
+		}
+
+		safe_unpack32(&count, buffer);
+		if (count > NO_VAL)
+			goto unpack_error;
+		if (count != NO_VAL) {
+			object_ptr->groupid_list = list_create(xfree_ptr);
+			for (i = 0; i < count; i++) {
+				safe_unpackstr_xmalloc(&tmp_info, &uint32_tmp,
+						       buffer);
+				list_append(object_ptr->groupid_list, tmp_info);
+			}
+		}
+
+		safe_unpack32(&count, buffer);
+		if (count > NO_VAL)
+			goto unpack_error;
+		if (count != NO_VAL) {
+			object_ptr->jobname_list = list_create(xfree_ptr);
+			for (i = 0; i < count; i++) {
+				safe_unpackstr_xmalloc(&tmp_info, &uint32_tmp,
+						       buffer);
+				list_append(object_ptr->jobname_list, tmp_info);
+			}
+		}
+
+		safe_unpack32(&object_ptr->nodes_max, buffer);
+		safe_unpack32(&object_ptr->nodes_min, buffer);
+
+		safe_unpack32(&count, buffer);
+		if (count > NO_VAL)
+			goto unpack_error;
+		if (count != NO_VAL) {
+			object_ptr->partition_list = list_create(xfree_ptr);
+			for (i = 0; i < count; i++) {
+				safe_unpackstr_xmalloc(&tmp_info,
+						       &uint32_tmp, buffer);
+				list_append(object_ptr->partition_list,
+					    tmp_info);
+			}
+		}
+
+		safe_unpack32(&count, buffer);
+		if (count > NO_VAL)
+			goto unpack_error;
+		if (count != NO_VAL) {
+			object_ptr->qos_list = list_create(xfree_ptr);
+			for (i = 0; i < count; i++) {
+				safe_unpackstr_xmalloc(&tmp_info,
+						       &uint32_tmp, buffer);
+				list_append(object_ptr->qos_list,
+					    tmp_info);
+			}
+		}
+
+		safe_unpack32(&count, buffer);
+		if (count != NO_VAL) {
+			object_ptr->reason_list = list_create(xfree_ptr);
+			for (i = 0; i < count; i++) {
+				safe_unpackstr_xmalloc(&tmp_info,
+						       &uint32_tmp, buffer);
+				list_append(object_ptr->reason_list,
+					    tmp_info);
+			}
+		}
+
+		safe_unpack32(&count, buffer);
+		if (count != NO_VAL) {
+			object_ptr->resv_list = list_create(xfree_ptr);
+			for (i = 0; i < count; i++) {
+				safe_unpackstr_xmalloc(&tmp_info,
+						       &uint32_tmp, buffer);
+				list_append(object_ptr->resv_list,
+					    tmp_info);
+			}
+		}
+
+		safe_unpack32(&count, buffer);
+		if (count > NO_VAL)
+			goto unpack_error;
+		if (count != NO_VAL) {
+			object_ptr->resvid_list = list_create(xfree_ptr);
+			for (i = 0; i < count; i++) {
+				safe_unpackstr_xmalloc(&tmp_info,
+						       &uint32_tmp, buffer);
+				list_append(object_ptr->resvid_list,
+					    tmp_info);
+			}
+		}
+
+		safe_unpack32(&count, buffer);
+		if (count > NO_VAL)
+			goto unpack_error;
+		if (count != NO_VAL) {
+			object_ptr->step_list =
+				list_create(slurm_destroy_selected_step);
+			for (i = 0; i < count; i++) {
+				if (slurm_unpack_selected_step(
+					    &job, protocol_version, buffer)
+				    != SLURM_SUCCESS) {
+					error("unpacking selected step");
+					goto unpack_error;
+				}
+				/* There is no such thing as jobid 0,
+				 * if we process it the database will
+				 * return all jobs. */
+				if (!job->step_id.job_id)
+					slurm_destroy_selected_step(job);
+				else
+					list_append(object_ptr->step_list, job);
+			}
+			if (!list_count(object_ptr->step_list))
+				FREE_NULL_LIST(object_ptr->step_list);
+		}
+
+		safe_unpack32(&count, buffer);
+		if (count > NO_VAL)
+			goto unpack_error;
+		if (count != NO_VAL) {
+			object_ptr->state_list = list_create(xfree_ptr);
+			for (i = 0; i < count; i++) {
+				safe_unpackstr_xmalloc(&tmp_info,
+						       &uint32_tmp, buffer);
+				list_append(object_ptr->state_list, tmp_info);
+			}
+		}
+
+		safe_unpack32(&object_ptr->timelimit_max, buffer);
+		safe_unpack32(&object_ptr->timelimit_min, buffer);
+		safe_unpack_time(&object_ptr->usage_end, buffer);
+		safe_unpack_time(&object_ptr->usage_start, buffer);
+
+		safe_unpackstr_xmalloc(&object_ptr->used_nodes,
+				       &uint32_tmp, buffer);
+
+		safe_unpack32(&count, buffer);
+		if (count > NO_VAL)
+			goto unpack_error;
+		if (count != NO_VAL) {
+			object_ptr->userid_list = list_create(xfree_ptr);
+			for (i = 0; i < count; i++) {
+				safe_unpackstr_xmalloc(&tmp_info, &uint32_tmp,
+						       buffer);
+				list_append(object_ptr->userid_list, tmp_info);
+			}
+		}
+
+		safe_unpack32(&count, buffer);
+		if (count > NO_VAL)
+			goto unpack_error;
+		if (count != NO_VAL) {
+			object_ptr->wckey_list = list_create(xfree_ptr);
+			for (i = 0; i < count; i++) {
+				safe_unpackstr_xmalloc(&tmp_info, &uint32_tmp,
+						       buffer);
+				list_append(object_ptr->wckey_list, tmp_info);
+			}
+		}
 	} else
 		goto unpack_error;
+#endif
 
 	return SLURM_SUCCESS;
 
