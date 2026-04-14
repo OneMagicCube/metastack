@@ -860,54 +860,58 @@ _print_config_app(char *config_param)
 }  
 #endif
 #ifdef __METASTACK_OPT_APP_2  
-static int _parse_app_options(int argc, char **argv, app_desc_msg_t *app_msg)  
-{  
-	int update_cnt = 0;  
-	for (int i = 0; i < argc; i++) {  
-		char *tag = argv[i];  
-		char *val = strchr(argv[i], '=');  
-		int tag_len;  
-  
-		if (val) {  
-			tag_len = val - argv[i];  
-			val++;  
-		} else {  
-			tag_len = strlen(tag);
-		}
-
-		if (!val) {  
-			error("Missing value for option '%s' (expected '=')", tag);  
-			continue;  
-		}
-  
-		if (!xstrncasecmp(tag, "AppName", MAX(tag_len, 4))) {  
-			xfree(app_msg->app_name);  
-			app_msg->app_name = xstrdup(val);  
-			update_cnt++;  
-		} else if (!xstrncasecmp(tag, "Version", MAX(tag_len, 1))) {  
-			xfree(app_msg->version);  
-			app_msg->version = xstrdup(val);  
-			update_cnt++;  
-		} else if (!xstrncasecmp(tag, "Description", MAX(tag_len, 3))) {  
-			xfree(app_msg->description);  
-			app_msg->description = xstrdup(val);  
-			update_cnt++;  
-		} else if (!xstrncasecmp(tag, "Watchdog", MAX(tag_len, 1))) {  
-			xfree(app_msg->watchdog);  
-			app_msg->watchdog = xstrdup(val);  
-			update_cnt++;  
-		} else if (!xstrncasecmp(tag, "Default", MAX(tag_len, 3))) {  
-			if (!xstrcasecmp(val, "YES") ||  
-			    !xstrcasecmp(val, "1") ||  
-			    !xstrcasecmp(val, "TRUE"))  
-				app_msg->default_flag = 1;  
-			else  
-				app_msg->default_flag = 0;  
-			update_cnt++;  
+static int _parse_app_options(int argc, char **argv, app_desc_msg_t *app_msg)    
+{    
+	int update_cnt = 0;    
+	for (int i = 0; i < argc; i++) {    
+		char *tag = argv[i];    
+		char *val = strchr(argv[i], '=');    
+		int tag_len;    
+    
+		if (val) {    
+			tag_len = val - argv[i];    
+			val++;    
+		} else {    
+			tag_len = strlen(tag);  
 		}  
-	}  
-	return update_cnt;  
-}  
+  
+		if (!val) {  
+			/* Skip the "app" entity keyword passed from  
+			 * _create_it() / _update_it() */  
+			if (!xstrncasecmp(tag, "app", MAX(tag_len, 3)))  
+				continue;  
+			error("Missing value for option '%s' (expected '=')", tag);    
+			continue;    
+		}  
+    
+		if (!xstrncasecmp(tag, "AppName", MAX(tag_len, 4))) {    
+			xfree(app_msg->app_name);    
+			app_msg->app_name = xstrdup(val);    
+			update_cnt++;    
+		} else if (!xstrncasecmp(tag, "Version", MAX(tag_len, 1))) {    
+			xfree(app_msg->version);    
+			app_msg->version = xstrdup(val);    
+			update_cnt++;    
+		} else if (!xstrncasecmp(tag, "Description", MAX(tag_len, 3))) {    
+			xfree(app_msg->description);    
+			app_msg->description = xstrdup(val);    
+			update_cnt++;    
+		} else if (!xstrncasecmp(tag, "Watchdog", MAX(tag_len, 1))) {    
+			xfree(app_msg->watchdog);    
+			app_msg->watchdog = xstrdup(val);    
+			update_cnt++;    
+		} else if (!xstrncasecmp(tag, "Default", MAX(tag_len, 3))) {    
+			if (!xstrcasecmp(val, "YES") ||    
+			    !xstrcasecmp(val, "1") ||    
+			    !xstrcasecmp(val, "TRUE"))    
+				app_msg->default_flag = 1;    
+			else    
+				app_msg->default_flag = 0;    
+			update_cnt++;    
+		}    
+	}    
+	return update_cnt;    
+}
 
 int scontrol_create_app(int argc, char **argv)    
 {    

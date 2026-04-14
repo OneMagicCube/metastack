@@ -560,7 +560,12 @@ extern int slurm_step_launch_add(slurm_step_ctx_t *ctx,
 	launch.enable_all_nodes  = ctx->step_resp->enable_all_nodes;	
 	launch.enable_all_stepds = ctx->step_resp->enable_all_stepds;			
 	launch.style_step        = ctx->step_resp->style_step;	
-#endif	
+#endif
+#ifdef __METASTACK_OPT_APP_7
+	launch.app_name = xstrdup(ctx->step_resp->app_name);
+	launch.app_version = xstrdup(ctx->step_resp->app_version);
+	launch.app_source = ctx->step_resp->app_source;
+#endif
 	launch.open_mode        = params->open_mode;
 	launch.options          = job_options_create();
 	launch.complete_nodelist =
@@ -632,7 +637,10 @@ fail1:
 	xfree(io_key);
 	xfree(launch.resp_port);
 	xfree(launch.io_port);
-
+#ifdef __METASTACK_OPT_APP_7
+	xfree(launch.app_name);
+	xfree(launch.app_version);
+#endif
 	xfree(launch.cwd);
 	env_array_free(env);
 	FREE_NULL_LIST(launch.options);
