@@ -3054,20 +3054,23 @@ int _print_job_app(job_info_t *job, int width, bool right_justify,
 	return SLURM_SUCCESS;  
 }  
 #endif
-#ifdef __METASTACK_OPT_APP_9  
-int _print_job_app_source(job_info_t *job, int width, bool right_justify,  
-			   char *suffix)  
-{  
-	if (job == NULL) {  
-		_print_str("APPSOURCE", width, right_justify, true);  
-	} else {  
-		_print_str((char *)app_source_to_str(job->app_source),  
-			   width, right_justify, true);  
-	}  
-	if (suffix)  
-		printf("%s", suffix);  
-	return SLURM_SUCCESS;  
-}  
+#ifdef __METASTACK_OPT_APP_9    
+int _print_job_app_source(job_info_t *job, int width, bool right_justify,    
+			   char *suffix)    
+{    
+	if (job == NULL) {    
+		_print_str("APPSOURCE", width, right_justify, true);    
+	} else {    
+		if (job->app_name && job->app_name[0])    
+			_print_str((char *)app_source_to_str(job->app_source),    
+				   width, right_justify, true);    
+		else    
+			_print_str("", width, right_justify, true);    
+	}    
+	if (suffix)    
+		printf("%s", suffix);    
+	return SLURM_SUCCESS;    
+}    
 #endif
 
 /*
