@@ -406,8 +406,8 @@ extern int slurm_step_launch(slurm_step_ctx_t *ctx,
 	launch.style_step        = ctx->step_resp->style_step;	
 #endif
 #ifdef __METASTACK_OPT_APP_7  
-	launch.app_name    = ctx->step_resp->app_name;  
-	launch.app_version = ctx->step_resp->app_version;  
+	launch.app_name    = xstrdup(ctx->step_resp->app_name);
+	launch.app_version = xstrdup(ctx->step_resp->app_version);  
 	launch.app_source  = ctx->step_resp->app_source;  
 #endif
 	memcpy(launch.resp_port, ctx->launch_state->resp_port,
