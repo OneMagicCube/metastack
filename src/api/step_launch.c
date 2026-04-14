@@ -405,6 +405,11 @@ extern int slurm_step_launch(slurm_step_ctx_t *ctx,
 	launch.enable_all_stepds = ctx->step_resp->enable_all_stepds;			
 	launch.style_step        = ctx->step_resp->style_step;	
 #endif
+#ifdef __METASTACK_OPT_APP_7  
+	launch.app_name    = ctx->step_resp->app_name;  
+	launch.app_version = ctx->step_resp->app_version;  
+	launch.app_source  = ctx->step_resp->app_source;  
+#endif
 	memcpy(launch.resp_port, ctx->launch_state->resp_port,
 	       (sizeof(uint16_t) * launch.num_resp_port));
 
@@ -420,6 +425,10 @@ fail1:
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION	
 	xfree(launch.watch_dog);
 	xfree(launch.watch_dog_script);
+#endif
+#ifdef __METASTACK_OPT_APP_7  
+	xfree(launch.app_name);  
+	xfree(launch.app_version);  
 #endif
 	xfree(launch.complete_nodelist);
 	xfree(launch.cwd);

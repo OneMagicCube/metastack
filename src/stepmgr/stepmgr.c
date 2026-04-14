@@ -6040,7 +6040,11 @@ end_it:
 		job_step_resp.enable_all_stepds = step_rec->enable_all_stepds;
 		job_step_resp.style_step 		= step_rec->style_step;
 #endif
-
+#ifdef __METASTACK_OPT_APP_7  
+		job_step_resp.app_name    = job_ptr->app_name;  
+		job_step_resp.app_version = job_ptr->app_version;  
+		job_step_resp.app_source  = job_ptr->app_source;  
+#endif
 		if (job_ptr->bit_flags & STEPMGR_ENABLED)
 			job_step_resp.stepmgr = job_ptr->batch_host;
 

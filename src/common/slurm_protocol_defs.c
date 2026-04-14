@@ -4206,7 +4206,10 @@ extern void slurm_free_job_step_create_response_msg(
 			select_g_select_jobinfo_free(msg->select_jobinfo);
 		if (msg->switch_step)
 			switch_g_free_stepinfo(msg->switch_step);
-
+#ifdef __METASTACK_OPT_APP_7  
+		xfree(msg->app_name);  
+		xfree(msg->app_version);  
+#endif
 		xfree(msg);
 	}
 
