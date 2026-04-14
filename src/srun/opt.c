@@ -1845,6 +1845,14 @@ static void _help(void)
 "                              before killing job\n"
 "      --wckey=wckey           wckey to run job under\n"
 "  -X, --disable-status        Disable Ctrl-C status feature\n"
+#ifdef __METASTACK_OPT_APP_3  
+"\n"
+"Application options:\n"
+"      --app=name-version      specify app in combined format (e.g. vasp-5.7.1)\n"
+#endif  
+#ifdef __METASTACK_OPT_APP_9  
+"      --app-source=source     source of app assignment (user, portal, marketplace)\n"
+#endif  
 "\n"
 "Constraint options:\n"
 "      --cluster-constraint=list specify a list of cluster-constraints\n"

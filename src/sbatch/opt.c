@@ -1275,6 +1275,12 @@ static void _usage(void)
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
 "              [--watch-dog]\n"
 #endif
+#ifdef __METASTACK_OPT_APP_3  
+"              [--app=name-version] [--app-name=name] [--app-version=version]\n"  
+#endif  
+#ifdef __METASTACK_OPT_APP_9  
+"              [--app-source=source]\n"  
+#endif
 "              executable [args...]\n");
 }
 
@@ -1364,6 +1370,14 @@ static void _help(void)
 "  -W, --wait                  wait for completion of submitted job\n"
 "      --wckey=wckey           wckey to run job under\n"
 "      --wrap[=command string] wrap command string in a sh script and submit\n"
+#ifdef __METASTACK_OPT_APP_3  
+"\n"
+"Application options:\n"
+"      --app=name-version      specify app in combined format (e.g. vasp-5.7.1)\n"
+#endif  
+#ifdef __METASTACK_OPT_APP_9  
+"      --app-source=source     source of app assignment (user, portal, marketplace)\n"
+#endif
 
 "\n"
 "Constraint options:\n"
