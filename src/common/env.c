@@ -855,34 +855,31 @@ int setup_env(env_t *env, bool preserve_env)
 	}
 
 #ifdef __METASTACK_OPT_APP_7  
-	if (env->app_name) {  
-		if (setenvf(&env->env,  
-			    "SLURM_JOB_APP_NAME",  
-			    "%s",  
-			    env->app_name)) {  
-			error("%s: can't set SLURM_JOB_APP_NAME env variable",  
-			      __func__);  
-			rc = SLURM_ERROR;  
-		}  
-	}  
-	if (env->app_version) {  
-		if (setenvf(&env->env,  
-			    "SLURM_JOB_APP_VERSION",  
-			    "%s",  
-			    env->app_version)) {  
-			error("%s: can't set SLURM_JOB_APP_VERSION env variable",  
-			      __func__);  
-			rc = SLURM_ERROR;  
-		}  
-	}  
-	if (env->app_name) {  
-		if (setenvf(&env->env, "SLURM_JOB_APP_SOURCE", "%u",  
-			    env->app_source)) {  
-			error("%s: can't set SLURM_JOB_APP_SOURCE env variable",  
-			      __func__);  
-			rc = SLURM_ERROR;  
-		}  
-	}  
+	if (env->app_name) {    
+		if (setenvf(&env->env,    
+			    "SLURM_JOB_APP_NAME",    
+			    "%s",    
+			    env->app_name)) {    
+			error("%s: can't set SLURM_JOB_APP_NAME env variable",    
+			      __func__);    
+		}    
+	}    
+	if (env->app_version) {    
+		if (setenvf(&env->env,    
+			    "SLURM_JOB_APP_VERSION",    
+			    "%s",    
+			    env->app_version)) {    
+			error("%s: can't set SLURM_JOB_APP_VERSION env variable",    
+			      __func__);    
+		}    
+	}    
+	if (env->app_name) {    
+		if (setenvf(&env->env, "SLURM_JOB_APP_SOURCE", "%u",    
+			    env->app_source)) {    
+			error("%s: can't set SLURM_JOB_APP_SOURCE env variable",    
+			      __func__);    
+		}    
+	} 
 #endif
 
 	if (env->qos) {

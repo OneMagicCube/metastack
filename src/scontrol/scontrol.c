@@ -909,88 +909,83 @@ static int _parse_app_options(int argc, char **argv, app_desc_msg_t *app_msg)
 	return update_cnt;  
 }  
 
-int scontrol_create_app(int argc, char **argv)  
-{  
-	app_desc_msg_t app_msg;  
-	slurm_init_app_desc_msg(&app_msg);  
+int scontrol_create_app(int argc, char **argv)    
+{    
+	int rc = SLURM_SUCCESS;    
+	app_desc_msg_t app_msg = NULL;    
+	slurm_init_app_desc_msg(&app_msg);    
   
-	if (_parse_app_options(argc, argv, &app_msg) == 0) {  
-		exit_code = 1;  
-		error("No parameters specified");  
-		goto cleanup;  
-	}  
+	if (_parse_app_options(argc, argv, &app_msg) == 0) {    
+		exit_code = 1;    
+		error("No parameters specified");    
+		goto cleanup;    
+	}    
   
-	if (!app_msg.app_name) {  
-		exit_code = 1;  
-		error("AppName must be given.");  
-		goto cleanup;  
-	}  
-	if (!app_msg.version) {  
-		exit_code = 1;  
-		error("Version must be given.");  
-		goto cleanup;  
-	}  
+	if (!app_msg.app_name) {    
+		exit_code = 1;    
+		error("AppName must be given.");    
+		goto cleanup;    
+	}    
+	if (!app_msg.version) {    
+		exit_code = 1;    
+		error("Version must be given.");    
+		goto cleanup;    
+	}    
   
-	if (slurm_create_app(&app_msg)) {  
-		exit_code = 1;  
-		slurm_perror("Error creating the app");  
-		xfree(app_msg.app_name);  
-		xfree(app_msg.version);  
-		xfree(app_msg.description);  
-		xfree(app_msg.watchdog);  
-		return slurm_get_errno();  
-	}  
+	if (slurm_create_app(&app_msg)) {    
+		exit_code = 1;    
+		slurm_perror("Error creating the app");    
+		rc = slurm_get_errno();    
+		goto cleanup;    
+	}    
   
-	printf("App created: %s-%s\n", app_msg.app_name, app_msg.version);  
+	printf("App created: %s-%s\n", app_msg.app_name, app_msg.version);    
   
-cleanup:  
-	xfree(app_msg.app_name);  
-	xfree(app_msg.version);  
-	xfree(app_msg.description);  
-	xfree(app_msg.watchdog);  
-	return SLURM_SUCCESS;  
-}  
+cleanup:    
+	xfree(app_msg.app_name);    
+	xfree(app_msg.version);    
+	xfree(app_msg.description);    
+	xfree(app_msg.watchdog);    
+	return rc;
+}    
   
-int scontrol_update_app(int argc, char **argv)  
-{  
-	app_desc_msg_t app_msg;  
-	slurm_init_app_desc_msg(&app_msg);  
+int scontrol_update_app(int argc, char **argv)    
+{    
+	int rc = SLURM_SUCCESS;    
+	app_desc_msg_t app_msg = NULL;    
+	slurm_init_app_desc_msg(&app_msg);    
   
-	if (_parse_app_options(argc, argv, &app_msg) == 0) {  
-		exit_code = 1;  
-		error("No parameters specified");  
-		goto cleanup;  
-	}  
+	if (_parse_app_options(argc, argv, &app_msg) == 0) {    
+		exit_code = 1;    
+		error("No parameters specified");    
+		goto cleanup;    
+	}    
   
-	if (!app_msg.app_name) {  
-		exit_code = 1;  
-		error("AppName must be given.");  
-		goto cleanup;  
-	}  
-	if (!app_msg.version) {  
-		exit_code = 1;  
-		error("Version must be given.");  
-		goto cleanup;  
-	}  
+	if (!app_msg.app_name) {    
+		exit_code = 1;    
+		error("AppName must be given.");    
+		goto cleanup;    
+	}    
+	if (!app_msg.version) {    
+		exit_code = 1;    
+		error("Version must be given.");    
+		goto cleanup;    
+	}    
   
-	if (slurm_update_app(&app_msg)) {  
-		exit_code = 1;  
-		slurm_perror("Error updating the app");  
-		xfree(app_msg.app_name);  
-		xfree(app_msg.version);  
-		xfree(app_msg.description);  
-		xfree(app_msg.watchdog);  
-		return slurm_get_errno();  
-	}  
+	if (slurm_update_app(&app_msg)) {    
+		exit_code = 1;    
+		slurm_perror("Error updating the app");    
+		rc = slurm_get_errno();    
+		goto cleanup;    
+	}    
   
-cleanup:  
-	xfree(app_msg.app_name);  
-	xfree(app_msg.version);  
-	xfree(app_msg.description);  
-	xfree(app_msg.watchdog);  
-	return SLURM_SUCCESS;  
+cleanup:    
+	xfree(app_msg.app_name);    
+	xfree(app_msg.version);    
+	xfree(app_msg.description);    
+	xfree(app_msg.watchdog);    
+	return rc;    
 }
-
 #endif /* __METASTACK_OPT_APP_2 */
 
 /*
