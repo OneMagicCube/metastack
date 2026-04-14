@@ -103,7 +103,7 @@ _reset_period_str(uint16_t reset_period)
  * IN node_info_ptr - pointer to node table of information
  * IN part_info_ptr - pointer to partition information
  */
-#if defined(__METASTACK_OPT_APP_2)  
+#if defined(__METASTACK_OPT_APP)  
 extern void slurm_write_ctl_conf(slurm_conf_t *slurm_ctl_conf_ptr,  
                                  node_info_msg_t *node_info_ptr,  
                                  partition_info_msg_t *part_info_ptr,  
@@ -591,7 +591,7 @@ void slurm_write_ctl_conf ( slurm_ctl_conf_info_msg_t * slurm_ctl_conf_ptr,
 	}
 #endif
 
-#ifdef __METASTACK_OPT_APP_2  
+#ifdef __METASTACK_OPT_APP  
 	if (slurm_app_ptr) {  
 		fprintf(fp,  
 			"###############################################\n");  
@@ -2370,7 +2370,7 @@ int slurm_load_ctl_conf_watch_dog(time_t update_time, slurm_ctl_conf_info_msg_wa
 
 #endif
 
-#ifdef __METASTACK_OPT_APP_2  
+#ifdef __METASTACK_OPT_APP  
 int slurm_load_app(time_t update_time,  
                    slurm_ctl_conf_info_msg_app_t **confp)  
 {  
@@ -2451,7 +2451,7 @@ void slurm_print_app_info(FILE *out, app_record_t *app_ptr, int one_liner)
 	fprintf(out, "%s", print_this);  
 	xfree(print_this);  
 }  
-#endif /* __METASTACK_OPT_APP_2 */
+#endif /* __METASTACK_OPT_APP */
 
 /*
  * slurm_load_ctl_conf - issue RPC to get slurm control configuration

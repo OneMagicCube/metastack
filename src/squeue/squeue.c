@@ -404,7 +404,7 @@ static int _print_job(bool clear_old, bool log_cluster_name, int argc,
 		if (log_cluster_name)
 			xstrcat(params.format_long, "cluster:10 ,");
 		if (params.long_list) {
-#ifdef __METASTACK_OPT_APP_9  
+#ifdef __METASTACK_OPT_APP  
 			if (params.app_name_list || params.app_source_list) {  
 				xstrcat(params.format_long,  
 					"jobarrayid:.18 ,partition:.9 ,name:.8 ,"  
@@ -419,7 +419,7 @@ static int _print_job(bool clear_old, bool log_cluster_name, int argc,
 					"timelimit:.9 ,numnodes:.6 ,reasonlist:0");  
 			}
 		} else {
-#ifdef __METASTACK_OPT_APP_9  
+#ifdef __METASTACK_OPT_APP  
 			if (params.app_name_list || params.app_source_list) {  
 				xstrcat(params.format_long,  
 					"jobarrayid:.18 ,partition:.9 ,name:.8 ,"  

@@ -515,7 +515,7 @@ extern int initialize_and_process_args(int argc, char **argv, int *argc_off)
 		/* initialize options with argv */
 		_set_options(argc, argv);
 
-#ifdef __METASTACK_OPT_APP_3  
+#ifdef __METASTACK_OPT_APP  
         /* Handle --app=list: print preset app list and exit.  
          * Must be before _opt_args() which fatals if no command given. */  
         if (opt.app && !xstrcasecmp(opt.app, "list")) {
@@ -849,7 +849,7 @@ env_vars_t env_vars[] = {
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
   { "SLURM_JOB_APPTYPE", LONG_OPT_APPTYPE },
 #endif
-#ifdef __METASTACK_OPT_APP_3  
+#ifdef __METASTACK_OPT_APP  
   { "SLURM_APP", LONG_OPT_APP },  
 #endif
   { NULL }
@@ -1732,10 +1732,8 @@ static void _usage(void)
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
 "			 [--watch-dog]\n"
 #endif
-#ifdef __METASTACK_OPT_APP_3  
+#ifdef __METASTACK_OPT_APP  
 "            [--app=name-version|list] [--app-name=name] [--app-version=version]\n"
-#endif  
-#ifdef __METASTACK_OPT_APP_9  
 "            [--app-source=source]\n"
 #endif
 "            executable [args...]\n");
@@ -1851,15 +1849,13 @@ static void _help(void)
 "                              before killing job\n"
 "      --wckey=wckey           wckey to run job under\n"
 "  -X, --disable-status        Disable Ctrl-C status feature\n"
-#ifdef __METASTACK_OPT_APP_3  
+#ifdef __METASTACK_OPT_APP  
 "\n"
 "Application options:\n"
 "      --app=name-version      specify app in combined format (e.g. vasp-5.7.1)\n"
 "                              sets both app name and version; app must be\n"
 "                              pre-configured via 'scontrol create app'\n"
 "      --app=list              list all available app configurations and exit\n"
-#endif
-#ifdef __METASTACK_OPT_APP_9  
 "      --app-source=source     source of app assignment (user, portal, marketplace)\n"
 #endif  
 "\n"

@@ -119,7 +119,7 @@ char *job_req_inx[] = {
 #ifdef __METASTACK_OPT_RESC_NODEDETAIL
 	"t1.resource_node_detail",
 #endif
-#ifdef __METASTACK_OPT_APP_10  
+#ifdef __METASTACK_OPT_APP  
 	"t5.app_name",  
 	"t5.app_version",  
 	"t5.app_source",  
@@ -194,7 +194,7 @@ enum {
 #ifdef __METASTACK_OPT_RESC_NODEDETAIL
 	JOB_REQ_RESC_NODE,
 #endif
-#ifdef __METASTACK_OPT_APP_10  
+#ifdef __METASTACK_OPT_APP  
 	JOB_REQ_APP_NAME,  
 	JOB_REQ_APP_VERSION,  
 	JOB_REQ_APP_SOURCE,  
@@ -590,7 +590,7 @@ static int _cluster_get_jobs(kingbase_conn_t *kingbase_conn,
 			   " left join `%s_%s` as t4 "
 			   "on t1.env_hash_inx=t4.hash_inx",
 			   cluster_name, job_env_table);
-#ifdef __METASTACK_OPT_APP_10  
+#ifdef __METASTACK_OPT_APP  
 	/* Only LEFT JOIN apptype table when app info is actually needed */  
 	if (job_cond->flags & JOBCOND_FLAG_APP)  
 		xstrfmtcat(query,  
@@ -736,7 +736,7 @@ static int _cluster_get_jobs(kingbase_conn_t *kingbase_conn,
 		temp = KCIResultGetColumnValue(result,i,JOB_REQ_USER_NAME);
 		if (*temp != '\0')
 			job->user = xstrdup(temp);
-#ifdef __METASTACK_OPT_APP_10  
+#ifdef __METASTACK_OPT_APP  
 		{  
 			char *tmp_app = KCIResultGetColumnValue(result, i, JOB_REQ_APP_NAME);  
 			if (tmp_app && tmp_app[0])  
@@ -1481,7 +1481,7 @@ no_resv:
 			   *extra ? "and" : "where",
 			   JOB_REVOKED);
 
-#ifdef __METASTACK_OPT_APP_10  
+#ifdef __METASTACK_OPT_APP  
 	if (job_cond->appname_list &&  
 	    list_count(job_cond->appname_list)) {  
 		set = 0;  
@@ -1944,7 +1944,7 @@ extern List as_kingbase_jobacct_process_get_jobs(kingbase_conn_t *kingbase_conn,
 		     (!job_cond || !(job_cond->flags & JOBCOND_FLAG_SCRIPT))) ||
 		    ((i == JOB_REQ_ENV) &&
 		     (!job_cond || !(job_cond->flags & JOBCOND_FLAG_ENV)))
-#ifdef __METASTACK_OPT_APP_10 
+#ifdef __METASTACK_OPT_APP 
 		    || ((i == JOB_REQ_APP_NAME ||  
 		         i == JOB_REQ_APP_VERSION ||  
 		         i == JOB_REQ_APP_SOURCE) &&  

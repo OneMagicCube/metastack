@@ -211,7 +211,7 @@ enum cluster_fed_states {
 						    */
 #define JOBCOND_FLAG_SCRIPT           SLURM_BIT(8) /* Get batch script only */
 #define JOBCOND_FLAG_ENV              SLURM_BIT(9) /* Get job's env only */
-#ifdef __METASTACK_OPT_APP_6  
+#ifdef __METASTACK_OPT_APP  
 #define JOBCOND_FLAG_APP          SLURM_BIT(10)
 #endif
 
@@ -360,11 +360,9 @@ typedef struct {
 	char *used_nodes;       /* a ranged node string where jobs ran */
 	List userid_list;	/* list of char * */
 	List wckey_list;	/* list of char * */
-#ifdef __METASTACK_OPT_APP_6  
+#ifdef __METASTACK_OPT_APP  
 	List appname_list;      /* list of char *, --app-name filter values */  
 	List appversion_list;   /* list of char *, --app-version filter values */  
-#endif  
-#ifdef __METASTACK_OPT_APP_9  
 	List appsource_list;    /* list of char * (numeric strings "0","1",...),  
 	                         * --app-source filter values, converted from  
 	                         * string names to numeric for SQL WHERE clause */  
@@ -1027,7 +1025,7 @@ typedef struct {
 #ifdef __METASTACK_OPT_RESC_NODEDETAIL
 	char	*resource_node_detail;
 #endif
-#ifdef __METASTACK_OPT_APP_6  
+#ifdef __METASTACK_OPT_APP  
 	char    *app_name;      /* application name from job_app_table */  
 	char    *app_version;   /* application version from job_app_table */  
 	uint8_t  app_source;    /* 0=user, 1=auto, 2=portal, 3=marketplace,  

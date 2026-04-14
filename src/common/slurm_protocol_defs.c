@@ -1289,7 +1289,7 @@ slurm_copy_resource_allocation_response_msg(
 	new->uid = msg->uid;
 	new->user_name = xstrdup(msg->user_name);
 	new->working_cluster_rec = NULL;
-#ifdef __METASTACK_OPT_APP_7
+#ifdef __METASTACK_OPT_APP
 	new->app_name = xstrdup(msg->app_name);  
 	new->app_version = xstrdup(msg->app_version);  
 	new->app_source = msg->app_source;  
@@ -1687,7 +1687,7 @@ extern void slurm_free_job_desc_msg(job_desc_msg_t *msg)
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
 		xfree(msg->apptype);
 #endif
-#ifdef __METASTACK_OPT_APP_3  
+#ifdef __METASTACK_OPT_APP  
 		xfree(msg->app);  
 		xfree(msg->app_name);  
 		xfree(msg->app_version);  
@@ -1823,7 +1823,7 @@ extern void slurm_free_job_launch_msg(batch_job_launch_msg_t * msg)
 #ifdef __METASTACK_BUG_UPDATE_JOB_ENV
 		xfree(msg->tres_per_task);
 #endif
-#ifdef __METASTACK_OPT_APP_7
+#ifdef __METASTACK_OPT_APP
 		xfree(msg->app_name);  
 		xfree(msg->app_version);  
 #endif  
@@ -1916,7 +1916,7 @@ extern void slurm_free_job_info_members(job_info_t * job)
 		xfree(job->user_name);
 		xfree(job->wckey);
 		xfree(job->work_dir);
-#ifdef __METASTACK_OPT_APP_3  
+#ifdef __METASTACK_OPT_APP  
 		xfree(job->app_name);  
 		xfree(job->app_version);  
 #endif
@@ -2300,7 +2300,7 @@ extern void slurm_free_launch_tasks_request_msg(launch_tasks_request_msg_t * msg
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
 	xfree(msg->apptype);
 #endif
-#ifdef __METASTACK_OPT_APP_7
+#ifdef __METASTACK_OPT_APP
 	xfree(msg->app_name);  
 	xfree(msg->app_version);  
 #endif 
@@ -4153,7 +4153,7 @@ extern void slurm_free_resource_allocation_response_msg_members (
 		xfree(msg->tres_per_task);
 		xfree(msg->tres_bind);
 #endif
-#ifdef __METASTACK_OPT_APP_7
+#ifdef __METASTACK_OPT_APP
 		xfree(msg->app_name);  
 		xfree(msg->app_version);  
 #endif  
@@ -4206,7 +4206,7 @@ extern void slurm_free_job_step_create_response_msg(
 			select_g_select_jobinfo_free(msg->select_jobinfo);
 		if (msg->switch_step)
 			switch_g_free_stepinfo(msg->switch_step);
-#ifdef __METASTACK_OPT_APP_7  
+#ifdef __METASTACK_OPT_APP  
 		xfree(msg->app_name);  
 		xfree(msg->app_version);  
 #endif
@@ -4273,7 +4273,7 @@ extern void slurm_free_ctl_conf_watch_dog(slurm_ctl_conf_info_msg_watch_dog_t * 
 
 #endif
 
-#ifdef __METASTACK_OPT_APP_2
+#ifdef __METASTACK_OPT_APP
 extern void slurm_free_app_info_members(app_record_t *app)  
 {  
 	if (app) {  
@@ -4323,7 +4323,7 @@ extern void slurm_init_app_desc_msg(app_desc_msg_t *msg)
 }  
 #endif
 
-#ifdef __METASTACK_OPT_APP_9
+#ifdef __METASTACK_OPT_APP
 /*  
  * app_source — Indicates how the app identity was assigned to a job.  
  *   APP_SOURCE_USER        — User explicitly specified via --app/--app-name  
@@ -5623,7 +5623,7 @@ extern int slurm_free_msg_data(slurm_msg_type_t type, void *data)
 	case RESPONSE_NODE_ALIAS_ADDRS:
 		slurm_free_node_alias_addrs(data);
 		break;
-#ifdef __METASTACK_OPT_APP_2  
+#ifdef __METASTACK_OPT_APP  
 	case REQUEST_CREATE_APP:  
 	case REQUEST_UPDATE_APP:  
 		slurm_free_app_desc_msg(data);  

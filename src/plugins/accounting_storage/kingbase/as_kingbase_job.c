@@ -918,7 +918,7 @@ no_rollup_change:
 
 	xfree(query);
 
-#ifdef __METASTACK_OPT_APP_10  
+#ifdef __METASTACK_OPT_APP  
 	/* Insert/update apptype record into job_app_table */  
 	if (rc == SLURM_SUCCESS && job_ptr->db_index  
 	    && job_ptr->app_name && job_ptr->app_name[0]) {  

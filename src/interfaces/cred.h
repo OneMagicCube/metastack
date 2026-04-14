@@ -136,7 +136,7 @@ typedef struct {
 	list_t *step_gres_list;		/* GRES allocated to STEP */
 
 	void *switch_step;
-#ifdef __METASTACK_OPT_APP_7
+#ifdef __METASTACK_OPT_APP
 	char *job_app_name;		/* app name */  
 	char *job_app_version;		/* app version */  
 	uint8_t job_app_source;		/* 0=user, 1=auto, 2=portal, 3=marketplace */

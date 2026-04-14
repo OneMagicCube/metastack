@@ -1366,7 +1366,7 @@ static void _pack_resource_allocation_response_msg(const slurm_msg_t *smsg,
 		packstr(msg->tres_bind, buffer);
 		packstr(msg->tres_per_task, buffer);
 #endif
-#ifdef __METASTACK_OPT_APP_7
+#ifdef __METASTACK_OPT_APP
 		packstr(msg->app_name, buffer);  
 		packstr(msg->app_version, buffer);  
 		pack8(msg->app_source, buffer);  
@@ -1640,7 +1640,7 @@ static int _unpack_resource_allocation_response_msg(slurm_msg_t *smsg,
 		safe_unpackstr(&tmp_ptr->tres_bind, buffer);
 		safe_unpackstr(&tmp_ptr->tres_per_task, buffer);
 #endif
-#ifdef __METASTACK_OPT_APP_7
+#ifdef __METASTACK_OPT_APP
 		safe_unpackstr(&tmp_ptr->app_name, buffer);  
 		safe_unpackstr(&tmp_ptr->app_version, buffer);  
 		safe_unpack8(&tmp_ptr->app_source, buffer);  
@@ -4203,7 +4203,7 @@ static void _pack_job_step_create_response_msg(
 		packbool(msg->enable_all_stepds, buffer);
 		pack32(msg->style_step, buffer);
 #endif
-#ifdef __METASTACK_OPT_APP_7
+#ifdef __METASTACK_OPT_APP
 		packstr(msg->app_name, buffer);  
 		packstr(msg->app_version, buffer);  
 		pack8(msg->app_source, buffer);  
@@ -4342,7 +4342,7 @@ static int _unpack_job_step_create_response_msg(
 		safe_unpackbool(&tmp_ptr->enable_all_stepds, buffer);
 		safe_unpack32(&tmp_ptr->style_step, buffer);
 #endif
-#ifdef __METASTACK_OPT_APP_7
+#ifdef __METASTACK_OPT_APP
 		safe_unpackstr(&tmp_ptr->app_name, buffer);  
 		safe_unpackstr(&tmp_ptr->app_version, buffer);  
 		safe_unpack8(&tmp_ptr->app_source, buffer);  
@@ -5542,7 +5542,7 @@ _unpack_job_info_members(job_info_t * job, buf_t *buffer,
 #ifdef __METASTACK_NEW_TIME_PREDICT
 		safe_unpack16(&job->predict_job, buffer);
 #endif
-#ifdef __METASTACK_OPT_APP_3  
+#ifdef __METASTACK_OPT_APP  
 		safe_unpackstr(&job->app_name, buffer);  
 		safe_unpackstr(&job->app_version, buffer);  
 		safe_unpack8(&job->app_source, buffer);  
@@ -6762,7 +6762,7 @@ unpack_error:
 }
 #endif
 
-#ifdef __METASTACK_OPT_APP_2  
+#ifdef __METASTACK_OPT_APP  
 static void _pack_slurm_ctl_conf_app_msg(slurm_msg_t *msg, buf_t *buffer,  
                                          uint16_t protocol_version)  
 {  
@@ -6896,7 +6896,7 @@ unpack_error:
 	*msg = NULL;  
 	return SLURM_ERROR;  
 }  
-#endif /* __METASTACK_OPT_APP_2 */
+#endif /* __METASTACK_OPT_APP */
 
 
 static void
@@ -12490,7 +12490,7 @@ static void _pack_job_desc_msg(job_desc_msg_t *job_desc_ptr, buf_t *buffer,
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
 		pack32(job_desc_ptr->style_step, buffer);
 #endif
-#ifdef __METASTACK_OPT_APP_3  
+#ifdef __METASTACK_OPT_APP  
 		packstr(job_desc_ptr->app, buffer);  
 		packstr(job_desc_ptr->app_name, buffer);  
 		packstr(job_desc_ptr->app_version, buffer);  
@@ -13417,7 +13417,7 @@ _unpack_job_desc_msg(job_desc_msg_t ** job_desc_buffer_ptr, buf_t *buffer,
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
 		safe_unpack32(&job_desc_ptr->style_step, buffer);	
 #endif
-#ifdef __METASTACK_OPT_APP_3  
+#ifdef __METASTACK_OPT_APP  
 		safe_unpackstr(&job_desc_ptr->app, buffer);  
 		safe_unpackstr(&job_desc_ptr->app_name, buffer);  
 		safe_unpackstr(&job_desc_ptr->app_version, buffer);  
@@ -15102,7 +15102,7 @@ static void _pack_launch_tasks_request_msg(launch_tasks_request_msg_t *msg,
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
 		packstr(msg->apptype, buffer);
 #endif
-#ifdef __METASTACK_OPT_APP_7
+#ifdef __METASTACK_OPT_APP
 		packstr(msg->app_name, buffer);  
 		packstr(msg->app_version, buffer);  
 		pack8(msg->app_source, buffer);  
@@ -15974,7 +15974,7 @@ static int _unpack_launch_tasks_request_msg(launch_tasks_request_msg_t **msg_ptr
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
 		safe_unpackstr(&msg->apptype, buffer);
 #endif
-#ifdef __METASTACK_OPT_APP_3  
+#ifdef __METASTACK_OPT_APP  
 		safe_unpackstr(&msg->app_name, buffer);  
 		safe_unpackstr(&msg->app_version, buffer);  
 		safe_unpack8(&msg->app_source, buffer);  
@@ -18670,7 +18670,7 @@ _pack_batch_job_launch_msg(batch_job_launch_msg_t * msg, buf_t *buffer,
 #ifdef __METASTACK_BUG_UPDATE_JOB_ENV
 		packstr(msg->tres_per_task, buffer);
 #endif
-#ifdef __METASTACK_OPT_APP_7
+#ifdef __METASTACK_OPT_APP
 		packstr(msg->app_name, buffer);  
 		packstr(msg->app_version, buffer);  
 		pack8(msg->app_source, buffer);  
@@ -19188,7 +19188,7 @@ _unpack_batch_job_launch_msg(batch_job_launch_msg_t ** msg, buf_t *buffer,
 #ifdef __METASTACK_BUG_UPDATE_JOB_ENV
 		safe_unpackstr(&launch_msg_ptr->tres_per_task, buffer);
 #endif
-#ifdef __METASTACK_OPT_APP_7
+#ifdef __METASTACK_OPT_APP
 		safe_unpackstr(&launch_msg_ptr->app_name, buffer);  
 		safe_unpackstr(&launch_msg_ptr->app_version, buffer);  
 		safe_unpack8(&launch_msg_ptr->app_source, buffer);  
@@ -22673,7 +22673,7 @@ pack_msg(slurm_msg_t const *msg, buf_t *buffer)
 						msg->protocol_version);
 		break;
 #endif
-#ifdef __METASTACK_OPT_APP_2  
+#ifdef __METASTACK_OPT_APP  
 	case RESPONSE_BUILD_APP_INFO:  
 		_pack_slurm_ctl_conf_app_msg((slurm_msg_t *)msg, buffer,  
 					     msg->protocol_version);  
@@ -22699,14 +22699,14 @@ pack_msg(slurm_msg_t const *msg, buf_t *buffer)
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
 	case REQUEST_BUILD_WATCH_DOG_INFO:
 #endif
-#ifdef __METASTACK_OPT_APP_2
+#ifdef __METASTACK_OPT_APP
 	case REQUEST_BUILD_APP_INFO:
 #endif
 		_pack_last_update_msg((last_update_msg_t *)
 				      msg->data, buffer,
 				      msg->protocol_version);
 		break;
-#ifdef __METASTACK_OPT_APP_2  
+#ifdef __METASTACK_OPT_APP  
 	case REQUEST_CREATE_APP:  
 	case REQUEST_UPDATE_APP:  
 		_pack_app_desc_msg((app_desc_msg_t *)msg->data, buffer,  
@@ -23390,14 +23390,14 @@ unpack_msg(slurm_msg_t * msg, buf_t *buffer)
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
 	case REQUEST_BUILD_WATCH_DOG_INFO:
 #endif
-#ifdef __METASTACK_OPT_APP_2  
+#ifdef __METASTACK_OPT_APP  
 	case REQUEST_BUILD_APP_INFO:
 #endif
 		rc = _unpack_last_update_msg((last_update_msg_t **) &
 					     (msg->data), buffer,
 					     msg->protocol_version);
 		break;
-#ifdef __METASTACK_OPT_APP_2  
+#ifdef __METASTACK_OPT_APP  
 	case REQUEST_CREATE_APP:  
 	case REQUEST_UPDATE_APP:  
 		rc = _unpack_app_desc_msg(  
@@ -23431,7 +23431,7 @@ unpack_msg(slurm_msg_t * msg, buf_t *buffer)
 						msg->protocol_version);
 		break;
 #endif
-#ifdef __METASTACK_OPT_APP_2  
+#ifdef __METASTACK_OPT_APP  
 	case RESPONSE_BUILD_APP_INFO:  
 		rc = _unpack_app_info_msg(  
 			(slurm_ctl_conf_info_msg_app_t **)&(msg->data),  

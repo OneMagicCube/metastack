@@ -179,12 +179,12 @@ Create a new node, partition, or reservation. See the full list of parameters
 below.
 .IP
 
-.\" __METASTACK_OPT_APP_2  
+.\" __METASTACK_OPT_APP  
 .TP  
 \fBcreate app\fR AppName=<\fIname\fR> Version=<\fIversion\fR> [Description=<\fIdesc\fR>] [Watchdog=<\fIwatchdog\fR>] [Default=yes|no]  
 Create a new application configuration record. AppName and Version are required.  
 .IP  
-.\" __METASTACK_OPT_APP_2 
+.\" __METASTACK_OPT_APP 
 
 .TP
 \fBcompleting\fR
@@ -203,13 +203,13 @@ of their deletion (modify the jobs first). If the specified partition is in
 use, the request is denied.
 .IP
 
-.\" __METASTACK_OPT_APP_2  
+.\" __METASTACK_OPT_APP  
 .TP  
 \fBdelete app\fR AppName=<\fIname\-version\fR>  
 Delete the specified application configuration record. The name should be  
 in the combined format "name\-version" (e.g. "vasp\-5.7.1").  
 .IP  
-.\" __METASTACK_OPT_APP_2  
+.\" __METASTACK_OPT_APP  
 
 .TP
 \fBerrnumstr\fR <\fIERRNO\fP>
@@ -526,7 +526,7 @@ real node in a configuration where multiple slurmd daemons execute on a single
 compute node).
 .IP
 
-.\" __METASTACK_OPT_APP_2  
+.\" __METASTACK_OPT_APP  
 .TP  
 \fBapp\fR  
 Displays application configuration records. If an optional application  
@@ -534,7 +534,7 @@ name\-version combination is specified (e.g. "vasp\-5.7.1"), only that
 record is shown. Fields displayed include AppName, Version, Description,  
 Watchdog, and Default.  
 .IP  
-.\" __METASTACK_OPT_APP_2 
+.\" __METASTACK_OPT_APP 
 
 .TP
 \fBassoc_mgr\fR
@@ -645,7 +645,7 @@ If the job does not specify socket\-per\-node, cores\-per\-socket or
 threads\-per\-core then it will display '*' in the ReqS:C:T=*:*:* field.
 .IP
 
-.\" __METASTACK_OPT_APP_4  
+.\" __METASTACK_OPT_APP  
 The following application\-related fields may be displayed for jobs that have  
 application information set:  
 \fBApp\fR \- Combined application name and version (e.g. "vasp\-5.7.1").  
@@ -653,7 +653,7 @@ application information set:
 \fBAppVersion\fR \- Application version (e.g. "5.7.1").  
 \fBAppSource\fR \- Source of the application information: "user" (explicitly  
 specified via \-\-app) or "auto" (automatically detected).  
-.\" __METASTACK_OPT_APP_4
+.\" __METASTACK_OPT_APP
 
 .TP
 \fBlicenses\fR
@@ -799,12 +799,12 @@ accomplished through editing the Slurm configuration file and executing
 the \fIreconfigure\fP command (described above).
 .IP
 
-.\" __METASTACK_OPT_APP_2  
+.\" __METASTACK_OPT_APP  
 .TP  
 \fBupdate app\fR AppName=<\fIname\fR> Version=<\fIversion\fR> [Description=<\fIdesc\fR>] [Watchdog=<\fIwatchdog\fR>] [Default=yes|no]  
 Update an existing application configuration record.  
 .IP  
-.\" __METASTACK_OPT_APP_2
+.\" __METASTACK_OPT_APP
 
 .TP
 \fBupdate\fR <SuspendExc*>[=|+=|\-=]<\fILIST\fR>

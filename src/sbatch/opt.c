@@ -350,7 +350,7 @@ env_vars_t env_vars[] = {
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
   { "SBATCH_JOB_APPTYPE", LONG_OPT_APPTYPE},
 #endif
-#ifdef __METASTACK_OPT_APP_3  
+#ifdef __METASTACK_OPT_APP  
   { "SBATCH_APP", LONG_OPT_APP },  
 #endif
   { NULL }
@@ -1275,10 +1275,8 @@ static void _usage(void)
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
 "              [--watch-dog]\n"
 #endif
-#ifdef __METASTACK_OPT_APP_3  
+#ifdef __METASTACK_OPT_APP  
 "              [--app=name-version|list] [--app-name=name] [--app-version=version]\n"
-#endif  
-#ifdef __METASTACK_OPT_APP_9  
 "              [--app-source=source]\n"
 #endif
 "              executable [args...]\n");
@@ -1370,15 +1368,13 @@ static void _help(void)
 "  -W, --wait                  wait for completion of submitted job\n"
 "      --wckey=wckey           wckey to run job under\n"
 "      --wrap[=command string] wrap command string in a sh script and submit\n"
-#ifdef __METASTACK_OPT_APP_3  
+#ifdef __METASTACK_OPT_APP  
 "\n"
 "Application options:\n"
 "      --app=name-version      specify app in combined format (e.g. vasp-5.7.1)\n"
 "                              sets both app name and version; app must be\n"
 "                              pre-configured via 'scontrol create app'\n"
 "      --app=list              list all available app configurations and exit\n"
-#endif  
-#ifdef __METASTACK_OPT_APP_9  
 "      --app-source=source     source of app assignment (user, portal, marketplace)\n"
 #endif
 

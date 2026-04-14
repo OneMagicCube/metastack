@@ -154,7 +154,7 @@ extern void print_jobs_array(job_info_t *jobs, int size, list_t *format)
 	for (i = 0; i < size; i++) {
 		if (_filter_job(&jobs[i]))
 			continue;
-#ifdef __METASTACK_OPT_APP_9  
+#ifdef __METASTACK_OPT_APP  
 		if (params.app_source_list &&  
 		    list_count(params.app_source_list)) {  
 			bool match = false;  
@@ -3026,7 +3026,7 @@ int _print_step_tres_per_task(job_step_info_t * step, int width, bool right,
 	return SLURM_SUCCESS;
 }
 
-#ifdef __METASTACK_OPT_APP_4  
+#ifdef __METASTACK_OPT_APP  
 /*  
  * _print_job_app - print combined app name-version for squeue  
  * Format: "vasp-5.7.1" or "vasp" (if no version) or empty  
@@ -3053,8 +3053,6 @@ int _print_job_app(job_info_t *job, int width, bool right_justify,
 		printf("%s", suffix);  
 	return SLURM_SUCCESS;  
 }  
-#endif
-#ifdef __METASTACK_OPT_APP_9    
 int _print_job_app_source(job_info_t *job, int width, bool right_justify,    
 			   char *suffix)    
 {    

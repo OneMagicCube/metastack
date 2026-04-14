@@ -405,7 +405,7 @@ extern int slurm_step_launch(slurm_step_ctx_t *ctx,
 	launch.enable_all_stepds = ctx->step_resp->enable_all_stepds;			
 	launch.style_step        = ctx->step_resp->style_step;	
 #endif
-#ifdef __METASTACK_OPT_APP_7  
+#ifdef __METASTACK_OPT_APP  
 	launch.app_name    = xstrdup(ctx->step_resp->app_name);
 	launch.app_version = xstrdup(ctx->step_resp->app_version);  
 	launch.app_source  = ctx->step_resp->app_source;  
@@ -426,7 +426,7 @@ fail1:
 	xfree(launch.watch_dog);
 	xfree(launch.watch_dog_script);
 #endif
-#ifdef __METASTACK_OPT_APP_7  
+#ifdef __METASTACK_OPT_APP  
 	xfree(launch.app_name);  
 	xfree(launch.app_version);  
 #endif
@@ -561,7 +561,7 @@ extern int slurm_step_launch_add(slurm_step_ctx_t *ctx,
 	launch.enable_all_stepds = ctx->step_resp->enable_all_stepds;			
 	launch.style_step        = ctx->step_resp->style_step;	
 #endif
-#ifdef __METASTACK_OPT_APP_7
+#ifdef __METASTACK_OPT_APP
 	launch.app_name = xstrdup(ctx->step_resp->app_name);
 	launch.app_version = xstrdup(ctx->step_resp->app_version);
 	launch.app_source = ctx->step_resp->app_source;
@@ -637,7 +637,7 @@ fail1:
 	xfree(io_key);
 	xfree(launch.resp_port);
 	xfree(launch.io_port);
-#ifdef __METASTACK_OPT_APP_7
+#ifdef __METASTACK_OPT_APP
 	xfree(launch.app_name);
 	xfree(launch.app_version);
 #endif

@@ -648,7 +648,7 @@ typedef struct job_step_create_response_msg {
 	bool enable_all_stepds;   
 	uint32_t style_step;     /*which stepd, 0x001 is sbatch submit, 0x010 is srun submit, 0x100 is salloc submit*/
 #endif
-#ifdef __METASTACK_OPT_APP_7
+#ifdef __METASTACK_OPT_APP
 	char *app_name;  
 	char *app_version;  
 	uint8_t app_source;  
@@ -785,7 +785,7 @@ typedef struct launch_tasks_request_msg {
 	bool enable_all_stepds;    
 	uint32_t style_step;  /*which stepd, 0x001 is sbatch submit, 0x010 is srun submit, 0x100 is salloc submit*/ 
 #endif
-#ifdef __METASTACK_OPT_APP_7
+#ifdef __METASTACK_OPT_APP
 	char *app_name;  
 	char *app_version;  
 	uint8_t app_source;  
@@ -1013,7 +1013,7 @@ typedef struct batch_job_launch_msg {
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
 	char *apptype;		/*	--apptype	*/
 #endif
-#ifdef __METASTACK_OPT_APP_7
+#ifdef __METASTACK_OPT_APP
 	char *app_name;         /* app name for the job */  
 	char *app_version;      /* app version for the job */ 
 	uint8_t app_source;     /* 0=user, 1=auto, 2=portal, 3=marketplace */

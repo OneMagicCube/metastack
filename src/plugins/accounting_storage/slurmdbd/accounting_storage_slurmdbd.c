@@ -180,7 +180,7 @@ static void _partial_free_dbd_job_start(void *object)
 		xfree(req->tres_alloc_str);
 		xfree(req->tres_req_str);
 		xfree(req->work_dir);
-#ifdef __METASTACK_OPT_APP_5
+#ifdef __METASTACK_OPT_APP
 		xfree(req->app_name);
 		xfree(req->app_version);
 #endif
@@ -325,7 +325,7 @@ static int _setup_job_start_msg(dbd_job_start_msg_t *req,
 	req->uid           = job_ptr->user_id;
 	req->qos_id        = job_ptr->qos_id;
 	req->gres_used     = xstrdup(job_ptr->gres_used);
-#ifdef __METASTACK_OPT_APP_5  
+#ifdef __METASTACK_OPT_APP  
 	req->app_name    = xstrdup(job_ptr->app_name);  
 	req->app_version = xstrdup(job_ptr->app_version);  
 	req->app_source  = job_ptr->app_source;  

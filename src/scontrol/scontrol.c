@@ -139,7 +139,7 @@ static void _print_config(char *config_param, int argc, char **argv);
 static void _print_config_watchdog(char *config_param);
 slurm_ctl_conf_info_msg_watch_dog_t *old_slurm_watch_dog_ptr = NULL;
 #endif
-#ifdef __METASTACK_OPT_APP_2  
+#ifdef __METASTACK_OPT_APP  
 static void _print_config_app(char *config_param);  
 slurm_ctl_conf_info_msg_app_t *old_slurm_app_ptr = NULL;  
 #endif
@@ -690,7 +690,7 @@ static void _write_config(char *file_name)
 	}
 #endif
 
-#ifdef __METASTACK_OPT_APP_2  
+#ifdef __METASTACK_OPT_APP  
 	int error_code2 = SLURM_SUCCESS;  
 	slurm_ctl_conf_info_msg_app_t *slurm_app_ptr = NULL;  
   
@@ -717,7 +717,7 @@ static void _write_config(char *file_name)
 #endif
 
 		/* send the info off to be written */
-#ifdef __METASTACK_OPT_APP_2  
+#ifdef __METASTACK_OPT_APP  
 	slurm_write_ctl_conf(slurm_ctl_conf_ptr, node_info_ptr,  
 	                     part_info_ptr, slurm_watch_dog_ptr,  
 	                     slurm_app_ptr);  
@@ -791,7 +791,7 @@ _print_config_watchdog(char *config_param)
 }
 #endif
 
-#ifdef __METASTACK_OPT_APP_2  
+#ifdef __METASTACK_OPT_APP  
 static void  
 _print_config_app(char *config_param)  
 {  
@@ -858,8 +858,6 @@ _print_config_app(char *config_param)
 			printf("No apps configured.\n");  
 	}  
 }  
-#endif
-#ifdef __METASTACK_OPT_APP_2  
 static int _parse_app_options(int argc, char **argv, app_desc_msg_t *app_msg)    
 {    
 	int update_cnt = 0;    
@@ -999,7 +997,7 @@ cleanup:
 	xfree(app_msg.watchdog);    
 	return rc;    
 }
-#endif /* __METASTACK_OPT_APP_2 */
+#endif /* __METASTACK_OPT_APP */
 
 /*
  * _print_config - print the specified configuration parameter and value
@@ -2222,7 +2220,7 @@ static void _create_it(int argc, char **argv)
 			error_code = scontrol_create_res(argc, argv);
 			break;
 		}
-#ifdef __METASTACK_OPT_APP_2  
+#ifdef __METASTACK_OPT_APP  
 		else if (!xstrncasecmp(tag, "app", MAX(tag_len, 3))) {  
 			error_code = scontrol_create_app(argc, argv);  
 			break;  
@@ -2303,7 +2301,7 @@ static void _delete_it(int argc, char **argv)
 			slurm_perror(errmsg);
 			exit_code = 1;
 		}
-#ifdef __METASTACK_OPT_APP_2  
+#ifdef __METASTACK_OPT_APP  
 	} else if (xstrncasecmp(tag, "app", MAX(tag_len, 3)) == 0) {  
 		delete_app_msg_t app_msg;  
 		memset(&app_msg, 0, sizeof(app_msg));  
@@ -2394,7 +2392,7 @@ static void _show_it(int argc, char **argv)
 	} else if (xstrncasecmp(tag, "watchdog", MAX(tag_len, 5)) == 0) {
 		_print_config_watchdog (val);
 #endif
-#ifdef __METASTACK_OPT_APP_2  
+#ifdef __METASTACK_OPT_APP  
 	} else if (xstrncasecmp(tag, "app", MAX(tag_len, 3)) == 0) {  
 		_print_config_app(val);  
 #endif
@@ -2486,7 +2484,7 @@ static void _update_it(int argc, char **argv)
 	int i, error_code = SLURM_SUCCESS;
 	int node_tag = 0, part_tag = 0, job_tag = 0;
 	int res_tag = 0;
-#ifdef __METASTACK_OPT_APP_2  
+#ifdef __METASTACK_OPT_APP  
 	int app_tag = 0;  
 #endif
 	int debug_tag = 0, step_tag = 0, front_end_tag = 0;
@@ -2544,7 +2542,7 @@ static void _update_it(int argc, char **argv)
 					 MAX(tag_len, 11))) {
 			suspend_exc_states_tag = 1;
 		}
-#ifdef __METASTACK_OPT_APP_2  
+#ifdef __METASTACK_OPT_APP  
 		else if (!xstrncasecmp(tag, "app", MAX(tag_len, 3))) {  
 			app_tag = 1;  
 		}  
@@ -2577,7 +2575,7 @@ static void _update_it(int argc, char **argv)
 		error_code = slurm_update_suspend_exc_parts(val, mode);
 	else if (suspend_exc_states_tag)
 		error_code = slurm_update_suspend_exc_states(val, mode);
-#ifdef __METASTACK_OPT_APP_2  
+#ifdef __METASTACK_OPT_APP  
 	else if (app_tag)
 		error_code = scontrol_update_app(argc, argv);   
 #endif

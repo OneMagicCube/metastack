@@ -249,7 +249,7 @@ extern slurmdbd_msg_type_t str_2_slurmdbd_msg_type(char *msg_type)
 	} else if (!xstrcasecmp(msg_type,
 				"Persistent TLS Connection Initialization")) {
 		return SLURM_PERSIST_INIT_TLS;
-#ifdef __METASTACK_OPT_APP_5  
+#ifdef __METASTACK_OPT_APP  
 	} else if (!xstrcasecmp(msg_type, "Got Job App")) {  
 		return DBD_GOT_JOB_APP;  
 #endif
@@ -501,7 +501,7 @@ extern char *slurmdbd_msg_type_2_str(slurmdbd_msg_type_t msg_type, int get_enum)
 		} else
 			return "Got Jobs";
 		break;
-#ifdef __METASTACK_OPT_APP_5  
+#ifdef __METASTACK_OPT_APP  
 	case DBD_GOT_JOB_APP:  
 		if (get_enum) {  
 			return "DBD_GOT_JOB_APP";  
@@ -1220,7 +1220,7 @@ extern void slurmdbd_free_job_start_msg(void *in)
 		xfree(msg->tres_req_str);
 		xfree(msg->wckey);
 		xfree(msg->work_dir);
-#ifdef __METASTACK_OPT_APP_5 
+#ifdef __METASTACK_OPT_APP 
 		xfree(msg->app_name);  
 		xfree(msg->app_version);  
 #endif

@@ -500,7 +500,7 @@ extern stepd_step_rec_t *stepd_step_rec_create(launch_tasks_request_msg_t *msg,
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
 	step_rank.apptype = xstrdup(msg->apptype);
 #endif
-#ifdef __METASTACK_OPT_APP_7
+#ifdef __METASTACK_OPT_APP
 	step_rank.app_name = xstrdup(msg->app_name);  
 	step_rank.app_version = xstrdup(msg->app_version);  
 	step_rank.app_source = msg->app_source;  
@@ -514,7 +514,7 @@ extern stepd_step_rec_t *stepd_step_rec_create(launch_tasks_request_msg_t *msg,
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
 	xfree(step_rank.apptype);
 #endif
-#ifdef __METASTACK_OPT_APP_7
+#ifdef __METASTACK_OPT_APP
 	xfree(step_rank.app_name);  
 	xfree(step_rank.app_version);  
 #endif
@@ -656,7 +656,7 @@ batch_stepd_step_rec_create(batch_job_launch_msg_t *msg)
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
 	step_rank.apptype = xstrdup(msg->apptype);
 #endif
-#ifdef __METASTACK_OPT_APP_7  
+#ifdef __METASTACK_OPT_APP  
 	step_rank.app_name = xstrdup(msg->app_name);  
 	step_rank.app_version = xstrdup(msg->app_version);  
 	step_rank.app_source = msg->app_source;  
@@ -672,7 +672,7 @@ batch_stepd_step_rec_create(batch_job_launch_msg_t *msg)
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
 	xfree(step_rank.apptype);
 #endif
-#ifdef __METASTACK_OPT_APP_7  
+#ifdef __METASTACK_OPT_APP  
 	xfree(step_rank.app_name);  
 	xfree(step_rank.app_version);  
 #endif

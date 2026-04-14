@@ -3214,7 +3214,7 @@ extern void save_all_state(void)
 	schedule_part_save();
 	schedule_resv_save();
 	schedule_trigger_save();
-#ifdef __METASTACK_OPT_APP_2  
+#ifdef __METASTACK_OPT_APP  
 	schedule_app_save();  
 #endif  
 

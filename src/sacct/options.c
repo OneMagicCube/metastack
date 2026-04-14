@@ -66,11 +66,9 @@
 #define OPT_LONG_HELPSTATE 0x113
 #define OPT_LONG_HELPREASON 0x114
 #define OPT_LONG_EXPAND_PATTERNS 0x115
-#ifdef __METASTACK_OPT_APP_6  
+#ifdef __METASTACK_OPT_APP  
 #define OPT_LONG_APPNAME   0x116  
 #define OPT_LONG_APPVERSION 0x117  
-#endif
-#ifdef __METASTACK_OPT_APP_9  
 #define OPT_LONG_APPSOURCE 0x118  
 #endif
 
@@ -753,11 +751,9 @@ extern void parse_command_line(int argc, char **argv)
                 {"associations",   required_argument, 0,    'x'},
                 {"json", optional_argument, 0, OPT_LONG_JSON},
                 {"yaml", optional_argument, 0, OPT_LONG_YAML},
-#ifdef __METASTACK_OPT_APP_6    
+#ifdef __METASTACK_OPT_APP    
                 {"app-name",       required_argument, 0,    OPT_LONG_APPNAME},    
                 {"app-version",    required_argument, 0,    OPT_LONG_APPVERSION},    
-#endif
-#ifdef __METASTACK_OPT_APP_9  
                 {"app-source",     required_argument, 0,    OPT_LONG_APPSOURCE},  
 #endif
                 {0,                0,		      0,    0}};
@@ -1078,7 +1074,7 @@ extern void parse_command_line(int argc, char **argv)
 		case OPT_LONG_HELPREASON:
 			params.opt_help = 5;
 			break;
-#ifdef __METASTACK_OPT_APP_6  
+#ifdef __METASTACK_OPT_APP  
 		case OPT_LONG_APPNAME:  
 			if (!job_cond->appname_list)  
 				job_cond->appname_list = list_create(xfree_ptr);  
@@ -1091,8 +1087,6 @@ extern void parse_command_line(int argc, char **argv)
 			slurm_addto_char_list(job_cond->appversion_list, optarg);  
 			job_cond->flags |= JOBCOND_FLAG_APP;  
 			break;  
-#endif
-#ifdef __METASTACK_OPT_APP_9  
 		case OPT_LONG_APPSOURCE:  
 		{  
 			if (!job_cond->appsource_list)  
@@ -1118,7 +1112,7 @@ extern void parse_command_line(int argc, char **argv)
 			exit(1);
 		}
 	}
-#ifdef __METASTACK_OPT_APP_6    
+#ifdef __METASTACK_OPT_APP    
 	if (job_cond->appversion_list && list_count(job_cond->appversion_list)
 	    && (!job_cond->appname_list || !list_count(job_cond->appname_list))) {
 		fatal("--app-version must be used with --app-name");    
@@ -1459,7 +1453,7 @@ extern void parse_command_line(int argc, char **argv)
 			dot = DEFAULT_COMP_FIELDS;
 		else if ( ( env_val = getenv("SACCT_FORMAT") ) )
 			dot = xstrdup(env_val);
-#ifdef __METASTACK_OPT_APP_9  
+#ifdef __METASTACK_OPT_APP  
 		else if (job_cond->flags & JOBCOND_FLAG_APP)  
 			dot = DEFAULT_APP_FIELDS;  
 #endif 
@@ -1517,7 +1511,7 @@ extern void parse_command_line(int argc, char **argv)
 	foundfield:
 		if (newlen_set)
 			fields[i].len = newlen;
-#ifdef __METASTACK_OPT_APP_6  
+#ifdef __METASTACK_OPT_APP  
 		/* Auto-set APPTYPE flag when app format fields are requested */  
 		if (fields[i].type == PRINT_APPNAME ||  
 		    fields[i].type == PRINT_APPVERSION ||  

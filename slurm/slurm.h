@@ -612,16 +612,7 @@ typedef struct sbcast_cred sbcast_cred_t;		/* opaque data type */
 #endif
 
 #ifndef __METASTACK_OPT_APP  
-#define __METASTACK_OPT_APP_1 // slurmctld reads the app conf
-#define __METASTACK_OPT_APP_2 // scontrol crud for app config
-#define __METASTACK_OPT_APP_3 // add --app --app-version --app-name
-#define __METASTACK_OPT_APP_4 // squeue and scontrol show jobs app info
-#define __METASTACK_OPT_APP_5 // add <cluster_name>_job_app_table
-#define __METASTACK_OPT_APP_6 // The sacct command supports querying the app information of jobs. 
-#define __METASTACK_OPT_APP_7 // add slurm_app env
-#define __METASTACK_OPT_APP_8 // opt cli command
-#define __METASTACK_OPT_APP_9 // add --app-source option and squeue/sacct app-source filter
-#define __METASTACK_OPT_APP_10 // adapt app database support for kingbase
+#define __METASTACK_OPT_APP
 #endif
 
 /*****************************************************************************\
@@ -2351,7 +2342,7 @@ typedef struct job_descriptor {	/* For submit, allocate, and update requests */
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
 	uint32_t style_step;
 #endif
-#ifdef __METASTACK_OPT_APP_3  
+#ifdef __METASTACK_OPT_APP  
 	char *app;           /* --app combined name, e.g. "vasp-5.7.1" */  
 	char *app_name;      /* parsed app name, e.g. "vasp" */  
 	char *app_version;   /* parsed app version, e.g. "5.7.1" */  
@@ -2359,7 +2350,7 @@ typedef struct job_descriptor {	/* For submit, allocate, and update requests */
 #endif
 } job_desc_msg_t;
 
-#ifdef __METASTACK_OPT_APP_9 
+#ifdef __METASTACK_OPT_APP 
 /*  
  * app_source identifies HOW the app information was attached to a job:  
  *   USER(0)        - User explicitly specified --app=X on command line  
@@ -2552,7 +2543,7 @@ typedef struct job_info {
 #ifdef __METASTACK_NEW_PENDING_ORDER
 	uint32_t pending_order;
 #endif
-#ifdef __METASTACK_OPT_APP_3  
+#ifdef __METASTACK_OPT_APP  
 	char *app_name;      /* application name, e.g. "vasp" */  
 	char *app_version;   /* application version, e.g. "5.7.1" */  
 	uint8_t app_source;  /* how app was determined, see APP_SOURCE_* */  
@@ -3255,7 +3246,7 @@ typedef struct {
 
 } watch_dog_record_t;
 #endif
-#ifdef __METASTACK_OPT_APP_1
+#ifdef __METASTACK_OPT_APP
 /*  
  * app_record_t - Core application record.  
  *  
@@ -3324,7 +3315,7 @@ typedef struct resource_allocation_response_msg {
 	void *working_cluster_rec; /* Cluster to direct remaining messages to.
 				    * slurmdb_cluster_rec_t* because slurm.h
 				    * doesn't know about slurmdb.h. */
-#ifdef __METASTACK_OPT_APP_7  
+#ifdef __METASTACK_OPT_APP  
 	/* App info propagated to srun/salloc for environment injection.  
 	 * Set by slurmctld in _fill_job_alloc_info, consumed by  
 	 * setup_env() to set SLURM_JOB_APP_NAME/VERSION/SOURCE. */  
@@ -3348,7 +3339,7 @@ typedef struct slurm_ctl_conf_info_msg_watch_dog {
 } slurm_ctl_conf_info_msg_watch_dog_t;
 #endif
 
-#ifdef __METASTACK_OPT_APP_1
+#ifdef __METASTACK_OPT_APP
 /*  
  * slurm_ctl_conf_info_msg_app_t — Response message for REQUEST_BUILD_APP_INFO.  
  * Contains an array of app_record_t returned by slurmctld to client commands  
@@ -3359,8 +3350,7 @@ typedef struct slurm_ctl_conf_info_msg_app {
 	uint32_t record_count;  
 	app_record_t *app_array;  
 } slurm_ctl_conf_info_msg_app_t;  
-#endif
-#ifdef __METASTACK_OPT_APP_2
+
 /*  
  * app_desc_msg_t - RPC message for create/update app.  
  *  
@@ -3659,7 +3649,7 @@ typedef struct reservation_name_msg {
 #define RECONFIG_KEEP_PART_INFO SLURM_BIT(0) /* keep dynamic partition info on scontrol reconfig */
 #define RECONFIG_KEEP_PART_STAT SLURM_BIT(1) /* keep dynamic partition state on scontrol reconfig */
 #define RECONFIG_KEEP_POWER_SAVE_SETTINGS SLURM_BIT(2) /* keep dynamic power save settings on scontrol reconfig */
-#ifdef __METASTACK_OPT_APP_1  
+#ifdef __METASTACK_OPT_APP  
 #define RECONFIG_KEEP_APP_INFO SLURM_BIT(3)  
 #endif
 
@@ -4852,7 +4842,7 @@ extern void slurm_print_ctl_conf(FILE *out, slurm_conf_t *slurm_ctl_conf_ptr);
  * IN node_info_ptr - pointer to node table of information
  * IN part_info_ptr - pointer to partition information
  */
-#if defined(__METASTACK_OPT_APP_2)  
+#if defined(__METASTACK_OPT_APP)  
 extern void slurm_write_ctl_conf(slurm_conf_t *slurm_ctl_conf_ptr,  
                                  node_info_msg_t *node_info_ptr,  
                                  partition_info_msg_t *part_info_ptr,  

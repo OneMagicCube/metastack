@@ -3425,7 +3425,7 @@ function __scontrol_create() {
 		"partitionname="
 		"reservation "
 		"reservationname="
-#ifdef __METASTACK_OPT_APP_2 
+#ifdef __METASTACK_OPT_APP 
 		"app="  
 #endif
 	)
@@ -3451,7 +3451,7 @@ function __scontrol_delete() {
 		"nodename="
 		"partitionname="
 		"reservationname="
-#ifdef __METASTACK_OPT_APP_2 
+#ifdef __METASTACK_OPT_APP 
 		"app="  
 #endif
 	)
@@ -3893,7 +3893,7 @@ function __scontrol_show() {
 		"slurmd"
 		"steps"
 		"topology"
-#ifdef __METASTACK_OPT_APP_2
+#ifdef __METASTACK_OPT_APP
 		"app"
 #endif
 	)
@@ -4468,7 +4468,7 @@ function __scontrol_update() {
 		"suspendexcstates="
 		"suspendexcstates\+="
 		"suspendexcstates\-="
-#ifdef __METASTACK_OPT_APP_2
+#ifdef __METASTACK_OPT_APP
 		"app="
 #endif
 	)

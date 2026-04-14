@@ -3871,7 +3871,7 @@ extern job_record_t *job_array_split(job_record_t *job_ptr)
 	job_ptr_pend->user_name = xstrdup(job_ptr->user_name);
 	job_ptr_pend->wckey = xstrdup(job_ptr->wckey);
 	job_ptr_pend->deadline = job_ptr->deadline;
-#ifdef __METASTACK_OPT_APP_3  
+#ifdef __METASTACK_OPT_APP  
 	job_ptr_pend->app_name = xstrdup(job_ptr->app_name);  
 	job_ptr_pend->app_version = xstrdup(job_ptr->app_version);  
 	job_ptr_pend->app_source = job_ptr->app_source;  
@@ -7808,7 +7808,7 @@ static int _job_create(job_desc_msg_t *job_desc, int allocate, int will_run,
 
 #endif
 
-#ifdef __METASTACK_OPT_APP_9  
+#ifdef __METASTACK_OPT_APP  
 	/* --app-source requires --app to be specified */  
 	if ((!job_desc->app || !job_desc->app[0]) &&  
 		job_desc->app_source != NO_VAL8) {  
@@ -7841,7 +7841,7 @@ static int _job_create(job_desc_msg_t *job_desc, int allocate, int will_run,
  * app_source priority (highest wins):  
  *   portal/marketplace (set by external system) > user > auto  
  */
-#ifdef __METASTACK_OPT_APP_3  
+#ifdef __METASTACK_OPT_APP  
     /* Validate --app and auto-fill app_name, app_version */  
     if (job_desc->app && job_desc->app[0]) {  
         /* User explicitly specified --app=xxx */  
@@ -7863,15 +7863,11 @@ static int _job_create(job_desc_msg_t *job_desc, int allocate, int will_run,
         job_desc->app_name = xstrdup(app_ptr->app_name);  
         xfree(job_desc->app_version);  
         job_desc->app_version = xstrdup(app_ptr->version);  
-#ifdef __METASTACK_OPT_APP_9  
         /* Preserve --app-source if explicitly set by user (portal/marketplace),  
          * otherwise default to APP_SOURCE_USER */  
         if (job_desc->app_source != APP_SOURCE_PORTAL &&  
             job_desc->app_source != APP_SOURCE_MARKETPLACE)  
             job_desc->app_source = APP_SOURCE_USER;
-#else
-		job_desc->app_source = 0; /* user */  
-#endif
         /* If the app has a bound watchdog and user didn't specify one,  
          * use the app's watchdog */  
         if (app_ptr->watchdog && app_ptr->watchdog[0] &&  
@@ -7897,13 +7893,9 @@ static int _job_create(job_desc_msg_t *job_desc, int allocate, int will_run,
             job_desc->app_name = xstrdup(job_desc->apptype);  
             xfree(job_desc->app_version);  
             job_desc->app_version = NULL; /* no version from auto-recognition */  
-#ifdef __METASTACK_OPT_APP_9  
 			if (job_desc->app_source != APP_SOURCE_PORTAL &&  
 				job_desc->app_source != APP_SOURCE_MARKETPLACE)  
 				job_desc->app_source = APP_SOURCE_AUTO;  
-#else  
-			job_desc->app_source = 1; /* auto */  
-#endif
         }  
 #endif  
         /* If default app exists with watchdog and user didn't specify one,  
@@ -9306,7 +9298,7 @@ static int _copy_job_desc_to_job_record(job_desc_msg_t *job_desc,
 	job_ptr->warn_signal = job_desc->warn_signal;
 	job_ptr->warn_time   = job_desc->warn_time;
 
-#ifdef __METASTACK_OPT_APP_3
+#ifdef __METASTACK_OPT_APP
 	/* Copy user-specified app identity from job submission to job record.  
 	 * These fields originate from --app/--app-name/--app-version CLI options. */
 	job_ptr->app_name = xstrdup(job_desc->app_name);  
@@ -11850,7 +11842,7 @@ void pack_job(job_record_t *dump_job_ptr, uint16_t show_flags, buf_t *buffer,
 #ifdef __METASTACK_NEW_TIME_PREDICT
 		pack16(dump_job_ptr->predict_job, buffer);
 #endif
-#ifdef __METASTACK_OPT_APP_3  
+#ifdef __METASTACK_OPT_APP  
 		packstr(dump_job_ptr->app_name, buffer);  
 		packstr(dump_job_ptr->app_version, buffer);  
 		pack8(dump_job_ptr->app_source, buffer);  

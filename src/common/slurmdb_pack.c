@@ -5195,11 +5195,9 @@ extern void slurmdb_pack_job_cond(void *in, uint16_t protocol_version,
 			packnull(buffer);	/* used_nodes */
 			pack32(NO_VAL, buffer);	/* count(userid_list) */
 			pack32(NO_VAL, buffer);	/* count(wckey_list) */
-#ifdef __METASTACK_OPT_APP_6  
+#ifdef __METASTACK_OPT_APP  
 			pack32(NO_VAL, buffer);	/* count(appname_list) */  
 			pack32(NO_VAL, buffer);	/* count(appversion_list) */  
-#endif
-#ifdef __METASTACK_OPT_APP_9  
 			pack32(NO_VAL, buffer);	/* count(appsource_list) */  
 #endif
 			return;
@@ -5243,11 +5241,9 @@ extern void slurmdb_pack_job_cond(void *in, uint16_t protocol_version,
 
 		_pack_list_of_str(object->userid_list, buffer);
 		_pack_list_of_str(object->wckey_list, buffer);
-#ifdef __METASTACK_OPT_APP_6  
+#ifdef __METASTACK_OPT_APP  
 		_pack_list_of_str(object->appname_list, buffer);  
 		_pack_list_of_str(object->appversion_list, buffer);  
-#endif
-#ifdef __METASTACK_OPT_APP_9  
 		_pack_list_of_str(object->appsource_list, buffer);  
 #endif
 	}
@@ -5490,7 +5486,7 @@ extern int slurmdb_unpack_job_cond(void **object, uint16_t protocol_version,
 				list_append(object_ptr->wckey_list, tmp_info);
 			}
 		}
-#ifdef __METASTACK_OPT_APP_6  
+#ifdef __METASTACK_OPT_APP  
 		safe_unpack32(&count, buffer);  
 		if (count > NO_VAL)  
 			goto unpack_error;  
@@ -5514,8 +5510,6 @@ extern int slurmdb_unpack_job_cond(void **object, uint16_t protocol_version,
 				list_append(object_ptr->appversion_list, tmp_info);  
 			}  
 		}  
-#endif
-#ifdef __METASTACK_OPT_APP_9  
 		safe_unpack32(&count, buffer);  
 		if (count > NO_VAL)  
 			goto unpack_error;  
@@ -5648,7 +5642,7 @@ extern void slurmdb_pack_job_rec(void *object, uint16_t protocol_version,
 #ifdef __METASTACK_OPT_RESC_NODEDETAIL
 		packstr(job->resource_node_detail, buffer);
 #endif
-#ifdef __METASTACK_OPT_APP_6
+#ifdef __METASTACK_OPT_APP
 		packstr(job->app_name, buffer);
 		packstr(job->app_version, buffer);
 		pack8(job->app_source, buffer);
@@ -6218,7 +6212,7 @@ extern int slurmdb_unpack_job_rec(void **job, uint16_t protocol_version,
 #ifdef __METASTACK_OPT_RESC_NODEDETAIL
 		safe_unpackstr(&job_ptr->resource_node_detail, buffer);
 #endif
-#ifdef __METASTACK_OPT_APP_6  
+#ifdef __METASTACK_OPT_APP  
 		safe_unpackstr(&job_ptr->app_name, buffer);  
 		safe_unpackstr(&job_ptr->app_version, buffer);  
 		safe_unpack8(&job_ptr->app_source, buffer);  

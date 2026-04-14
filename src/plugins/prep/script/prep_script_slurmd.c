@@ -358,7 +358,7 @@ static char **_build_env(job_env_t *job_env, slurm_cred_t *cred,
 			setenvf(&env, "SLURM_JOB_USER", "%s",
 				cred_arg->id->pw_name);
 		}
-#ifdef __METASTACK_OPT_APP_7
+#ifdef __METASTACK_OPT_APP
 		if (cred_arg->job_app_name)  
 			setenvf(&env, "SLURM_JOB_APP_NAME", "%s",  
 				cred_arg->job_app_name);  

@@ -163,7 +163,7 @@ char *wckey_day_table = "wckey_usage_day_table";
 char *wckey_hour_table = "wckey_usage_hour_table";
 char *wckey_month_table = "wckey_usage_month_table";
 char *wckey_table = "wckey_table";
-#ifdef __METASTACK_OPT_APP_5
+#ifdef __METASTACK_OPT_APP
 char *job_app_table = "job_app_table";  
 #endif
 
@@ -1571,7 +1571,7 @@ extern int create_cluster_tables(mysql_conn_t *mysql_conn, char *cluster_name)
  * Fault isolation: write failures use independent app_rc, logged but  
  * not propagated to the main job_start rc.  
  */
-#ifdef __METASTACK_OPT_APP_5
+#ifdef __METASTACK_OPT_APP
 	storage_field_t job_app_table_fields[] = {  
 		{ "job_db_inx", "bigint unsigned not null" },  
 		{ "app_name", "varchar(128) not null default ''" },  
@@ -1713,7 +1713,7 @@ extern int create_cluster_tables(mysql_conn_t *mysql_conn, char *cluster_name)
 	    == SLURM_ERROR)
 		return SLURM_ERROR;
 
-#ifdef __METASTACK_OPT_APP_5
+#ifdef __METASTACK_OPT_APP
 	snprintf(table_name, sizeof(table_name), "\"%s_%s\"",  
 		 cluster_name, job_app_table);  
 	if (mysql_db_create_table(mysql_conn, table_name,  
@@ -1849,7 +1849,7 @@ extern int remove_cluster_tables(mysql_conn_t *mysql_conn, char *cluster_name)
 #ifdef __METASTACK_NEW_AUTO_SUPPLEMENT_AVAIL_NODES
 		   "\"%s_%s\", "
 #endif
-#ifdef __METASTACK_OPT_APP_5
+#ifdef __METASTACK_OPT_APP
 		   "\"%s_%s\", "  
 #endif
 		   "\"%s_%s\", \"%s_%s\", \"%s_%s\", \"%s_%s\";",
@@ -1871,7 +1871,7 @@ extern int remove_cluster_tables(mysql_conn_t *mysql_conn, char *cluster_name)
 		   cluster_name, resv_table,
 		   cluster_name, step_table,
 		   cluster_name, suspend_table,
-#ifdef __METASTACK_OPT_APP_5
+#ifdef __METASTACK_OPT_APP
 		   cluster_name, job_app_table,  
 #endif
 		   cluster_name, wckey_table,

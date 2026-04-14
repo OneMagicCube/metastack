@@ -749,7 +749,7 @@ static char **_build_watch_dog_env(acct_gather_rank_t *watch_dog)
 	setenvf(&my_env, "SLURM_JOB_UID", "%u", watch_dog->uid);
 	setenvf(&my_env, "SLURM_JOB_GID", "%u", watch_dog->gid);
 	setenvf(&my_env, "SLURM_STEP_WATCH_DOG", "%s", watch_dog->watch_dog);
-#ifdef __METASTACK_OPT_APP_7
+#ifdef __METASTACK_OPT_APP
 	if (watch_dog->app_name)  
 		setenvf(&my_env, "SLURM_JOB_APP_NAME", "%s",  
 			watch_dog->app_name);  
@@ -893,7 +893,7 @@ static void *step_watch_dog(void *args)
 		xfree(watch_dog_tran->watch_dog_script);
 		xfree(watch_dog_tran->job_stdout);
 		xfree(watch_dog_tran->job_stderr);
-#ifdef __METASTACK_OPT_APP_7  
+#ifdef __METASTACK_OPT_APP  
 		xfree(watch_dog_tran->app_name);  
 		xfree(watch_dog_tran->app_version);  
 #endif
@@ -1868,7 +1868,7 @@ extern int jobacct_gather_watchdog(int frequency, acct_gather_rank_t *step_rank)
 	load_args->uid 					= step_rank->uid;
 	load_args->gid					= step_rank->gid;
 	load_args->switch_step			= step_rank->switch_step;
-#ifdef __METASTACK_OPT_APP_7  
+#ifdef __METASTACK_OPT_APP  
 	load_args->app_name = xstrdup(step_rank->app_name);  
 	load_args->app_version = xstrdup(step_rank->app_version);  
 	load_args->app_source = step_rank->app_source;  

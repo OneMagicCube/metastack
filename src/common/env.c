@@ -854,7 +854,7 @@ int setup_env(env_t *env, bool preserve_env)
 		}
 	}
 
-#ifdef __METASTACK_OPT_APP_7
+#ifdef __METASTACK_OPT_APP
 	/*  
 	 * Inject app identity into the job/step environment:  
 	 *   SLURM_JOB_APP_NAME    — registered application name  
@@ -1183,7 +1183,7 @@ extern int env_array_for_job(char ***dest,
 					    het_job_offset, "%s",
 					    alloc->account);
 	}
-#ifdef __METASTACK_OPT_APP_7
+#ifdef __METASTACK_OPT_APP
 	/* Propagate app identity from allocation response to salloc/srun  
 	 * environment. Supports het-job offset for heterogeneous jobs. */
 	if (alloc->app_name) {  
@@ -1485,7 +1485,7 @@ env_array_for_batch_job(char ***dest, const batch_job_launch_msg_t *batch,
 					batch->account);
 	}
 
-#ifdef __METASTACK_OPT_APP_7
+#ifdef __METASTACK_OPT_APP
 	/* Set app identity environment variables for batch job scripts.  
 	 * batch->app_name/version/source are populated by slurmctld  
 	 * from the job_record when launching the batch step. */

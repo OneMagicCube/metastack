@@ -67,7 +67,7 @@
 #define BRIEF_COMP_FIELDS "jobid,uid,state"
 #define DEFAULT_FIELDS "jobid,jobname,partition,account,alloccpus,state,exitcode"
 #define DEFAULT_COMP_FIELDS "jobid,uid,jobname,partition,nnodes,nodelist,state,end"
-#ifdef __METASTACK_OPT_APP_9  
+#ifdef __METASTACK_OPT_APP  
 #define DEFAULT_APP_FIELDS "jobid,jobname,appname,appversion,appsource,state"  
 #endif
 //NOTE: add /command/stdout/stderr to long-fileld formats while ALL addon fields enabled
@@ -216,7 +216,7 @@ typedef enum {
 		PRINT_COMMAND,
 #endif
 		PRINT_WCKEYID,
-#ifdef __METASTACK_OPT_APP_6  
+#ifdef __METASTACK_OPT_APP  
 		PRINT_APPNAME,  
 		PRINT_APPVERSION,  
 		PRINT_APPSOURCE,  

@@ -72,7 +72,7 @@ static pthread_cond_t  state_save_cond = PTHREAD_COND_INITIALIZER;
 static int save_jobs = 0, save_nodes = 0, save_parts = 0;
 static int save_front_end = 0, save_triggers = 0, save_resv = 0;
 static bool run_save_thread = true;
-#ifdef __METASTACK_OPT_APP_2  
+#ifdef __METASTACK_OPT_APP  
 static int save_app = 0;  
 #endif 
 
@@ -209,7 +209,7 @@ extern void schedule_trigger_save(void)
 	slurm_mutex_unlock(&state_save_lock);
 }
 
-#ifdef __METASTACK_OPT_APP_2  
+#ifdef __METASTACK_OPT_APP  
 /* Queue saving of app configuration state information */  
 extern void schedule_app_save(void)  
 {  
@@ -259,7 +259,7 @@ extern void *slurmctld_state_save(void *no_data)
 			save_count = save_jobs + save_nodes + save_parts +
 				     save_front_end + save_resv +
 				     save_triggers;
-#ifdef __METASTACK_OPT_APP_2  
+#ifdef __METASTACK_OPT_APP  
 			save_count += save_app;  
 #endif 
 			now = time(NULL);
@@ -349,7 +349,7 @@ extern void *slurmctld_state_save(void *no_data)
 		slurm_mutex_unlock(&state_save_lock);
 		if (run_save)
 			(void)trigger_state_save();
-#ifdef __METASTACK_OPT_APP_2  
+#ifdef __METASTACK_OPT_APP  
 		/* save app config info if necessary */  
 		run_save = false;  
 		slurm_mutex_lock(&state_save_lock);  

@@ -243,10 +243,8 @@ enum {
 	LONG_OPT_SUBMIT_LINE,
 	LONG_OPT_APPTYPE,
 #endif
-#ifdef __METASTACK_OPT_APP_3  
+#ifdef __METASTACK_OPT_APP  
 	LONG_OPT_APP,  
-#endif
-#ifdef __METASTACK_OPT_APP_9  
 	LONG_OPT_APP_SOURCE,  
 #endif
 	LONG_OPT_ENUM_END
@@ -533,10 +531,8 @@ typedef struct {
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
 	char *apptype;			/* --apptype	*/
 #endif
-#ifdef __METASTACK_OPT_APP_3  
+#ifdef __METASTACK_OPT_APP  
 	char *app;           /* --app */  
-#endif
-#ifdef __METASTACK_OPT_APP_9  
 	uint8_t app_source_val;    /* --app-source value */  
 	bool    app_source_set;    /* whether --app-source was explicitly set */  
 #endif

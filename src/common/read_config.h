@@ -585,7 +585,7 @@ extern int slurm_conf_partition_array(slurm_conf_partition_t **ptr_array[]);
 int slurm_conf_watch_dog_array(watch_dog_record_t **watr_array[]);
 #endif
 
-#ifdef __METASTACK_OPT_APP_1  
+#ifdef __METASTACK_OPT_APP  
 /*  
  * Set "app_array" with the pointer to an array of pointers to  
  * app_record_t structures.  

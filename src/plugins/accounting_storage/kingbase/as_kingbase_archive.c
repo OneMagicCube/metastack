@@ -281,7 +281,7 @@ static void _free_local_job_script_members(local_job_script_t *object)
 	}
 }
 
-#ifdef __METASTACK_OPT_APP_10
+#ifdef __METASTACK_OPT_APP
 /*  
  * job_app_inx / JOB_APP_* enum — Column index mapping for the  
  * <cluster>_job_app_table in KingBase. Mirrors the MySQL counterpart  
@@ -725,7 +725,7 @@ enum {
 	JOB_SCRIPT_COUNT
 };
 
-#ifdef __METASTACK_OPT_APP_10  
+#ifdef __METASTACK_OPT_APP  
 /* if this changes you will need to edit the corresponding enum below */  
 static char *job_app_inx[] = {  
 	"job_db_inx",  
@@ -979,7 +979,7 @@ typedef enum {
 	PURGE_JOB,
 	PURGE_JOB_ENV,
 	PURGE_JOB_SCRIPT,
-#ifdef __METASTACK_OPT_APP_10  
+#ifdef __METASTACK_OPT_APP  
 	PURGE_JOB_APP,  
 #endif
 	PURGE_STEP,
@@ -1953,7 +1953,7 @@ unpack_error:
 	return SLURM_ERROR;
 }
 
-#ifdef __METASTACK_OPT_APP_10  
+#ifdef __METASTACK_OPT_APP  
 static void _pack_local_job_app(local_job_app_t *object, buf_t *buffer)  
 {  
 	/* Always packs as current version */  
@@ -3447,7 +3447,7 @@ static char *_get_archive_columns(purge_type_t type)
 		cols      = job_script_inx;
 		col_count = JOB_SCRIPT_COUNT;
 		break;
-#ifdef __METASTACK_OPT_APP_10  
+#ifdef __METASTACK_OPT_APP  
 	case PURGE_JOB_APP:  
 		cols      = job_app_inx;  
 		col_count = JOB_APP_COUNT;  
@@ -4054,7 +4054,7 @@ static buf_t *_pack_archive_job_script(KCIResult *result, char *cluster_name,
 	return buffer;
 }
 
-#ifdef __METASTACK_OPT_APP_10  
+#ifdef __METASTACK_OPT_APP  
 static buf_t *_pack_archive_job_app(KCIResult *result, char *cluster_name,  
 				    uint32_t cnt, uint32_t usage_info,  
 				    time_t *period_start)  
@@ -4170,7 +4170,7 @@ static char *_load_job_script(uint16_t rpc_version, buf_t *buffer,
 	return insert;
 }
 
-#ifdef __METASTACK_OPT_APP_10  
+#ifdef __METASTACK_OPT_APP  
 /* returns sql statement from archived data or NULL on error */  
 static char *_load_job_app(uint16_t rpc_version, buf_t *buffer,  
 			   char *cluster_name, uint32_t rec_cnt)  
@@ -5093,7 +5093,7 @@ static uint32_t _archive_table(purge_type_t type, kingbase_conn_t *kingbase_conn
 		hash_col = "script_hash_inx";
 		pack_func = &_pack_archive_job_script;
 		break;
-#ifdef __METASTACK_OPT_APP_10  
+#ifdef __METASTACK_OPT_APP  
 	case PURGE_JOB_APP:  
 		parent_table = job_table; 
 		pack_func = &_pack_archive_job_app;  
@@ -5145,7 +5145,7 @@ static uint32_t _archive_table(purge_type_t type, kingbase_conn_t *kingbase_conn
 				       period_end, col_name, MAX_PURGE_LIMIT,
 				       hash_col);
 		break;
-#ifdef __METASTACK_OPT_APP_10  
+#ifdef __METASTACK_OPT_APP  
 	case PURGE_JOB_APP:  
 		/*  
 		 * The JOIN and subquery of PURGE_JOB_APP both use job_db_inx.  
@@ -5505,7 +5505,7 @@ static int _archive_purge_table(purge_type_t purge_type, uint32_t usage_info,
 						    usage_info);
 				if (rc == SLURM_ERROR)
 					return rc;
-#ifdef __METASTACK_OPT_APP_10  
+#ifdef __METASTACK_OPT_APP  
 				rc = _archive_table(PURGE_JOB_APP,  
 						    kingbase_conn, cluster_name,  
 						    col_name, &start, tmp_end,  
@@ -5594,7 +5594,7 @@ static int _archive_purge_table(purge_type_t purge_type, uint32_t usage_info,
 	return SLURM_SUCCESS;
 }
 
-#ifdef __METASTACK_OPT_APP_10  
+#ifdef __METASTACK_OPT_APP  
 static int _purge_app_table(kingbase_conn_t *kingbase_conn, char *cluster_name,  
 			    char *app_table, char *parent_table)  
 {  
@@ -5676,7 +5676,7 @@ static int _execute_archive(kingbase_conn_t *kingbase_conn,
 					    job_env_table, job_table,
 					    "env_hash_inx")))
 			return rc;
-#ifdef __METASTACK_OPT_APP_10  
+#ifdef __METASTACK_OPT_APP  
 		/* Purge orphaned app records */  
 		if ((rc = _purge_app_table(kingbase_conn, cluster_name,  
 					   job_app_table, job_table)))  
@@ -5868,7 +5868,7 @@ static int _process_archive_data(char **data_in, uint32_t data_size,
 		case DBD_GOT_JOB_SCRIPT:
 			data = _load_job_script(ver, buffer, cluster_name, rec_cnt);
 			break;
-#ifdef __METASTACK_OPT_APP_10  
+#ifdef __METASTACK_OPT_APP  
 		case DBD_GOT_JOB_APP:  
 			data = _load_job_app(ver, buffer, cluster_name, rec_cnt);  
 			break;  

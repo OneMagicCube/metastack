@@ -2235,7 +2235,7 @@ extern void print_fields(type_t type, void *object)
 					     (curr_inx == field_count));
 			break;
 #endif
-#ifdef __METASTACK_OPT_APP_6  
+#ifdef __METASTACK_OPT_APP  
 		case PRINT_APPNAME:  
 			switch(type) {  
 			case JOB:  
@@ -2266,17 +2266,8 @@ extern void print_fields(type_t type, void *object)
 			switch(type) {  
 			case JOB:  
 				if (job->app_name && job->app_name[0]) {  
-#ifdef __METASTACK_OPT_APP_9  
 					tmp_char = (char *)app_source_to_str(  
 						job->app_source);  
-#else  
-					if (job->app_source == 0)  
-						tmp_char = "user";  
-					else if (job->app_source == 1)  
-						tmp_char = "auto";  
-					else  
-						tmp_char = "";  
-#endif
 				} else {  
 					tmp_char = "";  
 				}  

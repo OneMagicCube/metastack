@@ -347,7 +347,7 @@ extern void job_record_delete(void *job_entry)
 #ifdef __METASTACK_OPT_MSG_OUTPUT
 	xfree(job_ptr->reason_detail);
 #endif
-#ifdef __METASTACK_OPT_APP_3  
+#ifdef __METASTACK_OPT_APP  
 	xfree(job_ptr->app_name);  
 	xfree(job_ptr->app_version);  
 #endif
@@ -947,7 +947,7 @@ extern int job_record_pack(job_record_t *dump_job_ptr,
 #ifdef __METASTACK_NEW_TIME_PREDICT
 		pack16(dump_job_ptr->predict_job, buffer);
 #endif
-#ifdef __METASTACK_OPT_APP_3  
+#ifdef __METASTACK_OPT_APP  
 		packstr(dump_job_ptr->app_name, buffer);  
 		packstr(dump_job_ptr->app_version, buffer);  
 		pack8(dump_job_ptr->app_source, buffer);  
@@ -2923,7 +2923,7 @@ extern int job_record_unpack(job_record_t **out,
 #ifdef __METASTACK_NEW_TIME_PREDICT
 		safe_unpack16(&job_ptr->predict_job, buffer);
 #endif
-#ifdef __METASTACK_OPT_APP_3  
+#ifdef __METASTACK_OPT_APP  
 		safe_unpackstr(&job_ptr->app_name, buffer);  
 		safe_unpackstr(&job_ptr->app_version, buffer);  
 		safe_unpack8(&job_ptr->app_source, buffer);  

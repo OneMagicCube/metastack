@@ -144,7 +144,7 @@ static s_p_hashtbl_t *default_partition_tbl;
 static s_p_hashtbl_t *default_watch_dog_tbl = NULL;
 #endif
 static list_t *config_files = NULL;
-#ifdef __METASTACK_OPT_APP_1  
+#ifdef __METASTACK_OPT_APP  
 static s_p_hashtbl_t *default_app_tbl = NULL;  
 #endif
 
@@ -203,7 +203,7 @@ static watch_dog_record_t *_create_conf_watch_dog(void);
 static void _init_conf_watch_dog(watch_dog_record_t *conf_watch_dog);
 static void _destroy_watch_dog(void *ptr);
 #endif
-#ifdef __METASTACK_OPT_APP_1  
+#ifdef __METASTACK_OPT_APP  
 static int _parse_app_name(void **dest, slurm_parser_enum_t type,  
 			   const char *key, const char *value,  
 			   const char *line, char **leftover);  
@@ -556,7 +556,7 @@ s_p_options_t slurm_conf_options[] = {
 	 {"WatchDogName", S_P_ARRAY, _parse_watch_dog_name,
 	  _destroy_watch_dog},
 #endif
-#ifdef __METASTACK_OPT_APP_1  
+#ifdef __METASTACK_OPT_APP  
 	{"AppName", S_P_ARRAY, _parse_app_name, _destroy_app_name},  
 #endif 
 	{NULL}
@@ -2049,7 +2049,7 @@ static int _parse_watch_dog_name(void **dest, slurm_parser_enum_t type,
  * non-slurmctld processes (sbatch, srun, etc.) skip this  
  * line entirely to avoid unnecessary parsing and potential errors.  
  */
-#ifdef __METASTACK_OPT_APP_1  
+#ifdef __METASTACK_OPT_APP  
 static int _parse_app_name(void **dest, slurm_parser_enum_t type,  
                            const char *key, const char *value,  
                            const char *line, char **leftover)  
@@ -2063,12 +2063,10 @@ static int _parse_app_name(void **dest, slurm_parser_enum_t type,
         {NULL}  
     };  
 
-#ifdef __METASTACK_OPT_APP_8
 	if (!running_in_slurmctld()) {
 		*leftover += strlen(*leftover);
 		return 0;
 	}
-#endif
 
     tbl = s_p_hashtbl_create(_app_name_options);  
     if (!s_p_parse_line(tbl, *leftover, leftover)) {  
@@ -3008,7 +3006,7 @@ int slurm_conf_watch_dog_array(watch_dog_record_t **watr_array[])
 }
 #endif
 
-#ifdef __METASTACK_OPT_APP_1  
+#ifdef __METASTACK_OPT_APP  
 int slurm_conf_app_array(app_record_t **app_array[])  
 {  
 	int count = 0;  
@@ -4350,7 +4348,7 @@ _destroy_slurm_conf(void)
 		default_watch_dog_tbl = NULL;
 	}
 #endif
-#ifdef __METASTACK_OPT_APP_1  
+#ifdef __METASTACK_OPT_APP  
 	if (default_app_tbl != NULL) {  
 		s_p_hashtbl_destroy(default_app_tbl);  
 		default_app_tbl = NULL;  
@@ -7440,7 +7438,7 @@ extern char * reconfig_flags2str(uint16_t reconfig_flags)
 			xstrcat(rc, ",");
 		xstrcat(rc, "KeepPowerSaveSettings");
 	}
-#ifdef __METASTACK_OPT_APP_1  
+#ifdef __METASTACK_OPT_APP  
 	if (reconfig_flags & RECONFIG_KEEP_APP_INFO) {  
 		if (rc)  
 			xstrcat(rc, ",");  
@@ -7473,7 +7471,7 @@ extern uint16_t reconfig_str2flags(char *reconfig_flags)
 			rc |= RECONFIG_KEEP_PART_STAT;
 		else if (xstrcasecmp(tok, "KeepPowerSaveSettings") == 0)
 			rc |= RECONFIG_KEEP_POWER_SAVE_SETTINGS;
-#ifdef __METASTACK_OPT_APP_1  
+#ifdef __METASTACK_OPT_APP  
 		else if (xstrcasecmp(tok, "KeepAppInfo") == 0)  
 			rc |= RECONFIG_KEEP_APP_INFO;  
 #endif 

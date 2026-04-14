@@ -271,7 +271,7 @@ typedef struct {
 	char *batch_script;
 } local_job_script_t;
 
-#ifdef __METASTACK_OPT_APP_5
+#ifdef __METASTACK_OPT_APP
 /*  
  * local_job_app_t — Intermediate struct for archiving/purging rows from  
  * the <cluster>_job_app_table. Maps 1:1 to the DB columns.  
@@ -725,7 +725,7 @@ enum {
 	JOB_SCRIPT_COUNT
 };
 
-#ifdef __METASTACK_OPT_APP_5  
+#ifdef __METASTACK_OPT_APP  
 enum {  
 	JOB_APP_DB_INX,  
 	JOB_APP_APP_NAME,  
@@ -978,7 +978,7 @@ typedef enum {
 	PURGE_JOB,
 	PURGE_JOB_ENV,
 	PURGE_JOB_SCRIPT,
-#ifdef __METASTACK_OPT_APP_5  
+#ifdef __METASTACK_OPT_APP  
 	PURGE_JOB_APP,  
 #endif
 	PURGE_STEP,
@@ -1952,7 +1952,7 @@ unpack_error:
 	return SLURM_ERROR;
 }
 
-#ifdef __METASTACK_OPT_APP_5  
+#ifdef __METASTACK_OPT_APP  
 static void _pack_local_job_app(local_job_app_t *object, buf_t *buffer)  
 {  
 	/* Always packs as current version */  
@@ -3446,7 +3446,7 @@ static char *_get_archive_columns(purge_type_t type)
 		cols      = job_script_inx;
 		col_count = JOB_SCRIPT_COUNT;
 		break;
-#ifdef __METASTACK_OPT_APP_5  
+#ifdef __METASTACK_OPT_APP  
 	case PURGE_JOB_APP:  
 		cols      = job_app_req_inx;
 		col_count = JOB_APP_COUNT;
@@ -4130,7 +4130,7 @@ static char *_load_job_script(uint16_t rpc_version, buf_t *buffer,
 	return insert;
 }
 
-#ifdef __METASTACK_OPT_APP_5  
+#ifdef __METASTACK_OPT_APP  
 static buf_t *_pack_archive_job_app(MYSQL_RES *result, char *cluster_name,  
 				    uint32_t cnt, uint32_t usage_info,  
 				    time_t *period_start)  
@@ -5090,7 +5090,7 @@ static uint32_t _archive_table(purge_type_t type, mysql_conn_t *mysql_conn,
 		hash_col = "script_hash_inx";
 		pack_func = &_pack_archive_job_script;
 		break;
-#ifdef __METASTACK_OPT_APP_5  
+#ifdef __METASTACK_OPT_APP  
 	case PURGE_JOB_APP:  
 		parent_table = job_table;  
 		pack_func = &_pack_archive_job_app;  
@@ -5142,7 +5142,7 @@ static uint32_t _archive_table(purge_type_t type, mysql_conn_t *mysql_conn,
 				       period_end, col_name, MAX_PURGE_LIMIT,
 				       hash_col);
 		break;
-#ifdef __METASTACK_OPT_APP_5  
+#ifdef __METASTACK_OPT_APP  
 	case PURGE_JOB_APP:  
 		/*
 			The JOIN and subquery of PURGE_JOB_APP both use job_db_inx. 
@@ -5496,7 +5496,7 @@ static int _archive_purge_table(purge_type_t purge_type, uint32_t usage_info,
 						    usage_info);
 				if (rc == SLURM_ERROR)
 					return rc;
-#ifdef __METASTACK_OPT_APP_5  
+#ifdef __METASTACK_OPT_APP  
 				rc = _archive_table(PURGE_JOB_APP,  
 						    mysql_conn, cluster_name,  
 						    col_name, &start, tmp_end,  
@@ -5577,7 +5577,7 @@ static int _archive_purge_table(purge_type_t purge_type, uint32_t usage_info,
 	return SLURM_SUCCESS;
 }
 
-#ifdef __METASTACK_OPT_APP_5  
+#ifdef __METASTACK_OPT_APP  
 static int _purge_app_table(mysql_conn_t *mysql_conn, char *cluster_name,  
 							char *app_table, char *parent_table)  
 {  
@@ -5653,7 +5653,7 @@ static int _execute_archive(mysql_conn_t *mysql_conn,
 					    job_env_table, job_table,
 					    "env_hash_inx")))
 			return rc;
-#ifdef __METASTACK_OPT_APP_5
+#ifdef __METASTACK_OPT_APP
 		/* Purge orphaned app records */  
 		if ((rc = _purge_app_table(mysql_conn, cluster_name,  
 					       job_app_table, job_table)))  
@@ -5840,7 +5840,7 @@ static int _process_archive_data(char **data_in, uint32_t data_size,
 		case DBD_GOT_JOB_SCRIPT:
 			data = _load_job_script(ver, buffer, cluster_name, rec_cnt);
 			break;
-#ifdef __METASTACK_OPT_APP_5  
+#ifdef __METASTACK_OPT_APP  
 		case DBD_GOT_JOB_APP:  
 			data = _load_job_app(ver, buffer, cluster_name, rec_cnt);  
 			break;  

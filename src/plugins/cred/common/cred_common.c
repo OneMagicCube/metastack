@@ -221,7 +221,7 @@ extern slurm_cred_t *cred_create(slurm_cred_arg_t *cred,
 				     buffer);
 		}
 		packstr(cred->job_selinux_context, buffer);
-#ifdef __METASTACK_OPT_APP_7
+#ifdef __METASTACK_OPT_APP
 		packstr(cred->job_app_name, buffer);  
 		packstr(cred->job_app_version, buffer);  
 		pack8(cred->job_app_source, buffer);  
@@ -579,7 +579,7 @@ extern int cred_unpack(void **out, buf_t *buffer, uint16_t protocol_version)
 		}
 
 		safe_unpackstr(&cred_arg->job_selinux_context, buffer);
-#ifdef __METASTACK_OPT_APP_7
+#ifdef __METASTACK_OPT_APP
 		safe_unpackstr(&cred_arg->job_app_name, buffer);  
 		safe_unpackstr(&cred_arg->job_app_version, buffer);  
 		safe_unpack8(&cred_arg->job_app_source, buffer);  

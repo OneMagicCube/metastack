@@ -3764,7 +3764,7 @@ static batch_job_launch_msg_t *_build_launch_job_msg(job_record_t *job_ptr,
 	launch_msg_ptr->account = xstrdup(job_ptr->account);
 	if (job_ptr->qos_ptr)
 		launch_msg_ptr->qos = xstrdup(job_ptr->qos_ptr->name);
-#ifdef __METASTACK_OPT_APP_7
+#ifdef __METASTACK_OPT_APP
 	launch_msg_ptr->app_name = xstrdup(job_ptr->app_name);  
 	launch_msg_ptr->app_version = xstrdup(job_ptr->app_version);  
 	launch_msg_ptr->app_source = job_ptr->app_source;
@@ -3970,7 +3970,7 @@ static void _set_het_job_env(job_record_t *het_job_leader,
 				"SLURM_JOB_ACCOUNT",
 				het_job_offset, "%s", het_job->account);
 		}
-#ifdef __METASTACK_OPT_APP_7
+#ifdef __METASTACK_OPT_APP
 		if (het_job->app_name) {  
 			(void) env_array_overwrite_het_fmt(  
 				&launch_msg_ptr->environment,  

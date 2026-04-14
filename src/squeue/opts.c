@@ -80,7 +80,7 @@
 #define OPT_LONG_CACHE        0x200
 #define OPT_LONG_NOCACHE        0x201
 #endif
-#ifdef __METASTACK_OPT_APP_9  
+#ifdef __METASTACK_OPT_APP  
 #define OPT_LONG_APP_SOURCE   0x202
 #define OPT_LONG_APP_NAME     0x203 
 #endif
@@ -463,7 +463,7 @@ extern void parse_command_line(int argc, char **argv)
 		{"version",    no_argument,       0, 'V'},
 		{"json", optional_argument, 0, OPT_LONG_JSON},
 		{"yaml", optional_argument, 0, OPT_LONG_YAML},
-#ifdef __METASTACK_OPT_APP_9  
+#ifdef __METASTACK_OPT_APP  
 		{"app-source", required_argument, 0, OPT_LONG_APP_SOURCE},
 		{"app-name",   required_argument, 0, OPT_LONG_APP_NAME},  
 #endif 
@@ -734,7 +734,7 @@ extern void parse_command_line(int argc, char **argv)
 			params.cache_query = false;
 			break;
 #endif
-#ifdef __METASTACK_OPT_APP_9  
+#ifdef __METASTACK_OPT_APP  
 		case OPT_LONG_APP_SOURCE:  
 		{  
 			char *tmp = xstrdup(optarg);  
@@ -1103,10 +1103,8 @@ static fmt_data_job_t fmt_data_job[] = {
 #ifdef __METASTACK_NEW_PENDING_ORDER
 	{"Order", 0, _print_job_order, 0},
 #endif
-#ifdef __METASTACK_OPT_APP_4  
+#ifdef __METASTACK_OPT_APP  
 	{"App", 0, _print_job_app, 0},  
-#endif 
-#ifdef __METASTACK_OPT_APP_9  
 	{"AppSource", 0, _print_job_app_source, 0},
 #endif
 	{NULL, 0, NULL, 0},

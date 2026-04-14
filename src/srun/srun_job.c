@@ -523,7 +523,7 @@ extern srun_job_t *job_create_allocation(
 		job->account = xstrdup(resp->account);
 		job->qos = xstrdup(resp->qos);
 		job->resv_name = xstrdup(resp->resv_name);
-#ifdef __METASTACK_OPT_APP_7
+#ifdef __METASTACK_OPT_APP
 		job->app_name = xstrdup(resp->app_name);  
 		job->app_version = xstrdup(resp->app_version);  
 		job->app_source = resp->app_source;
@@ -2071,7 +2071,7 @@ static void _set_env_vars2(resource_allocation_response_msg_t *resp,
 		xfree(key);
 	}
 
-#ifdef __METASTACK_OPT_APP_7
+#ifdef __METASTACK_OPT_APP
 	if (resp->app_name) {  
 		key = _build_key("SLURM_JOB_APP_NAME", het_job_offset);  
 		if (!getenv(key) &&  

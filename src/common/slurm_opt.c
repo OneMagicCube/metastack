@@ -1050,7 +1050,7 @@ static slurm_cli_opt_t slurm_opt_apptype = {
 };
 #endif
 
-#ifdef __METASTACK_OPT_APP_3  
+#ifdef __METASTACK_OPT_APP  
 static int arg_set_app(slurm_opt_t *opt, const char *arg)  
 {  
 	xfree(opt->app);  
@@ -1072,9 +1072,6 @@ static slurm_cli_opt_t slurm_opt_app = {
 	.get_func = arg_get_app,  
 	.reset_func = arg_reset_app,  
 };  
-#endif
-
-#ifdef __METASTACK_OPT_APP_9  
 static int arg_set_app_source(slurm_opt_t *opt, const char *arg)  
 {  
 	uint8_t val = app_source_from_str(arg);  
@@ -6174,10 +6171,8 @@ static const slurm_cli_opt_t *common_options[] = {
 	&slurm_opt_submit_line,
 	&slurm_opt_apptype,
 #endif
-#ifdef __METASTACK_OPT_APP_3  
+#ifdef __METASTACK_OPT_APP  
 	&slurm_opt_app,  
-#endif
-#ifdef __METASTACK_OPT_APP_9  
 	&slurm_opt_app_source,  
 #endif
 	NULL /* END */
@@ -8132,10 +8127,8 @@ extern job_desc_msg_t *slurm_opt_create_job_desc(slurm_opt_t *opt_local,
 	xfmt_tres(&job_desc->tres_per_socket, "gres/npu",
 				opt_local->npus_per_socket);
 #endif
-#ifdef __METASTACK_OPT_APP_3  
+#ifdef __METASTACK_OPT_APP  
 	job_desc->app = xstrdup(opt_local->app);  
-#endif
-#ifdef __METASTACK_OPT_APP_9  
 	if (opt_local->app_source_set)  
 		job_desc->app_source = opt_local->app_source_val;  
 #endif

@@ -1100,7 +1100,7 @@ slurm_sprint_job_info ( job_info_t * job_ptr, int one_liner )
 	}
 
 	xstrcat(out, line_end);
-#ifdef __METASTACK_OPT_APP_4    
+#ifdef __METASTACK_OPT_APP    
 	/****** Line: App Info ******/    
 	if (job_ptr->app_name && job_ptr->app_name[0]) {    
 		char *app_combined = NULL;    
@@ -1112,22 +1112,8 @@ slurm_sprint_job_info ( job_info_t * job_ptr, int one_liner )
 				   job_ptr->app_version);    
 		else    
 			app_combined = xstrdup(job_ptr->app_name);    
-  
-#ifdef __METASTACK_OPT_APP_9    
+    
 		source_str = app_source_to_str(job_ptr->app_source);    
-#else    
-		switch (job_ptr->app_source) {    
-		case 0:    
-			source_str = "user";    
-			break;    
-		case 1:    
-			source_str = "auto";    
-			break;    
-		default:    
-			source_str = "N/A";    
-			break;    
-		}    
-#endif  
   
 		xstrfmtcat(out, "App=%s AppName=%s AppVersion=%s AppSource=%s",    
 			   app_combined,    

@@ -692,7 +692,7 @@ static void _setup_one_job_env(slurm_opt_t *opt_local, srun_job_t *job,
 		env->jobid = job->step_id.job_id;
 	env->stepid = job->step_id.step_id;
 	env->account = job->account;
-#ifdef __METASTACK_OPT_APP_7  
+#ifdef __METASTACK_OPT_APP  
 	env->app_name = job->app_name;  
 	env->app_version = job->app_version;  
 	env->app_source = job->app_source;  
