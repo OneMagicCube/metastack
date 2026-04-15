@@ -104,7 +104,7 @@ _reset_period_str(uint16_t reset_period)
  * IN part_info_ptr - pointer to partition information
  */
 #if defined(__METASTACK_OPT_APP)  
-extern void slurm_write_ctl_conf(slurm_conf_t *slurm_ctl_conf_ptr,  
+void slurm_write_ctl_conf(slurm_conf_t *slurm_ctl_conf_ptr,  
                                  node_info_msg_t *node_info_ptr,  
                                  partition_info_msg_t *part_info_ptr,  
                                  slurm_ctl_conf_info_msg_watch_dog_t *slurm_watch_dog_ptr,  
