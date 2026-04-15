@@ -365,9 +365,8 @@ static char **_build_env(job_env_t *job_env, slurm_cred_t *cred,
 		if (cred_arg->job_app_version)  
 			setenvf(&env, "SLURM_JOB_APP_VERSION", "%s",  
 				cred_arg->job_app_version);  
-		if (cred_arg->job_app_name)  
-			setenvf(&env, "SLURM_JOB_APP_SOURCE", "%u",    
-				cred_arg->job_app_source);
+		if (cred_arg->job_app_name)
+			setenvf(&env, "SLURM_JOB_APP_SOURCE", "%s", app_source_to_str(cred_arg->job_app_source));
 #endif 
 		slurm_cred_unlock_args(cred);
 	}
