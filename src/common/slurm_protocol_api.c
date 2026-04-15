@@ -41,6 +41,14 @@
 
 #include "config.h"
 
+#ifndef __METASTACK_OPT_MSG_OUTPUT_MULTI_LANG
+#define __METASTACK_OPT_MSG_OUTPUT_MULTI_LANG
+#endif
+
+#ifdef __METASTACK_OPT_MSG_OUTPUT_MULTI_LANG
+#define _GNU_SOURCE
+#endif
+
 /* GLOBAL INCLUDES */
 
 #include <arpa/inet.h>
@@ -78,6 +86,11 @@
 #include "src/interfaces/topology.h"
 
 #include "src/slurmdbd/read_config.h"
+
+#ifdef __METASTACK_OPT_MSG_OUTPUT_MULTI_LANG
+#include <locale.h>
+#include <langinfo.h>
+#endif
 
 typedef struct {
 	uint32_t control_cnt;
@@ -120,6 +133,118 @@ extern char *get_err_msg(char *conf_path, int err_code) {
 		return NULL;
 	}
 
+#ifdef __METASTACK_OPT_MSG_OUTPUT_MULTI_LANG
+	bool is_utf8 = false;
+	locale_t loc = newlocale(LC_CTYPE_MASK, "", (locale_t)0);
+    
+	if (loc != (locale_t)0) {
+		char *codeset = nl_langinfo_l(CODESET, loc);
+
+		if (codeset && (strcasecmp(codeset, "UTF-8") == 0 || strcasecmp(codeset, "UTF8") == 0)) {
+			is_utf8 = true;
+		}
+        
+		freelocale(loc);
+	}
+
+	// Default target language is set to US English
+	char target_lang[32] = "en_US"; 
+
+	/* SLURM_LANG > LC_ALL > LC_MESSAGES > LANG */
+	char *user_pref = getenv("SLURM_LANG");
+	char *lc_all = getenv("LC_ALL");
+	char *lc_messages = getenv("LC_MESSAGES");
+	char *sys_lang = getenv("LANG");
+	char *lang_to_check = NULL;
+
+	if (user_pref && user_pref[0] != '\0')
+		lang_to_check = user_pref;
+	else if (lc_all && lc_all[0] != '\0')
+		lang_to_check = lc_all;
+	else if (lc_messages && lc_messages[0] != '\0')
+		lang_to_check = lc_messages;
+	else if (sys_lang && sys_lang[0] != '\0')
+		lang_to_check = sys_lang;
+
+	if (lang_to_check) {
+		strncpy(target_lang, lang_to_check, sizeof(target_lang) - 1);
+		target_lang[sizeof(target_lang) - 1] = '\0';
+
+		char *dot = strchr(target_lang, '.');
+		if (dot) *dot = '\0';
+	}
+
+	if (!is_utf8 && strncasecmp(target_lang, "en", 2) != 0) {
+		strcpy(target_lang, "en_US");
+	}
+
+	char buf[1024];
+	char *saveptr = NULL;
+	char *fallback_msg = NULL;
+	char *token_code = NULL;
+	char *token_lang = NULL;
+	char *token_val = NULL;
+	char *legacy_msg = NULL;
+
+	while (fgets(buf, sizeof(buf), fp)) {
+		saveptr = NULL;
+		if (buf[0] == '#' || buf[0] == '\n' || buf[0] == '\r' || buf[0] == ' ')
+			continue;
+		
+		/* old format: "error_code=message_string" */
+		if (!strchr(buf, ':')) {
+			token_code = strtok_r(buf, "=", &saveptr);
+			token_val  = strtok_r(NULL, "\n\r", &saveptr);
+			if (!token_code || !token_val)
+				continue;
+			if (atoi(token_code) == err_code) {
+				if (legacy_msg)
+					xfree(legacy_msg);
+				legacy_msg = xstrdup(token_val);
+			}
+			continue;
+		}
+
+		// Parse the line format: "error_code:language=message_string"
+		token_code = strtok_r(buf, ":", &saveptr);
+		token_lang = strtok_r(NULL, "=", &saveptr);
+		token_val  = strtok_r(NULL, "\n\r", &saveptr);
+
+		if (!token_code || !token_lang || !token_val)
+			continue;
+
+		if (atoi(token_code) != err_code)
+			continue;
+
+		// 1. Perfect match: Target language found
+		if (strcmp(token_lang, target_lang) == 0) {
+			err_msg = xstrdup(token_val);
+			break; 
+		} else if (strcmp(token_lang, "en_US") == 0) {
+		// 2. Fallback match: Store the English version in case the target language is missing
+			if (fallback_msg) 
+				xfree(fallback_msg);
+			fallback_msg = xstrdup(token_val);
+		}
+	}
+
+	fclose(fp);
+
+	if (err_msg) {
+		if (fallback_msg) 
+			xfree(fallback_msg);
+		if (legacy_msg)
+			xfree(legacy_msg);
+		return err_msg;
+	}
+
+	if (fallback_msg) {
+		if (legacy_msg)
+			xfree(legacy_msg);
+		return fallback_msg;
+	}
+	return legacy_msg;
+#else
 	char buf[512];
 	char *key = NULL, *value = NULL;
 
@@ -141,6 +266,7 @@ extern char *get_err_msg(char *conf_path, int err_code) {
 	fclose(fp);
 
 	return err_msg;
+#endif
 }
 #endif
 

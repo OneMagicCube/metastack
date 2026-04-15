@@ -615,6 +615,10 @@ typedef struct sbcast_cred sbcast_cred_t;		/* opaque data type */
 #define __METASTACK_BUG_SPREAD_JOB_CRASH_CTLD
 #endif
 
+#ifndef __METASTACK_OPT_MSG_OUTPUT_MULTI_LANG
+#define __METASTACK_OPT_MSG_OUTPUT_MULTI_LANG
+#endif
+
 /*****************************************************************************\
  *	DEFINITIONS FOR POSIX VALUES
 \*****************************************************************************/
