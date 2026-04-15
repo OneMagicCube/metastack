@@ -2957,8 +2957,6 @@ extern int read_slurm_conf(int recover)
 #ifdef __METASTACK_OPT_APP  
 	if (recover > 1)  
         reconfig_flags |= RECONFIG_KEEP_APP_INFO; 
-	if (app_list)  
-		list_flush(app_list);  
 	_build_all_app_info();  
   
 	/* Then optionally merge state file data into config-loaded app_list.    

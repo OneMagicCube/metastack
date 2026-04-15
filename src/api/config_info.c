@@ -2424,13 +2424,16 @@ char *slurm_sprint_app_info(app_record_t *app_ptr, int one_liner)
 	xstrfmtcat(out, " Version=%s", app_ptr->version);  
 	xstrcat(out, line_end);  
   
-	if (app_ptr->description)  
-		xstrfmtcat(out, "Description=\"%s\"", app_ptr->description);  
-	if (app_ptr->watchdog)  
-		xstrfmtcat(out, " Watchdog=%s", app_ptr->watchdog);  
-	if (app_ptr->default_flag)  
-		xstrcat(out, " Default=YES");  
-	else  
+	if (app_ptr->description) {
+		xstrfmtcat(out, "Description=\"%s\"", app_ptr->description);
+		if (app_ptr->watchdog)
+			xstrfmtcat(out, " Watchdog=%s", app_ptr->watchdog);
+	} else if (app_ptr->watchdog) {
+		xstrfmtcat(out, "Watchdog=%s", app_ptr->watchdog);
+	}
+	if (app_ptr->default_flag)
+		xstrcat(out, " Default=YES");
+	else
 		xstrcat(out, " Default=NO");  
   
 	if (one_liner)  

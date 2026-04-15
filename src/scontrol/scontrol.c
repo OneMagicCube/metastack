@@ -724,6 +724,9 @@ static void _write_config(char *file_name)
 #elif defined(__METASTACK_NEW_CUSTOM_EXCEPTION)  
 	slurm_write_ctl_conf(slurm_ctl_conf_ptr, node_info_ptr,  
 	                     part_info_ptr, slurm_watch_dog_ptr);  
+#else
+	slurm_write_ctl_conf(slurm_ctl_conf_ptr, node_info_ptr,  
+	                     part_info_ptr);  
 #endif
 	}
 }
