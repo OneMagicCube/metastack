@@ -1427,20 +1427,21 @@ static buf_t *_open_app_state_file(char **state_file)
 	return create_mmap_buf(*state_file);  
 }
 
-/*  
- * load_all_app_state - Recover app records from state file on slurmctld start.  
- *  
- * State file takes precedence over slurm.conf: init_app_conf() clears  
- * config-loaded records, then state file records are rebuilt. This ensures  
- * dynamically created/modified/deleted apps (via scontrol) are preserved  
- * across restarts.  
- *  
- * On reconfigure (recover==0): only loads state if RECONFIG_KEEP_APP_INFO  
- * flag is set; otherwise discards dynamic changes and uses config only.  
- *  
- * Error handling: unpack failures go to unpack_error which frees tmp_app  
- * members and buffer. With ignore_state_errors=false, incompatible versions  
- * cause fatal(); otherwise logs error and continues with partial data.  
+/*    
+ * load_all_app_state - Merge app state file data into config-loaded app_list.    
+ *    
+ * Uses merge strategy (consistent with load_all_part_state):    
+ *   - For each record in state file, find matching record in app_list.    
+ *   - If found: overlay state file fields onto config-loaded record.    
+ *   - If not found: create new record (dynamically created app).    
+ *   - Apps in slurm.conf but not in state file are preserved as-is.    
+ *    
+ * On reconfigure (recover==0): only loads state if RECONFIG_KEEP_APP_INFO    
+ * flag is set; otherwise discards dynamic changes and uses config only.    
+ *    
+ * Error handling: unpack failures go to unpack_error which frees tmp_app    
+ * members and buffer. With ignore_state_errors=false, incompatible versions    
+ * cause fatal(); otherwise logs error and continues with partial data.    
  */
 extern int load_all_app_state(uint16_t reconfig_flags) 
 {  
@@ -1496,59 +1497,76 @@ extern int load_all_app_state(uint16_t reconfig_flags)
 	xfree(ver_str);  
 	safe_unpack_time(&now, buffer);  
   
-	/*  
-	 * Clear the config-loaded app_list and rebuild from state file.  
-	 * This ensures dynamically created/modified/deleted apps are preserved.  
-	 */  
-	init_app_conf();  
-  
-	while (remaining_buf(buffer) > 0) {  
-		memset(&tmp_app, 0, sizeof(tmp_app));  
-  
-#ifdef __META_PROTOCOL  
-		if (protocol_version >= META_3_2_PROTOCOL_VERSION) {  
-			safe_unpackstr(&tmp_app.app_name, buffer);  
-			if (tmp_app.app_name == NULL)  
-				tmp_app.app_name = xmalloc(1);  
-			safe_unpackstr(&tmp_app.version, buffer);  
-			safe_unpackstr(&tmp_app.description, buffer);  
-			safe_unpackstr(&tmp_app.watchdog, buffer);  
-			safe_unpackbool(&tmp_app.default_flag, buffer);  
-		} else {  
-			goto unpack_error;  
-		}  
-#else  
-		goto unpack_error;  
-#endif  
-  
-		/* Rebuild the app record */  
-		app_record_t *app_ptr = create_app_record(  
-			tmp_app.app_name, tmp_app.version);  
-		if (app_ptr) {  
-			if (tmp_app.description)  
-				app_ptr->description =  
-					xstrdup(tmp_app.description);  
-			if (tmp_app.watchdog)  
-				app_ptr->watchdog =  
-					xstrdup(tmp_app.watchdog);  
-			app_ptr->default_flag = tmp_app.default_flag;  
-  
-			if (tmp_app.default_flag) {  
-				xfree(default_app_name);  
-				xstrfmtcat(default_app_name, "%s-%s",  
-					   app_ptr->app_name,  
-					   app_ptr->version);  
-				default_app_loc = app_ptr;  
-			}  
-			app_count++;  
-		}  
-  
-		/* Free temporary strings */  
-		xfree(tmp_app.app_name);  
-		xfree(tmp_app.version);  
-		xfree(tmp_app.description);  
-		xfree(tmp_app.watchdog);  
-	}  
+	/*    
+	 * Merge state file data into config-loaded app_list.    
+	 * For each state file record:    
+	 *   - If app exists in app_list (from slurm.conf): overlay state data.    
+	 *   - If app does not exist: create new record (dynamic app).    
+	 * Apps in slurm.conf but not in state file are preserved as-is.    
+	 * This is consistent with load_all_part_state() merge strategy.    
+	 */    
+    
+	while (remaining_buf(buffer) > 0) {    
+		memset(&tmp_app, 0, sizeof(tmp_app));    
+    
+#ifdef __META_PROTOCOL    
+		if (protocol_version >= META_3_2_PROTOCOL_VERSION) {    
+			safe_unpackstr(&tmp_app.app_name, buffer);    
+			if (tmp_app.app_name == NULL)    
+				tmp_app.app_name = xmalloc(1);    
+			safe_unpackstr(&tmp_app.version, buffer);    
+			safe_unpackstr(&tmp_app.description, buffer);    
+			safe_unpackstr(&tmp_app.watchdog, buffer);    
+			safe_unpackbool(&tmp_app.default_flag, buffer);    
+		} else {    
+			goto unpack_error;    
+		}    
+#else    
+		goto unpack_error;    
+#endif    
+    
+		/* Find existing record or create new one */    
+		app_record_t *app_ptr = find_app_record(    
+			tmp_app.app_name, tmp_app.version);    
+    
+		if (!app_ptr) {    
+			/* Not in config — dynamically created app */    
+			info("%s: app %s-%s missing from configuration "    
+			     "file, creating from state",    
+			     __func__, tmp_app.app_name,    
+			     tmp_app.version);    
+			app_ptr = create_app_record(    
+				tmp_app.app_name, tmp_app.version);    
+		}    
+    
+		if (app_ptr) {    
+			/* Overlay state file data onto record */    
+			xfree(app_ptr->description);    
+			if (tmp_app.description)    
+				app_ptr->description =    
+					xstrdup(tmp_app.description);    
+			xfree(app_ptr->watchdog);    
+			if (tmp_app.watchdog)    
+				app_ptr->watchdog =    
+					xstrdup(tmp_app.watchdog);    
+			app_ptr->default_flag = tmp_app.default_flag;    
+    
+			if (tmp_app.default_flag) {    
+				xfree(default_app_name);    
+				xstrfmtcat(default_app_name, "%s-%s",    
+					   app_ptr->app_name,    
+					   app_ptr->version);    
+				default_app_loc = app_ptr;    
+			}    
+			app_count++;    
+		}    
+    
+		/* Free temporary strings */    
+		xfree(tmp_app.app_name);    
+		xfree(tmp_app.version);    
+		xfree(tmp_app.description);    
+		xfree(tmp_app.watchdog);    
+	}
   
 	info("Recovered state of %d app records", app_count);  
 	FREE_NULL_BUFFER(buffer);  
@@ -2943,10 +2961,10 @@ extern int read_slurm_conf(int recover)
 		list_flush(app_list);  
 	_build_all_app_info();  
   
-	/* Then optionally overlay state file data.    
-	 * On full recovery (recover > 1): restore from state file.    
+	/* Then optionally merge state file data into config-loaded app_list.    
+	 * On full recovery (recover > 1): merge state file data.    
 	 * On normal startup (recover == 1) or reconfigure (recover == 0):    
-	 *   rebuild from config file only, dynamic changes are discarded. */
+	 *   use config file only, dynamic changes are discarded. */
 	(void)load_all_app_state(reconfig_flags);
 #endif
 
