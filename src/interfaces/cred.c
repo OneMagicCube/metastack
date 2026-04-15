@@ -287,6 +287,10 @@ extern void slurm_cred_free_args(slurm_cred_arg_t *arg)
 	xfree(arg->step_mem_alloc_rep_count);
 
 	switch_g_free_stepinfo(arg->switch_step);
+#ifdef __METASTACK_OPT_APP
+	xfree(arg->job_app_name);
+	xfree(arg->job_app_version);
+#endif
 	xfree(arg);
 }
 
