@@ -1201,74 +1201,80 @@ app_record_t *find_app_record_by_combined(const char *combined_name)
 	return (app_record_t *)xhash_get_str(app_hash_table, combined_name);  
 }
   
-static int _build_single_appline_info(app_record_t *app)  
-{  
-	app_record_t *app_ptr = NULL;  
-  
-	/* Use hash table for O(1) duplicate detection */  
-	char *buf = NULL;  
-	xstrfmtcat(buf, "%s-%s", app->app_name, app->version);    
-	app_ptr = (app_record_t *)xhash_get_str(app_hash_table, buf);    
-  
-	if (app_ptr) {  
-		error("%s: AppName=%s Version=%s specified more than once, "  
-		      "latest value used",  
-		      __func__, app->app_name, app->version);  
-  
-		/* Remove old record from hash table first */  
-		xhash_pop_str(app_hash_table, buf);  
-  
-		/* Then remove from list */  
-		char *find_key[2];  
-		find_key[0] = app_ptr->app_name;  
-		find_key[1] = app_ptr->version;  
-		list_delete_first(app_list, &list_find_app, find_key);  
-	}
-
-	xfree(buf);
-  
-	app_ptr = create_app_record(app->app_name, app->version);  
-  
-	if (app->description)  
-		app_ptr->description = xstrdup(app->description);  
-  
-	if (app->watchdog) {  
-#ifdef __METASTACK_NEW_CUSTOM_EXCEPTION  
-    /* Validate watchdog reference — only set if valid */  
-		if (list_find_first(watch_dog_list, &list_find_watch_dog,  
-							app->watchdog)) {  
-			app_ptr->watchdog = xstrdup(app->watchdog);  
-		} else {  
-			error("AppName=%s Version=%s references undefined "  
-				"Watchdog '%s', ignoring watchdog setting",  
-				app->app_name, app->version, app->watchdog);  
-			/* Leave app_ptr->watchdog as NULL — app is still usable,  
-			* just without watchdog functionality */  
+static int _build_single_appline_info(app_record_t *app)    
+{    
+	app_record_t *app_ptr = NULL;    
+    
+	/* Use hash table for O(1) duplicate detection */    
+	char *buf = NULL;    
+	xstrfmtcat(buf, "%s-%s", app->app_name, app->version);      
+	app_ptr = (app_record_t *)xhash_get_str(app_hash_table, buf);      
+    
+	if (app_ptr) {    
+		error("%s: AppName=%s Version=%s specified more than once, "    
+		      "latest value used",    
+		      __func__, app->app_name, app->version);    
+    
+		/* Clear default if the old record was the default */  
+		if (default_app_loc == app_ptr) {  
+			xfree(default_app_name);  
+			default_app_loc = NULL;  
 		}  
-#else  
-		app_ptr->watchdog = xstrdup(app->watchdog);
-#endif  
+  
+		/* Remove old record from hash table first */    
+		xhash_pop_str(app_hash_table, buf);    
+    
+		/* Then remove from list */    
+		char *find_key[2];    
+		find_key[0] = app_ptr->app_name;    
+		find_key[1] = app_ptr->version;    
+		list_delete_first(app_list, &list_find_app, find_key);    
 	}  
   
-	app_ptr->default_flag = app->default_flag;  
-  
-	if (app->default_flag) {
-		if (default_app_name &&  
-		    (xstrcmp(default_app_loc->app_name, app->app_name) ||  
-		    xstrcmp(default_app_loc->version, app->version))) {
-			info("%s: changing default app from %s-%s to %s-%s",
-			     __func__,  
-			     default_app_loc->app_name,  
-			     default_app_loc->version,  
-			     app->app_name, app->version);  
-		}
-		xfree(default_app_name);
-		xstrfmtcat(default_app_name, "%s-%s",
-			   app->app_name, app->version);
-		default_app_loc = app_ptr;
-	}  
-  
-	return 0;  
+	xfree(buf);  
+    
+	app_ptr = create_app_record(app->app_name, app->version);    
+    
+	if (app->description)    
+		app_ptr->description = xstrdup(app->description);    
+    
+	if (app->watchdog) {    
+#ifdef __METASTACK_NEW_CUSTOM_EXCEPTION    
+    /* Validate watchdog reference — only set if valid */    
+		if (list_find_first(watch_dog_list, &list_find_watch_dog,    
+							app->watchdog)) {    
+			app_ptr->watchdog = xstrdup(app->watchdog);    
+		} else {    
+			error("AppName=%s Version=%s references undefined "    
+				"Watchdog '%s', ignoring watchdog setting",    
+				app->app_name, app->version, app->watchdog);    
+			/* Leave app_ptr->watchdog as NULL — app is still usable,    
+			* just without watchdog functionality */    
+		}    
+#else    
+		app_ptr->watchdog = xstrdup(app->watchdog);  
+#endif    
+	}    
+    
+	app_ptr->default_flag = app->default_flag;    
+    
+	if (app->default_flag) {  
+		if (default_app_name &&    
+		    (xstrcmp(default_app_loc->app_name, app->app_name) ||    
+		    xstrcmp(default_app_loc->version, app->version))) {  
+			info("%s: changing default app from %s-%s to %s-%s",  
+			     __func__,    
+			     default_app_loc->app_name,    
+			     default_app_loc->version,    
+			     app->app_name, app->version);    
+		}  
+		xfree(default_app_name);  
+		xstrfmtcat(default_app_name, "%s-%s",  
+			   app->app_name, app->version);  
+		default_app_loc = app_ptr;  
+	}    
+    
+	return 0;    
 }
 
 static int _build_all_app_info(void)  
