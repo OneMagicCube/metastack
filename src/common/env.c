@@ -1198,8 +1198,8 @@ extern int env_array_for_job(char ***dest,
 	}
 	if (alloc->app_name) {  
 		env_array_overwrite_het_fmt(dest, "SLURM_JOB_APP_SOURCE",    
-					    het_job_offset, "%u",    
-					    alloc->app_source);
+					    het_job_offset, "%s",    
+					    app_source_to_str(alloc->app_source));
 	} 
 #endif
 	if (alloc->qos) {
