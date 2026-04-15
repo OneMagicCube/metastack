@@ -1308,8 +1308,8 @@ void pack_app(app_record_t *app_ptr, buf_t *buffer,
 		packstr(app_ptr->description, buffer);  
 		packstr(app_ptr->watchdog, buffer);  
 		packbool(app_ptr->default_flag, buffer);  
-	}  
-#endif  
+	}
+#endif
 }  
   
 static int _pack_app(void *object, void *arg)  

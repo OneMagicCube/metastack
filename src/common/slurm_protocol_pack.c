@@ -6768,8 +6768,8 @@ static void _pack_slurm_ctl_conf_app_msg(slurm_msg_t *msg, buf_t *buffer,
 {  
 	xassert(msg);  
 #ifdef __META_PROTOCOL  
-	buf_t *msg_buffer = msg->data;  
-	if (protocol_version >= META_3_0_PROTOCOL_VERSION) {  
+	buf_t *msg_buffer = msg->data;
+	if (protocol_version >= META_3_2_PROTOCOL_VERSION) {
 		packmem_array(msg_buffer->head, msg_buffer->processed, buffer);  
 	}  
 #endif  
@@ -6779,7 +6779,7 @@ static int _unpack_app_info_members(app_record_t *app, buf_t *buffer,
                                     uint16_t protocol_version)  
 {  
 #ifdef __META_PROTOCOL  
-	if (protocol_version >= META_3_0_PROTOCOL_VERSION) {  
+	if (protocol_version >= META_3_2_PROTOCOL_VERSION) {  
 		safe_unpackstr(&app->app_name, buffer);  
 		if (app->app_name == NULL)  
 			app->app_name = xmalloc(1);  
@@ -6805,7 +6805,7 @@ static int _unpack_app_info_msg(slurm_ctl_conf_info_msg_app_t **msg,
 	*msg = app_msg;  
   
 #ifdef __META_PROTOCOL  
-	if (protocol_version >= META_3_0_PROTOCOL_VERSION) {  
+	if (protocol_version >= META_3_2_PROTOCOL_VERSION) {  
 		safe_unpack32(&record_count, buffer);  
 		safe_unpack_time(&app_msg->last_update, buffer);  
 		safe_xcalloc(app_msg->app_array, record_count,  
@@ -6835,7 +6835,7 @@ static void _pack_app_desc_msg(app_desc_msg_t *msg, buf_t *buffer,
                                uint16_t protocol_version)  
 {  
 #ifdef __META_PROTOCOL  
-	if (protocol_version >= META_3_0_PROTOCOL_VERSION) {  
+	if (protocol_version >= META_3_2_PROTOCOL_VERSION) {  
 		packstr(msg->app_name, buffer);  
 		packstr(msg->version, buffer);  
 		packstr(msg->description, buffer);  
@@ -6852,7 +6852,7 @@ static int _unpack_app_desc_msg(app_desc_msg_t **msg, buf_t *buffer,
 	*msg = tmp_ptr;  
   
 #ifdef __META_PROTOCOL  
-	if (protocol_version >= META_3_0_PROTOCOL_VERSION) {  
+	if (protocol_version >= META_3_2_PROTOCOL_VERSION) {  
 		safe_unpackstr(&tmp_ptr->app_name, buffer);  
 		safe_unpackstr(&tmp_ptr->version, buffer);  
 		safe_unpackstr(&tmp_ptr->description, buffer);  
@@ -6872,7 +6872,7 @@ static void _pack_delete_app_msg(delete_app_msg_t *msg, buf_t *buffer,
                                  uint16_t protocol_version)  
 {  
 #ifdef __META_PROTOCOL  
-	if (protocol_version >= META_3_0_PROTOCOL_VERSION) {  
+	if (protocol_version >= META_3_2_PROTOCOL_VERSION) {  
 		packstr(msg->name, buffer);  
 	}  
 #endif  
@@ -6885,7 +6885,7 @@ static int _unpack_delete_app_msg(delete_app_msg_t **msg, buf_t *buffer,
 	*msg = tmp_ptr;  
   
 #ifdef __META_PROTOCOL  
-	if (protocol_version >= META_3_0_PROTOCOL_VERSION) {  
+	if (protocol_version >= META_3_2_PROTOCOL_VERSION) {  
 		safe_unpackstr(&tmp_ptr->name, buffer);  
 	}  
 #endif  
