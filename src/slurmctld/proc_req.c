@@ -836,6 +836,10 @@ extern resource_allocation_response_msg_t *build_alloc_msg(
 	resource_allocation_response_msg_t *alloc_msg =
 		xmalloc(sizeof(resource_allocation_response_msg_t));
 
+#ifdef __METASTACK_OPT_APP  
+	alloc_msg->app_source = NO_VAL8;  
+#endif
+
 	/* send job_ID and node_name_ptr */
 	if (job_ptr->job_resrcs && job_ptr->job_resrcs->cpu_array_cnt) {
 		alloc_msg->num_cpu_groups = job_ptr->job_resrcs->cpu_array_cnt;

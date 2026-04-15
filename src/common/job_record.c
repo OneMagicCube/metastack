@@ -93,6 +93,9 @@ extern job_record_t *job_record_create(void)
 	job_ptr->enable_stepd_send_term_job = false;
 	job_ptr->comp_batch_flag = false;
 #endif
+#ifdef __METASTACK_OPT_APP
+	job_ptr->app_source = NO_VAL8;
+#endif
 	return job_ptr;
 }
 
