@@ -7811,7 +7811,7 @@ static int _job_create(job_desc_msg_t *job_desc, int allocate, int will_run,
 #ifdef __METASTACK_OPT_APP  
 	/* --app-source requires --app to be specified */  
 	if ((!job_desc->app || !job_desc->app[0]) &&  
-		job_desc->app_source != NO_VAL8) {  
+		job_desc->app_source != APP_SOURCE_NOTSET) {  
 		info("%s: --app-source requires --app to be specified", __func__);  
 		if (err_msg) {  
 			xfree(*err_msg);  
