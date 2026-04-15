@@ -1075,7 +1075,8 @@ static slurm_cli_opt_t slurm_opt_app = {
 static int arg_set_app_source(slurm_opt_t *opt, const char *arg)  
 {  
 	uint8_t val = app_source_from_str(arg);  
-	if (val == NO_VAL8 || val == APP_SOURCE_AUTO) {  
+	if (val == NO_VAL8 || val == APP_SOURCE_AUTO ||  
+	    val == APP_SOURCE_NOTSET) {  
 		error("Invalid --app-source value: '%s'. "  
 		      "Valid: user, portal, marketplace", arg);  
 		return SLURM_ERROR;  
@@ -1092,9 +1093,9 @@ static char *arg_get_app_source(slurm_opt_t *opt)
 }  
 static void arg_reset_app_source(slurm_opt_t *opt)  
 {  
-	opt->app_source_val = NO_VAL8;
+	opt->app_source_val = APP_SOURCE_NOTSET;  
 	opt->app_source_set = false;  
-}  
+}
 static int arg_set_data_app_source(slurm_opt_t *opt,  
 				   const data_t *arg,  
 				   data_t *errors)  

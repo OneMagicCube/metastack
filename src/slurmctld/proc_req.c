@@ -837,7 +837,7 @@ extern resource_allocation_response_msg_t *build_alloc_msg(
 		xmalloc(sizeof(resource_allocation_response_msg_t));
 
 #ifdef __METASTACK_OPT_APP  
-	alloc_msg->app_source = NO_VAL8;  
+	alloc_msg->app_source = APP_SOURCE_NOTSET;  
 #endif
 
 	/* send job_ID and node_name_ptr */

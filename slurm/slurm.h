@@ -2354,32 +2354,37 @@ typedef struct job_descriptor {	/* For submit, allocate, and update requests */
 #endif
 } job_desc_msg_t;
 
-#ifdef __METASTACK_OPT_APP 
+#ifdef __METASTACK_OPT_APP  
 /*  
  * app_source identifies HOW the app information was attached to a job:  
- *   USER(0)        - User explicitly specified --app=X on command line  
- *   AUTO(1)        - cli_filter.lua auto-recognized the application type  
- *   PORTAL(2)      - Set by web portal integration (preserved across validation)  
- *   MARKETPLACE(3) - Set by marketplace integration (preserved across validation)  
+ *   NOTSET(0)      - Not set / unknown (zero-init safe default)  
+ *   USER(1)        - User explicitly specified --app=X on command line  
+ *   AUTO(2)        - cli_filter.lua auto-recognized the application type  
+ *   PORTAL(3)      - Set by web portal integration (preserved across validation)  
+ *   MARKETPLACE(4) - Set by marketplace integration (preserved across validation)  
+ *  
+ * NOTSET must be 0 so that zero-initialized fields are safely "not set"  
+ * rather than falsely indicating a specific source.  
  *  
  * PORTAL and MARKETPLACE are "external" sources: once set, they are NOT  
  * overwritten by the slurmctld validation logic (see _job_create).  
- */ 
-#define APP_SOURCE_USER        0  
-#define APP_SOURCE_AUTO        1  
-#define APP_SOURCE_PORTAL      2  
-#define APP_SOURCE_MARKETPLACE 3  
+ */  
+#define APP_SOURCE_NOTSET      0  
+#define APP_SOURCE_USER        1  
+#define APP_SOURCE_AUTO        2  
+#define APP_SOURCE_PORTAL      3  
+#define APP_SOURCE_MARKETPLACE 4  
   
 /* app_source string constants */  
+#define APP_SOURCE_STR_NOTSET      "notset"  
 #define APP_SOURCE_STR_USER        "user"  
 #define APP_SOURCE_STR_AUTO        "auto"  
 #define APP_SOURCE_STR_PORTAL      "portal"  
 #define APP_SOURCE_STR_MARKETPLACE "marketplace"  
-#define APP_SOURCE_STR_UNKNOWN     "unknown"  
   
 extern const char *app_source_to_str(uint8_t source);  
 /* helper: string -> uint8, returns NO_VAL8 on error */  
-extern uint8_t app_source_from_str(const char *str); 
+extern uint8_t app_source_from_str(const char *str);  
 #endif
 
 typedef struct job_info {

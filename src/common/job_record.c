@@ -94,7 +94,7 @@ extern job_record_t *job_record_create(void)
 	job_ptr->comp_batch_flag = false;
 #endif
 #ifdef __METASTACK_OPT_APP
-	job_ptr->app_source = NO_VAL8;
+	job_ptr->app_source = APP_SOURCE_NOTSET;
 #endif
 	return job_ptr;
 }

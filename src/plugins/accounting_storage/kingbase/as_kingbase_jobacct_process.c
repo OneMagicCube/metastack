@@ -745,8 +745,10 @@ static int _cluster_get_jobs(kingbase_conn_t *kingbase_conn,
 			if (tmp_app && tmp_app[0])  
 				job->app_version = xstrdup(tmp_app);  
 			tmp_app = KCIResultGetColumnValue(result, i, JOB_REQ_APP_SOURCE);  
-			if (tmp_app && tmp_app[0])
+			if (tmp_app && tmp_app[0])  
 				job->app_source = slurm_atoul(tmp_app);  
+			else  
+				job->app_source = APP_SOURCE_NOTSET;
 		}  
 #endif
 		temp = KCIResultGetColumnValue(result,i,JOB_REQ_UID);

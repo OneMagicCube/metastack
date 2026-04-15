@@ -733,7 +733,7 @@ static int _cluster_get_jobs(mysql_conn_t *mysql_conn,
 		if (row[JOB_REQ_APP_SOURCE] && row[JOB_REQ_APP_SOURCE][0])  
 			job->app_source = slurm_atoul(row[JOB_REQ_APP_SOURCE]);  
 		else  
-			job->app_source = NO_VAL8;
+			job->app_source = APP_SOURCE_NOTSET;
 #endif
 		if (row[JOB_REQ_UID])
 			job->uid = slurm_atoul(row[JOB_REQ_UID]);

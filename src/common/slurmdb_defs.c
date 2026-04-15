@@ -679,7 +679,7 @@ extern slurmdb_job_rec_t *slurmdb_create_job_rec(void)
 	job->lft = NO_VAL;
 	job->resvid = NO_VAL;
 #ifdef __METASTACK_OPT_APP
-	job->app_source = NO_VAL8;
+	job->app_source = APP_SOURCE_NOTSET;
 #endif
       	return job;
 }
