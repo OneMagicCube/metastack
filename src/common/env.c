@@ -1493,7 +1493,7 @@ env_array_for_batch_job(char ***dest, const batch_job_launch_msg_t *batch,
 		env_array_overwrite_fmt(dest, "SLURM_JOB_APP_NAME", "%s", batch->app_name);  
 		if (batch->app_version)  
 			env_array_overwrite_fmt(dest, "SLURM_JOB_APP_VERSION", "%s", batch->app_version);  
-		env_array_overwrite_fmt(dest, "SLURM_JOB_APP_SOURCE", "%u", batch->app_source);  
+		env_array_overwrite_fmt(dest, "SLURM_JOB_APP_SOURCE", "%s", app_source_to_str(batch->app_source));  
 	}
 #endif
 
