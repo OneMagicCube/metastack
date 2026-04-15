@@ -1621,7 +1621,7 @@ static void *_wait_extern_pid(void *args)
 	_block_on_pid(pid);
 #endif
 	//info("done with pid %d %d: %m", pid, rc);
-	jobacct = jobacct_gather_remove_task(pid);
+	jobacct = jobacct_gather_remove_task_nopoll(pid);
 	if (jobacct) {
 		step->jobacct->energy.consumed_energy = 0;
 		jobacctinfo_aggregate(step->jobacct, jobacct);
@@ -1722,7 +1722,7 @@ static int _handle_add_extern_pid_internal(stepd_step_rec_t *step, pid_t pid)
 		return SLURM_ERROR;
 	}
 
-	if (jobacct_gather_add_task(pid, &jobacct_id, 1) != SLURM_SUCCESS) {
+	if (jobacct_gather_add_task(pid, &jobacct_id, 0) != SLURM_SUCCESS) {
 		error("%s: Job %u can't add pid %d to jobacct_gather plugin in the extern_step.",
 		      __func__, step->step_id.job_id, pid);
 		return SLURM_ERROR;

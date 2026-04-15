@@ -334,6 +334,16 @@ extern jobacctinfo_t *jobacct_gather_stat_task(pid_t pid, bool update_data);
  */
 extern jobacctinfo_t *jobacct_gather_remove_task(pid_t pid);
 
+/*
+ * Find task by pid and remove from tracked task list WITHOUT triggering a
+ * synchronous poll of all tasks. Intended for high-churn extern/adopted pids
+ * where polling is performed by the periodic jobacct gather thread.
+ *
+ * IN pid - pid of task to find or 0 to find first task
+ * RET ptr (must free jobacctinfo_t if not NULL)
+ */
+extern jobacctinfo_t *jobacct_gather_remove_task_nopoll(pid_t pid);
+
 extern int jobacct_gather_set_proctrack_container_id(uint64_t id);
 extern int jobacct_gather_set_mem_limit(slurm_step_id_t *step_id,
 					uint64_t mem_limit);
