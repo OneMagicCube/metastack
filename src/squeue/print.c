@@ -156,18 +156,20 @@ extern void print_jobs_array(job_info_t *jobs, int size, list_t *format)
 			continue;
 #ifdef __METASTACK_OPT_APP  
 		if (params.app_source_list &&  
-		    list_count(params.app_source_list)) {  
+			list_count(params.app_source_list)) {  
 			bool match = false;  
-			list_itr_t *as_itr = list_iterator_create(  
-				params.app_source_list);  
-			uint8_t *src_val;  
-			while ((src_val = list_next(as_itr))) {  
-				if (*src_val == jobs[i].app_source) {  
-					match = true;  
-					break;  
+			if (jobs[i].app_name && jobs[i].app_name[0]) {
+				list_itr_t *as_itr = list_iterator_create(  
+					params.app_source_list);  
+				uint8_t *src_val;  
+				while ((src_val = list_next(as_itr))) {  
+					if (*src_val == jobs[i].app_source) {  
+						match = true;  
+						break;  
+					}  
 				}  
+				list_iterator_destroy(as_itr);  
 			}  
-			list_iterator_destroy(as_itr);  
 			if (!match)  
 				continue;  
 		}
