@@ -41,6 +41,9 @@
 
 #include "src/common/log.h"
 #include "src/common/plugrack.h"
+#ifdef __METASTACK_BUG_SRUN_REDUNDANT_LOG
+#include "src/common/run_in_daemon.h"
+#endif
 #include "src/common/slurm_protocol_api.h"
 #include "src/interfaces/topology.h"
 #include "src/common/timers.h"
@@ -226,8 +229,12 @@ extern int topology_g_split_hostlist(hostlist_t *hl,
 		 * split_hostlise call.  */
 		nnodes = hostlist_count(hl);
 		buf = hostlist_ranged_string_xmalloc(hl);
-		info("ROUTE: split_hostlist: hl=%s tree_width %u",
-		     buf, tree_width);
+#ifdef __METASTACK_BUG_SRUN_REDUNDANT_LOG
+		/* Suppress ROUTE info on CLI (e.g. srun stderr); daemons unchanged. */
+		if (running_in_daemon())
+#endif
+			info("ROUTE: split_hostlist: hl=%s tree_width %u",
+			     buf, tree_width);
 		xfree(buf);
 	}
 
@@ -246,9 +253,12 @@ extern int topology_g_split_hostlist(hostlist_t *hl,
 			nnodex += hostlist_count((*sp_hl)[j]);
 		}
 		if (nnodex != nnodes) {	/* CLANG false positive */
-			info("ROUTE: number of nodes in split lists (%d)"
-			     " is not equal to number in input list (%d)",
-			     nnodex, nnodes);
+#ifdef __METASTACK_BUG_SRUN_REDUNDANT_LOG
+			if (running_in_daemon())
+#endif
+				info("ROUTE: number of nodes in split lists (%d)"
+				     " is not equal to number in input list (%d)",
+				     nnodex, nnodes);
 		}
 	}
 

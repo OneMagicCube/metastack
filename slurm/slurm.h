@@ -615,6 +615,11 @@ typedef struct sbcast_cred sbcast_cred_t;		/* opaque data type */
 #define __METASTACK_BUG_SPREAD_JOB_CRASH_CTLD
 #endif
 
+// Fixed Bug 117103. The stderr log of the assignment contains redundant information.
+#ifndef __METASTACK_BUG_SRUN_REDUNDANT_LOG
+#define __METASTACK_BUG_SRUN_REDUNDANT_LOG
+#endif
+
 /*****************************************************************************\
  *	DEFINITIONS FOR POSIX VALUES
 \*****************************************************************************/
