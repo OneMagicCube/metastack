@@ -1,0 +1,59 @@
+---
+alwaysApply: true
+---
+
+# Slurm 核心开发与稳定性守则 (生产级二次开发规范)
+
+## 1. 核心设计原则 (Design Philosophy)
+- **最小侵入性**：代码修改必须本着“最小化”原则，优先使用钩子（Hooks）或在现有逻辑中插入少量逻辑，禁止无意义的大规模重构。
+- **宏守护隔离 (Feature Guarding)**：
+  - 所有新增字段、函数、逻辑分支必须使用宏 `#ifdef HAVE_METASTACK`（或其他指定宏）进行包裹。
+  - 确保在未定义该宏时，代码能完全回退至 Slurm 原生逻辑且编译无警告。
+- **回答要求**：
+  - 全程使用 **中文**。
+  - **代码为证**：所有建议必须对照源码，明确指出修改的文件路径及行号，并成对展示修改前后的对比。
+
+## 2. 稳定性与 Core Dump 防范 (Stability & Safety)
+- **内存零容忍**：
+  - 严禁引入内存泄漏。必须使用 Slurm 内置的 `xmalloc()`, `xfree()`, `xstrdup()` 宏。
+  - 结构体销毁时，必须同步实现对应的 `_free_` 或 `_destroy_` 逻辑。
+- **指针深度校验**：
+  - 在解引用任何指针（尤其是 `job_ptr`, `step_ptr`, `node_record`）前，必须进行 `NULL` 校验。
+- **非破坏性流程**：
+  - 严禁在原有流程中因自定义逻辑执行失败而直接调用 `exit()`, `abort()`。
+  - 遇到非预期情况，应通过 `error()` 或 `debug()` 记录日志，并确保程序能平滑回到原本的调度流程中。
+
+## 3. 序列化与滚动升级 (Pack/Unpack & Compatibility)
+- **结构体修改规范**：
+  - 新增字段必须追加在结构体的**末尾**，以减少内存偏移风险。
+- **Pack/Unpack 对称性**：
+  - 修改 `src/common/slurm_protocol_pack.c` 时，`pack` 和 `unpack` 逻辑必须严格对称（顺序、类型、长度一致）。
+- **协议版本兼容 (Rolling Upgrade)**：
+  - 必须通过判断 `rpc_version` 来保证兼容性。
+  - 确保新版本 `slurmctld` 能够正确解析（unpack）旧版本发送的数据包。
+  - 在 `unpack` 逻辑中，如果数据流中不包含新字段（旧版本数据），必须显式赋初始值（如 0 或 NULL）。
+  - **示例格式**：
+    ```c
+    if (rpc_version >= SLURM_MIN_PROTOCOL_VERSION) {
+        #ifdef HAVE_METASTACK
+        packstr(job_ptr->custom_field, buffer);
+        #else
+        packnull(buffer);
+        #endif
+    }
+    ```
+
+## 4. 调度器性能与并发 (Concurrency & Performance)
+- **禁止阻塞主进程**：
+  - 在 `slurmctld` 主逻辑路径（如调度循环）中，严禁引入同步磁盘 I/O 或耗时长耗时的网络请求。
+- **锁一致性 (Locking)**：
+  - 涉及作业、节点、分区状态修改时，必须严格遵守 Slurm 的读写锁（`lock_slurm_conf`）顺序，严禁引入死锁。
+
+## 5. 日志与调试规范 (Logging)
+- **规范化输出**：日志必须包含上下文，推荐格式：
+  `error("Metastack: [%s] failed to process job %u: %m", __func__, job_ptr->job_id);`
+  （注：`%m` 用于打印当前的 `errno` 描述）。
+
+## 6. 自动化流程支持 (Agent Instruction)
+- 当要求执行编译时，请自动检查 `Makefile.am` 改动并决定是否运行 `autogen.sh`。
+- 若编译报错，请自动读取终端最后 50 行输出，分析是否由于缺少 `-devel` 库或 C 语法错误引起，并给出修正后的单行指令。
