@@ -1621,7 +1621,11 @@ static void *_wait_extern_pid(void *args)
 	_block_on_pid(pid);
 #endif
 	//info("done with pid %d %d: %m", pid, rc);
+#ifdef __METASTACK_BUG_EXTERM_ORPHAN_LOCK_CONTENTION
+	jobacct = jobacct_gather_remove_task_extern(pid);
+#else
 	jobacct = jobacct_gather_remove_task(pid);
+#endif
 	if (jobacct) {
 		step->jobacct->energy.consumed_energy = 0;
 		jobacctinfo_aggregate(step->jobacct, jobacct);
