@@ -333,7 +333,7 @@ extern jobacctinfo_t *jobacct_gather_stat_task(pid_t pid, bool update_data);
  * RET ptr (must free jobacctinfo_t if not NULL)
  */
 extern jobacctinfo_t *jobacct_gather_remove_task(pid_t pid);
-#ifdef __METASTACK_BUG_EXTERM_ORPHAN_LOCK_CONTENTION
+#ifdef __METASTACK_BUG_EXTERN_ORPHAN_LOCK_CONTENTION
 extern jobacctinfo_t *jobacct_gather_remove_task_extern(pid_t pid);
 #endif
 

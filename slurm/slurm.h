@@ -558,8 +558,8 @@ typedef struct sbcast_cred sbcast_cred_t;		/* opaque data type */
 #endif
 
 // Fixed bug 121740. Extern orphan path: skip final jobacct _poll_data (task_list_lock contention).
-#ifndef __METASTACK_BUG_EXTERM_ORPHAN_LOCK_CONTENTION
-#define __METASTACK_BUG_EXTERM_ORPHAN_LOCK_CONTENTION
+#ifndef __METASTACK_BUG_EXTERN_ORPHAN_LOCK_CONTENTION
+#define __METASTACK_BUG_EXTERN_ORPHAN_LOCK_CONTENTION
 #endif
 
 #ifndef __METASTACK_BUG_CANNOT_CANCEL_STEP

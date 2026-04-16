@@ -2143,7 +2143,7 @@ error:
 	return jobacct;
 }
 
-#ifdef __METASTACK_BUG_EXTERM_ORPHAN_LOCK_CONTENTION
+#ifdef __METASTACK_BUG_EXTERN_ORPHAN_LOCK_CONTENTION
 /*
  * Like jobacct_gather_remove_task() but does not call _poll_data() first.
  * Used by slurmstepd extern orphan threads to avoid task_list_lock contention.
