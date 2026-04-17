@@ -1429,7 +1429,11 @@ static int _spawn_job_container(stepd_step_rec_t *step)
 	jobacct_id.taskid = step->nodeid; /* Treat node ID as global task ID */
 	jobacct_id.step = step;
 	jobacct_gather_set_proctrack_container_id(step->cont_id);
+#ifdef __METASTACK_BUG_EXTERN_ORPHAN_LOCK_CONTENTION
+	jobacct_gather_add_task(pid, &jobacct_id, 0);
+#else
 	jobacct_gather_add_task(pid, &jobacct_id, 1);
+#endif
 
 	set_job_state(step, SLURMSTEPD_STEP_RUNNING);
 	if (!slurm_conf.job_acct_gather_freq)

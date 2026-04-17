@@ -1726,7 +1726,11 @@ static int _handle_add_extern_pid_internal(stepd_step_rec_t *step, pid_t pid)
 		return SLURM_ERROR;
 	}
 
+#ifdef __METASTACK_BUG_EXTERN_ORPHAN_LOCK_CONTENTION
+	if (jobacct_gather_add_task(pid, &jobacct_id, 0) != SLURM_SUCCESS) {
+#else
 	if (jobacct_gather_add_task(pid, &jobacct_id, 1) != SLURM_SUCCESS) {
+#endif
 		error("%s: Job %u can't add pid %d to jobacct_gather plugin in the extern_step.",
 		      __func__, step->step_id.job_id, pid);
 		return SLURM_ERROR;
