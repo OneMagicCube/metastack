@@ -156,6 +156,18 @@ static pthread_cond_t message_cond = PTHREAD_COND_INITIALIZER;
 static int message_connections = 0;
 static int msg_target_node_id = 0;
 
+#ifdef __METASTACK_BUG_EXTERN_ORPHAN_LOCK_CONTENTION
+static bool _jobacct_no_immediate_poll_enabled(void)
+{
+	if (!slurm_conf.job_acct_gather_params)
+		return false;
+
+	/* JobAcctGatherParams=... ,NoImmediatePoll,... */
+	return (xstrcasestr(slurm_conf.job_acct_gather_params,
+			    "NoImmediatePoll") != NULL);
+}
+#endif
+
 /*
  *  Returns true if "uid" is a "slurm authorized user" - i.e. uid == 0
  *   or uid == slurm user id at this time.
@@ -1622,7 +1634,10 @@ static void *_wait_extern_pid(void *args)
 #endif
 	//info("done with pid %d %d: %m", pid, rc);
 #ifdef __METASTACK_BUG_EXTERN_ORPHAN_LOCK_CONTENTION
-	jobacct = jobacct_gather_remove_task_extern(pid);
+	if (_jobacct_no_immediate_poll_enabled())
+		jobacct = jobacct_gather_remove_task_extern(pid);
+	else
+		jobacct = jobacct_gather_remove_task(pid);
 #else
 	jobacct = jobacct_gather_remove_task(pid);
 #endif
@@ -1727,14 +1742,28 @@ static int _handle_add_extern_pid_internal(stepd_step_rec_t *step, pid_t pid)
 	}
 
 #ifdef __METASTACK_BUG_EXTERN_ORPHAN_LOCK_CONTENTION
-	if (jobacct_gather_add_task(pid, &jobacct_id, 0) != SLURM_SUCCESS) {
+	if (_jobacct_no_immediate_poll_enabled()) {
+		if (jobacct_gather_add_task(pid, &jobacct_id, 0) !=
+		    SLURM_SUCCESS) {
+			error("%s: Job %u can't add pid %d to jobacct_gather plugin in the extern_step.",
+			      __func__, step->step_id.job_id, pid);
+			return SLURM_ERROR;
+		}
+	} else {
+		if (jobacct_gather_add_task(pid, &jobacct_id, 1) !=
+		    SLURM_SUCCESS) {
+			error("%s: Job %u can't add pid %d to jobacct_gather plugin in the extern_step.",
+			      __func__, step->step_id.job_id, pid);
+			return SLURM_ERROR;
+		}
+	}
 #else
 	if (jobacct_gather_add_task(pid, &jobacct_id, 1) != SLURM_SUCCESS) {
-#endif
 		error("%s: Job %u can't add pid %d to jobacct_gather plugin in the extern_step.",
 		      __func__, step->step_id.job_id, pid);
 		return SLURM_ERROR;
 	}
+#endif
 
 
 	if (xstrcasestr(slurm_conf.launch_params, "ulimit_pam_adopt"))
