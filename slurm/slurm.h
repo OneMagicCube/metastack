@@ -2350,18 +2350,18 @@ typedef struct job_descriptor {	/* For submit, allocate, and update requests */
 	char *app;           /* --app combined name, e.g. "vasp-5.7.1" */  
 	char *app_name;      /* parsed app name, e.g. "vasp" */  
 	char *app_version;   /* parsed app version, e.g. "5.7.1" */  
-	uint8_t app_source;  /* APP_SOURCE_NOTSET(0), USER(1), AUTO(2), PORTAL(3), MARKETPLACE(4) */
+	uint8_t app_source;  /* app_source_t values; uint8_t for packed layout */
 #endif
 } job_desc_msg_t;
 
 #ifdef __METASTACK_OPT_APP  
 /*  
  * app_source identifies HOW the app information was attached to a job:  
- *   NOTSET(0)      - Not set / unknown (zero-init safe default)  
- *   USER(1)        - User explicitly specified --app=X on command line  
- *   AUTO(2)        - cli_filter.lua auto-recognized the application type  
- *   PORTAL(3)      - Set by web portal integration (preserved across validation)  
- *   MARKETPLACE(4) - Set by marketplace integration (preserved across validation)  
+ *   NOTSET      - Not set / unknown (zero-init safe default)  
+ *   USER        - User explicitly specified --app=X on command line  
+ *   AUTO        - cli_filter.lua auto-recognized the application type  
+ *   PORTAL      - Set by web portal integration (preserved across validation)  
+ *   MARKETPLACE - Set by marketplace integration (preserved across validation)  
  *  
  * NOTSET must be 0 so that zero-initialized fields are safely "not set"  
  * rather than falsely indicating a specific source.  
@@ -2369,22 +2369,26 @@ typedef struct job_descriptor {	/* For submit, allocate, and update requests */
  * PORTAL and MARKETPLACE are "external" sources: once set, they are NOT  
  * overwritten by the slurmctld validation logic (see _job_create).  
  */  
-#define APP_SOURCE_NOTSET      0  
-#define APP_SOURCE_USER        1  
-#define APP_SOURCE_AUTO        2  
-#define APP_SOURCE_PORTAL      3  
-#define APP_SOURCE_MARKETPLACE 4  
-  
-/* app_source string constants */  
-#define APP_SOURCE_STR_NOTSET      "notset"  
-#define APP_SOURCE_STR_USER        "user"  
-#define APP_SOURCE_STR_AUTO        "auto"  
-#define APP_SOURCE_STR_PORTAL      "portal"  
-#define APP_SOURCE_STR_MARKETPLACE "marketplace"  
-  
-extern const char *app_source_to_str(uint8_t source);  
-/* helper: string -> uint8, returns NO_VAL8 on error */  
-extern uint8_t app_source_from_str(const char *str);  
+typedef enum {
+	APP_SOURCE_NOTSET = 0,
+	APP_SOURCE_USER = 1,
+	APP_SOURCE_AUTO = 2,
+	APP_SOURCE_PORTAL = 3,
+	APP_SOURCE_MARKETPLACE = 4,
+} app_source_t;
+
+/* app_source string constants (parallel to app_source_t) */
+#define APP_SOURCE_STR_NOTSET      "notset"
+#define APP_SOURCE_STR_USER        "user"
+#define APP_SOURCE_STR_AUTO        "auto"
+#define APP_SOURCE_STR_PORTAL      "portal"
+#define APP_SOURCE_STR_MARKETPLACE "marketplace"
+
+extern const char *app_source_to_str(app_source_t source);
+/*
+ * Returns app_source_t value as uint8_t, or NO_VAL8 if str is NULL or unknown.
+ */
+extern uint8_t app_source_from_str(const char *str);
 #endif
 
 typedef struct job_info {
@@ -2555,7 +2559,7 @@ typedef struct job_info {
 #ifdef __METASTACK_OPT_APP  
 	char *app_name;      /* application name, e.g. "vasp" */  
 	char *app_version;   /* application version, e.g. "5.7.1" */  
-	uint8_t app_source;  /* how app was determined, see APP_SOURCE_* */  
+	uint8_t app_source;  /* app_source_t; how app was determined */  
 #endif
 } slurm_job_info_t;
 

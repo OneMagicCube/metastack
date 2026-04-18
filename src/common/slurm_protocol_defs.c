@@ -4332,19 +4332,19 @@ extern void slurm_init_app_desc_msg(app_desc_msg_t *msg)
  *   APP_SOURCE_MARKETPLACE — Set by marketplace/app-store submission  
  * Used in job_record, squeue/sacct filtering, and environment variables.  
  */
-extern const char *app_source_to_str(uint8_t source)  
-{  
-	switch (source) {  
-	case APP_SOURCE_NOTSET:      return APP_SOURCE_STR_NOTSET;  
-	case APP_SOURCE_USER:        return APP_SOURCE_STR_USER;  
-	case APP_SOURCE_AUTO:        return APP_SOURCE_STR_AUTO;  
-	case APP_SOURCE_PORTAL:      return APP_SOURCE_STR_PORTAL;  
-	case APP_SOURCE_MARKETPLACE: return APP_SOURCE_STR_MARKETPLACE;  
-	default:                     return APP_SOURCE_STR_NOTSET;  
-	}  
-}  
-  
-extern uint8_t app_source_from_str(const char *str)  
+extern const char *app_source_to_str(app_source_t source)
+{
+	switch (source) {
+	case APP_SOURCE_NOTSET:      return APP_SOURCE_STR_NOTSET;
+	case APP_SOURCE_USER:        return APP_SOURCE_STR_USER;
+	case APP_SOURCE_AUTO:        return APP_SOURCE_STR_AUTO;
+	case APP_SOURCE_PORTAL:      return APP_SOURCE_STR_PORTAL;
+	case APP_SOURCE_MARKETPLACE: return APP_SOURCE_STR_MARKETPLACE;
+	default:                     return APP_SOURCE_STR_NOTSET;
+	}
+}
+
+extern uint8_t app_source_from_str(const char *str)
 {  
 	if (!str) return NO_VAL8;  
 	if (!xstrcasecmp(str, APP_SOURCE_STR_NOTSET))      return APP_SOURCE_NOTSET;  
