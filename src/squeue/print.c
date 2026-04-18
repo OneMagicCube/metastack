@@ -258,6 +258,52 @@ extern void squeue_filter_jobs_for_json(job_info_msg_t *job_info)
 	for (int i = 0; i < job_info->record_count; i++) {
 		if (!(_filter_job(&job_info->job_array[i])) &&
 		    !(_filter_job_part(job_info->job_array[i].partition))) {
+#ifdef __METASTACK_OPT_APP  
+			/* Filter by --app-source */  
+			if (params.app_source_list &&  
+				list_count(params.app_source_list)) {  
+				bool match = false;  
+				if (job_info->job_array[i].app_name &&  
+					job_info->job_array[i].app_name[0]) {  
+					list_itr_t *as_itr = list_iterator_create(  
+						params.app_source_list);  
+					uint8_t *src_val;  
+					while ((src_val = list_next(as_itr))) {  
+						if (*src_val == job_info->job_array[i].app_source) {  
+							match = true;  
+							break;  
+						}  
+					}  
+					list_iterator_destroy(as_itr);  
+				}  
+				if (!match) {  
+					slurm_free_job_info_members(&job_info->job_array[i]);  
+					continue;  
+				}  
+			}  
+			/* Filter by --app-name */  
+			if (params.app_name_list &&  
+				list_count(params.app_name_list)) {  
+				bool match = false;  
+				if (job_info->job_array[i].app_name &&  
+					job_info->job_array[i].app_name[0]) {  
+					list_itr_t *an_itr = list_iterator_create(  
+						params.app_name_list);  
+					char *name_val;  
+					while ((name_val = list_next(an_itr))) {  
+						if (!xstrcasecmp(name_val, job_info->job_array[i].app_name)) {  
+							match = true;  
+							break;  
+						}  
+					}  
+					list_iterator_destroy(an_itr);  
+				}  
+				if (!match) {  
+					slurm_free_job_info_members(&job_info->job_array[i]);  
+					continue;  
+				}  
+			}  
+#endif 
 			tmp_jobs[new_array_size] = job_info->job_array[i];
 			new_array_size++;
 		} else {
