@@ -144,9 +144,6 @@ static s_p_hashtbl_t *default_partition_tbl;
 static s_p_hashtbl_t *default_watch_dog_tbl = NULL;
 #endif
 static list_t *config_files = NULL;
-#ifdef __METASTACK_OPT_APP  
-static s_p_hashtbl_t *default_app_tbl = NULL;  
-#endif
 
 inline static void _normalize_debug_level(uint16_t *level);
 static int _init_slurm_conf(const char *file_name);
@@ -2079,10 +2076,10 @@ static int _parse_app_name(void **dest, slurm_parser_enum_t type,
 		*leftover += strlen(*leftover);  
 		return 0;  
 	}
-  
-    app_record_t *p = _create_conf_app();  
-  
-    if (value == NULL) {  
+
+	app_record_t *p = _create_conf_app();  
+
+	if (value == NULL) {  
 		error("AppName line missing name value, ignoring");
 		_destroy_app_name(p);  
 		s_p_hashtbl_destroy(tbl);  
@@ -4347,12 +4344,6 @@ _destroy_slurm_conf(void)
 		s_p_hashtbl_destroy(default_watch_dog_tbl);
 		default_watch_dog_tbl = NULL;
 	}
-#endif
-#ifdef __METASTACK_OPT_APP  
-	if (default_app_tbl != NULL) {  
-		s_p_hashtbl_destroy(default_app_tbl);  
-		default_app_tbl = NULL;  
-	}  
 #endif
 	free_slurm_conf(conf_ptr, true);
 	memset(conf_ptr, 0, sizeof(slurm_conf_t));
