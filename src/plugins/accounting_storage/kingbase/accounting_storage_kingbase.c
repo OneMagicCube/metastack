@@ -1714,7 +1714,7 @@ extern int create_cluster_tables(kingbase_conn_t *kingbase_conn, char *cluster_n
  *  
  * Table: <cluster_name>_job_app_table  
  * Primary key: job_db_inx (1:1 with job_table)  
- * Index: idx_app_name for sacct --app-name queries  
+ * Index: idx_app_name for sacct --appname queries  
  *  
  * Fields:  
  *   app_name    - Application name (e.g. "vasp"), from --app or auto-recognition  

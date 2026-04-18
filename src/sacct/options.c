@@ -450,12 +450,12 @@ sacct [<OPTION>]                                                            \n \
      -V, --version: Print version.                                          \n\
      -W, --wckeys:                                                          \n\
                    Only send data about these wckeys.  Default is all.      \n\
-     --app-name:                                                              \n\
+     --appname:                                                               \n\
                    Filter by application name(s), comma separated.           \n\
-     --app-version:                                                           \n\
+     --appversion:                                                            \n\
                    Filter by application version(s), comma separated.        \n\
                    Must be used with --appname.                              \n\
-	 --app-source:                                                              \n\
+     --appsource:                                                             \n\
                    Filter by application source(s), comma separated.           \n\
                    Valid values: user, auto, portal, marketplace.             \n\
      --whole-hetjob[=yes|no]:                                               \n\
@@ -752,9 +752,9 @@ extern void parse_command_line(int argc, char **argv)
                 {"json", optional_argument, 0, OPT_LONG_JSON},
                 {"yaml", optional_argument, 0, OPT_LONG_YAML},
 #ifdef __METASTACK_OPT_APP    
-                {"app-name",       required_argument, 0,    OPT_LONG_APPNAME},    
-                {"app-version",    required_argument, 0,    OPT_LONG_APPVERSION},    
-                {"app-source",     required_argument, 0,    OPT_LONG_APPSOURCE},  
+                {"appname",        required_argument, 0,    OPT_LONG_APPNAME},    
+                {"appversion",     required_argument, 0,    OPT_LONG_APPVERSION},    
+                {"appsource",      required_argument, 0,    OPT_LONG_APPSOURCE},  
 #endif
                 {0,                0,		      0,    0}};
 
@@ -1097,7 +1097,7 @@ extern void parse_command_line(int argc, char **argv)
 			while (tok) {  
 				uint8_t val = app_source_from_str(tok);  
 				if (val == NO_VAL8)  
-					fatal("Invalid --app-source value: '%s'", tok);  
+					fatal("Invalid --appsource value: '%s'", tok);  
 				char *num_str = xstrdup_printf("%u", val);  
 				list_append(job_cond->appsource_list, num_str);  
 				tok = strtok_r(NULL, ",", &save_ptr);  
@@ -1115,7 +1115,7 @@ extern void parse_command_line(int argc, char **argv)
 #ifdef __METASTACK_OPT_APP    
 	if (job_cond->appversion_list && list_count(job_cond->appversion_list)
 	    && (!job_cond->appname_list || !list_count(job_cond->appname_list))) {
-		fatal("--app-version must be used with --app-name");    
+		fatal("--appversion must be used with --appname");    
 	}
 #endif
 	if (!job_cond->step_list || !list_count(job_cond->step_list)) {

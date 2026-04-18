@@ -361,10 +361,10 @@ typedef struct {
 	List userid_list;	/* list of char * */
 	List wckey_list;	/* list of char * */
 #ifdef __METASTACK_OPT_APP  
-	List appname_list;      /* list of char *, --app-name filter values */  
-	List appversion_list;   /* list of char *, --app-version filter values */  
+	List appname_list;      /* list of char *, --appname filter values */  
+	List appversion_list;   /* list of char *, --appversion filter values */  
 	List appsource_list;    /* list of char * (numeric strings "0","1",...),  
-	                         * --app-source filter values, converted from  
+	                         * --appsource filter values, converted from  
 	                         * string names to numeric for SQL WHERE clause */  
 #endif
 } slurmdb_job_cond_t;
