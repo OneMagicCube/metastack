@@ -1733,7 +1733,7 @@ static void _usage(void)
 "			 [--watch-dog]\n"
 #endif
 #ifdef __METASTACK_OPT_APP  
-"            [--app=name-version|list] [--app-name=name] [--app-version=version]\n"
+"            [--app=name-version|list]\n"
 "            [--app-source=source]\n"
 #endif
 "            executable [args...]\n");
