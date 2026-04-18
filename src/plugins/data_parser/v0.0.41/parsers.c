@@ -5063,6 +5063,25 @@ static int DUMP_FUNC(JOB_INFO_STDERR)(const parser_t *const parser, void *obj,
 	return SLURM_SUCCESS;
 }
 
+#ifdef __METASTACK_OPT_APP
+PARSE_DISABLED(JOB_INFO_APP_SOURCE)
+
+static int DUMP_FUNC(JOB_INFO_APP_SOURCE)(const parser_t *const parser,
+					  void *obj, data_t *dst, args_t *args)
+{
+	slurm_job_info_t *job = obj;
+
+	xassert(job);
+	if (job->app_name && job->app_name[0])
+		data_set_string(dst,
+				app_source_to_str((app_source_t)job->app_source));
+	else
+		data_set_string(dst, "");
+
+	return SLURM_SUCCESS;
+}
+#endif
+
 static int _parse_timestamp(const parser_t *const parser, time_t *time_ptr,
 			    data_t *src, args_t *args, data_t *parent_path)
 {
@@ -7747,6 +7766,14 @@ static const parser_t PARSER_ARRAY(JOB_INFO)[] = {
 	add_parse(UINT32, wait4switch, "maximum_switch_wait_time", "Maximum time to wait for switches in seconds"),
 	add_parse(STRING, wckey, "wckey", "Workload characterization key"),
 	add_parse(STRING, work_dir, "current_working_directory", "Working directory to use for the job"),
+#ifdef __METASTACK_OPT_APP
+	add_parse(STRING, app_name, "application_name",
+		  "Application name associated with the job"),
+	add_parse(STRING, app_version, "application_version",
+		  "Application version string"),
+	add_cparse(JOB_INFO_APP_SOURCE, "application_source",
+		   "How application identity was assigned (see app_source_t)"),
+#endif
 };
 #undef add_parse
 #undef add_parse_overload
@@ -9812,6 +9839,9 @@ static const parser_t parsers[] = {
 	addpc(JOB_INFO_STDIN, slurm_job_info_t, NEED_NONE, STRING, NULL),
 	addpc(JOB_INFO_STDOUT, slurm_job_info_t, NEED_NONE, STRING, NULL),
 	addpc(JOB_INFO_STDERR, slurm_job_info_t, NEED_NONE, STRING, NULL),
+#ifdef __METASTACK_OPT_APP
+	addpc(JOB_INFO_APP_SOURCE, slurm_job_info_t, NEED_NONE, STRING, NULL),
+#endif
 	addpc(JOB_USER, slurmdb_job_rec_t, NEED_NONE, STRING, NULL),
 	addpcp(JOB_CONDITION_SUBMIT_TIME, TIMESTAMP_NO_VAL, slurmdb_job_cond_t, NEED_NONE, NULL),
 	addpcp(JOB_DESC_MSG_RLIMIT_CPU, UINT64_NO_VAL, job_desc_msg_t, NEED_NONE, "Per-process CPU limit, in seconds."),
