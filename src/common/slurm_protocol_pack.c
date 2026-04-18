@@ -6840,7 +6840,7 @@ static void _pack_app_desc_msg(app_desc_msg_t *msg, buf_t *buffer,
 		packstr(msg->version, buffer);  
 		packstr(msg->description, buffer);  
 		packstr(msg->watchdog, buffer);  
-		pack8(msg->default_flag, buffer);  
+		pack8(msg->default_spec, buffer);  
 	}  
 #endif  
 }  
@@ -6857,7 +6857,7 @@ static int _unpack_app_desc_msg(app_desc_msg_t **msg, buf_t *buffer,
 		safe_unpackstr(&tmp_ptr->version, buffer);  
 		safe_unpackstr(&tmp_ptr->description, buffer);  
 		safe_unpackstr(&tmp_ptr->watchdog, buffer);  
-		safe_unpack8(&tmp_ptr->default_flag, buffer);  
+		safe_unpack8(&tmp_ptr->default_spec, buffer);  
 	}  
 #endif  
 	return SLURM_SUCCESS;  

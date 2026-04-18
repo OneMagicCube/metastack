@@ -3279,8 +3279,8 @@ typedef struct {
 	char    *description;   /* description */  
 	char    *watchdog;      /* bound watchdog name */
 	char    *combined_name; /* "app_name-version", hash key (slurmctld only) */
-	bool     default_flag;  /* is this the default app */  
-} app_record_t;  
+	bool     default_flag;  /* true if this app is the cluster default */  
+} app_record_t;
 #endif
 typedef struct delete_partition_msg {
 	char *name;		/* name of partition to be delete */
@@ -3362,22 +3362,29 @@ typedef struct slurm_ctl_conf_info_msg_app {
 	time_t last_update;  
 	uint32_t record_count;  
 	app_record_t *app_array;  
-} slurm_ctl_conf_info_msg_app_t;  
+} slurm_ctl_conf_info_msg_app_t;
+
+/*
+ * Tri-state for app_desc_msg_t.default_spec (RPC create/update).
+ * Semantics differ from app_record_t.default_flag (runtime bool).
+ */
+#define APP_DESC_DEFAULT_NO     ((uint8_t)0)
+#define APP_DESC_DEFAULT_YES    ((uint8_t)1)
+#define APP_DESC_DEFAULT_IGNORE ((uint8_t)0xff) /* update: leave default unchanged */
 
 /*  
  * app_desc_msg_t - RPC message for create/update app.  
  *  
  * Used by both REQUEST_CREATE_APP and REQUEST_UPDATE_APP.  
  * For update: fields set to NULL mean "don't change".  
- * default_flag uses tri-state: 0=set non-default, 1=set default,  
- * 0xff=not specified (don't change, initialized by slurm_init_app_desc_msg).  
+ * default_spec uses APP_DESC_DEFAULT_* (tri-state).
  */
 typedef struct app_desc_msg {  
 	char *app_name;  
 	char *version;  
 	char *description;  
 	char *watchdog;  
-	uint8_t default_flag; /* 0=no, 1=yes, 0xff=not set (for update) */  
+	uint8_t default_spec; /* APP_DESC_DEFAULT_* */
 } app_desc_msg_t;  
   
 /* Message for delete app */  
@@ -3397,7 +3404,7 @@ extern int slurm_delete_app(delete_app_msg_t *app_msg);
  * slurm_free_app_info_msg     — free the entire RESPONSE_BUILD_APP_INFO message  
  * slurm_free_app_desc_msg     — free a REQUEST_CREATE/UPDATE_APP message  
  * slurm_free_delete_app_msg   — free a REQUEST_DELETE_APP message  
- * slurm_init_app_desc_msg     — zero-initialize with default_flag=0xff (unset)  
+ * slurm_init_app_desc_msg     — default_spec=APP_DESC_DEFAULT_IGNORE  
  */   
 extern void slurm_free_app_info_msg(slurm_ctl_conf_info_msg_app_t *msg);  
 extern void slurm_free_app_info_members(app_record_t *app);  

@@ -4319,7 +4319,7 @@ extern void slurm_free_delete_app_msg(delete_app_msg_t *msg)
 extern void slurm_init_app_desc_msg(app_desc_msg_t *msg)  
 {  
 	memset(msg, 0, sizeof(app_desc_msg_t));  
-	msg->default_flag = 0xff; /* not set */  
+	msg->default_spec = APP_DESC_DEFAULT_IGNORE;  
 }  
 #endif
 

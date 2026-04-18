@@ -905,9 +905,9 @@ static int _parse_app_options(int argc, char **argv, app_desc_msg_t *app_msg)
 			if (!xstrcasecmp(val, "YES") ||    
 			    !xstrcasecmp(val, "1") ||    
 			    !xstrcasecmp(val, "TRUE"))    
-				app_msg->default_flag = 1;    
+				app_msg->default_spec = APP_DESC_DEFAULT_YES;    
 			else    
-				app_msg->default_flag = 0;    
+				app_msg->default_spec = APP_DESC_DEFAULT_NO;    
 			update_cnt++;    
 		}    
 	}    

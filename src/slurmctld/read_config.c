@@ -1637,7 +1637,7 @@ extern buf_t *pack_all_app(uid_t uid, uint16_t protocol_version)
  * RET SLURM_SUCCESS or ESLURM_* error code.  
  *  
  * On create: validates uniqueness, creates record, sets default if requested.  
- * On update: modifies description/watchdog/default_flag of existing record.  
+ * On update: modifies description/watchdog/default_spec of existing record.  
  * Both paths: update last_app_update timestamp and schedule state file save.  
  *  
  * Default app management: at most one app can be default. Setting a new  
@@ -1690,7 +1690,7 @@ extern int update_app(app_desc_msg_t *app_desc, bool create_flag)
 			app_ptr->description = xstrdup(app_desc->description);  
 		if (app_desc->watchdog)  
 			app_ptr->watchdog = xstrdup(app_desc->watchdog);  
-		if (app_desc->default_flag == 1) {  
+		if (app_desc->default_spec == APP_DESC_DEFAULT_YES) {  
 			/* Clear old default if any */  
 			if (default_app_loc && default_app_loc != app_ptr)  
 				default_app_loc->default_flag = false;  
@@ -1718,8 +1718,9 @@ extern int update_app(app_desc_msg_t *app_desc, bool create_flag)
 			xfree(app_ptr->watchdog);  
 			app_ptr->watchdog = xstrdup(app_desc->watchdog);  
 		}  
-		if (app_desc->default_flag != 0xff) {  
-			bool new_default = (app_desc->default_flag == 1);  
+		if (app_desc->default_spec != APP_DESC_DEFAULT_IGNORE) {
+			bool new_default =
+				(app_desc->default_spec == APP_DESC_DEFAULT_YES);
 			if (new_default && !app_ptr->default_flag) {  
 				if (default_app_loc && default_app_loc != app_ptr)  
 					default_app_loc->default_flag = false;  
