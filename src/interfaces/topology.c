@@ -229,12 +229,8 @@ extern int topology_g_split_hostlist(hostlist_t *hl,
 		 * split_hostlise call.  */
 		nnodes = hostlist_count(hl);
 		buf = hostlist_ranged_string_xmalloc(hl);
-#ifdef __METASTACK_BUG_SRUN_REDUNDANT_LOG
-		/* Suppress ROUTE info on CLI (e.g. srun stderr); daemons unchanged. */
-		if (running_in_daemon())
-#endif
-			info("ROUTE: split_hostlist: hl=%s tree_width %u",
-			     buf, tree_width);
+		info("ROUTE: split_hostlist: hl=%s tree_width %u",
+				buf, tree_width);
 		xfree(buf);
 	}
 
