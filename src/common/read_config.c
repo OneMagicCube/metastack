@@ -2087,7 +2087,7 @@ static int _parse_app_name(void **dest, slurm_parser_enum_t type,
 	}
 	p->app_name = xstrdup(value);  
   
-    if (!s_p_get_string(&p->version, "Version", tbl)) {  
+    if (value == NULL || value[0] == '\0') {
         error("AppName=%s missing required Version, ignoring",  
               p->app_name ? p->app_name : "?");  
         _destroy_app_name(p);  
