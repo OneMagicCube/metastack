@@ -7794,18 +7794,19 @@ explicitly specify an application. Only one application may be the default.
 Default value is "no".  
 .IP  
 
-Example:  
-.nf  
-  AppName=vasp Version=5.7.1 Description="VASP 5.7.1" Watchdog=vasp_dog Default=yes  
-  AppName=gromacs Version=2024.1 Description="GROMACS 2024.1"  
-.fi  
+.TP
+\fBExample:\fR
+.nf
+AppName=vasp Version=5.7.1 Description="VASP 5.7.1" Watchdog=vasp_dog Default=yes  
+AppName=gromacs Version=2024.1 Description="GROMACS 2024.1"  
+.fi
+.IP
 
-\fBNOTE\fR:
+.TP
+\fBNOTE:\fR
 The "appname" and "version" are concatenated using "-" to form a unique index. 
 Therefore, it is not recommended to include "-" in the "app-name".
-
-.RE  
-.IP  
+.RE
 .\" __METASTACK_OPT_APP
 
 .TP
