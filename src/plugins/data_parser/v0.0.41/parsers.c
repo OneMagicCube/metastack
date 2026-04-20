@@ -1688,6 +1688,25 @@ static int DUMP_FUNC(JOB_USER)(const parser_t *const parser, void *obj,
 	return SLURM_SUCCESS;
 }
 
+#ifdef __METASTACK_OPT_APP
+PARSE_DISABLED(JOB_APP_SOURCE)
+
+static int DUMP_FUNC(JOB_APP_SOURCE)(const parser_t *const parser, void *obj,
+				     data_t *dst, args_t *args)
+{
+	slurmdb_job_rec_t *job = obj;
+
+	xassert(job);
+	if (job->app_name && job->app_name[0])
+		data_set_string(dst,
+				app_source_to_str((app_source_t)job->app_source));
+	else
+		data_set_string(dst, "");
+
+	return SLURM_SUCCESS;
+}
+#endif
+
 PARSE_DISABLED(SLURMDB_RPC_ID)
 
 static int DUMP_FUNC(SLURMDB_RPC_ID)(const parser_t *const parser, void *obj,
@@ -6894,6 +6913,15 @@ static const parser_t PARSER_ARRAY(JOB)[] = {
 	add_parse(WCKEY_TAG, wckey, "wckey", "Workload characterization key"),
 	add_skip(wckeyid),
 	add_parse(STRING, work_dir, "working_directory", "Path to current working directory"),
+#ifdef __METASTACK_OPT_APP
+	add_parse(STRING, app_name, "application_name",
+		  "Application name associated with the job"),
+	add_parse(STRING, app_version, "application_version",
+		  "Application version string"),
+	add_complex_parser(slurmdb_job_rec_t, JOB_APP_SOURCE, false,
+			   "application_source",
+			   "How application identity was assigned (see app_source_t)"),
+#endif
 };
 #undef add_parse
 #undef add_skip
@@ -9794,6 +9822,9 @@ static const parser_t parsers[] = {
 	addpcp(JOB_STDIN, STRING, slurmdb_job_rec_t, NEED_NONE, NULL),
 	addpcp(JOB_STDOUT, STRING, slurmdb_job_rec_t, NEED_NONE, NULL),
 	addpcp(JOB_STDERR, STRING, slurmdb_job_rec_t, NEED_NONE, NULL),
+#ifdef __METASTACK_OPT_APP
+	addpcp(JOB_APP_SOURCE, STRING, slurmdb_job_rec_t, NEED_NONE, NULL),
+#endif
 	addpcp(JOB_ASSOC_ID, ASSOC_SHORT_PTR, slurmdb_job_rec_t, NEED_ASSOC, NULL),
 	addpca(QOS_PREEMPT_LIST, STRING, slurmdb_qos_rec_t, NEED_QOS, NULL),
 	addpcp(STEP_NODES, HOSTLIST, slurmdb_step_rec_t, NEED_TRES, NULL),
@@ -9843,6 +9874,9 @@ static const parser_t parsers[] = {
 	addpc(JOB_INFO_APP_SOURCE, slurm_job_info_t, NEED_NONE, STRING, NULL),
 #endif
 	addpc(JOB_USER, slurmdb_job_rec_t, NEED_NONE, STRING, NULL),
+#ifdef __METASTACK_OPT_APP
+	addpc(JOB_APP_SOURCE, slurmdb_job_rec_t, NEED_NONE, STRING, NULL),
+#endif
 	addpcp(JOB_CONDITION_SUBMIT_TIME, TIMESTAMP_NO_VAL, slurmdb_job_cond_t, NEED_NONE, NULL),
 	addpcp(JOB_DESC_MSG_RLIMIT_CPU, UINT64_NO_VAL, job_desc_msg_t, NEED_NONE, "Per-process CPU limit, in seconds."),
 	addpcp(JOB_DESC_MSG_RLIMIT_FSIZE, UINT64_NO_VAL, job_desc_msg_t, NEED_NONE, "Largest file that can be created, in bytes."),

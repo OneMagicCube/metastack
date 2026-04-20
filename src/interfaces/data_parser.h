@@ -568,6 +568,7 @@ typedef enum {
 	DATA_PARSER_OPENAPI_KILL_JOBS_RESP, /* openapi_kill_jobs_resp_t */
 	DATA_PARSER_OPENAPI_KILL_JOBS_RESP_PTR, /* openapi_kill_jobs_resp_t* */
 	DATA_PARSER_JOB_DESC_MSG_CRON_ENTRY, /* cron_entry_t * */
+	DATA_PARSER_JOB_APP_SOURCE, /* slurmdb_job_rec_t app_source as string */
 	DATA_PARSER_TYPE_MAX
 } data_parser_type_t;
 
