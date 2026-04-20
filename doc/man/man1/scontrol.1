@@ -183,6 +183,8 @@ below.
 .TP  
 \fBcreate app\fR AppName=<\fIname\fR> Version=<\fIversion\fR> [Description=<\fIdesc\fR>] [Watchdog=<\fIwatchdog\fR>] [Default=yes|no]  
 Create a new application configuration record. AppName and Version are required.  
+The "appname" and "version" are concatenated using "-" to form a unique index. 
+Therefore, it is not recommended to include "-" in the "app-name".
 .IP  
 .\" __METASTACK_OPT_APP 
 

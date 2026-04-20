@@ -7800,6 +7800,10 @@ Example:
   AppName=vasp Version=5.7.1 Description="VASP 5.7.1" Watchdog=vasp_dog Default=yes  
   AppName=gromacs Version=2024.1 Description="GROMACS 2024.1"  
 .fi  
+
+\fBNOTE\fR:
+The "appname" and "version" are concatenated using "-" to form a unique index. 
+Therefore, it is not recommended to include "-" in the "app-name".
 .IP  
 .\" __METASTACK_OPT_APP
 
