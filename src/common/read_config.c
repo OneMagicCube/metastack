@@ -2085,18 +2085,19 @@ static int _parse_app_name(void **dest, slurm_parser_enum_t type,
 		s_p_hashtbl_destroy(tbl);  
 		return 0;  
 	}
-	p->app_name = xstrdup(value);  
-  
-    if (value == NULL || value[0] == '\0') {
-        error("AppName=%s missing required Version, ignoring",  
-              p->app_name ? p->app_name : "?");  
-        _destroy_app_name(p);  
-        s_p_hashtbl_destroy(tbl);  
-        return 0; 
-    }  
-  
-    s_p_get_string(&p->description, "Description", tbl);  
-    s_p_get_string(&p->watchdog, "Watchdog", tbl);  
+	p->app_name = xstrdup(value);
+
+	if (!s_p_get_string(&p->version, "Version", tbl) ||
+	    !p->version || !p->version[0]) {
+		error("AppName=%s missing required Version, ignoring",
+		      p->app_name ? p->app_name : "?");
+		_destroy_app_name(p);
+		s_p_hashtbl_destroy(tbl);
+		return 0;
+	}
+
+	s_p_get_string(&p->description, "Description", tbl);
+	s_p_get_string(&p->watchdog, "Watchdog", tbl);
   
     if (!s_p_get_boolean(&p->default_flag, "Default", tbl))  
         p->default_flag = false;  
