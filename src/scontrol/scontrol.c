@@ -919,6 +919,51 @@ static int _parse_app_options(int argc, char **argv, app_desc_msg_t *app_msg)
  * Validates required fields (AppName, Version), sends REQUEST_CREATE_APP  
  * to slurmctld, and prints the created app's combined name on success.  
  */
+int scontrol_create_app(int argc, char **argv)    
+{    
+	int rc = SLURM_SUCCESS;    
+	app_desc_msg_t app_msg;   
+	slurm_init_app_desc_msg(&app_msg);    
+  
+	if (_parse_app_options(argc, argv, &app_msg) == 0) {    
+		exit_code = 1;    
+		error("No parameters specified");    
+		goto cleanup;    
+	}    
+  
+	if (!app_msg.app_name) {    
+		exit_code = 1;    
+		error("AppName must be given.");    
+		goto cleanup;    
+	}    
+	if (!app_msg.version) {    
+		exit_code = 1;    
+		error("Version must be given.");    
+		goto cleanup;    
+	}    
+  
+	if (slurm_create_app(&app_msg)) {    
+		exit_code = 1;    
+		slurm_perror("Error creating the app");    
+		rc = slurm_get_errno();    
+		goto cleanup;    
+	}    
+  
+	printf("App created: %s-%s\n", app_msg.app_name, app_msg.version);    
+  
+cleanup:    
+	xfree(app_msg.app_name);    
+	xfree(app_msg.version);    
+	xfree(app_msg.description);    
+	xfree(app_msg.watchdog);    
+	return rc;
+}    
+
+/*  
+ * scontrol_create_app — Handle "scontrol create app AppName=X Version=Y ..."  
+ * Validates required fields (AppName, Version), sends REQUEST_CREATE_APP  
+ * to slurmctld, and prints the created app's combined name on success.  
+ */
 static int _parse_app_options(int argc, char **argv, app_desc_msg_t *app_msg)      
 {      
 	int update_cnt = 0;      
