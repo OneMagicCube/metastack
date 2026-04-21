@@ -2598,7 +2598,7 @@ static void _update_it(int argc, char **argv)
 		fprintf(stderr, "No valid entity in update command\n");
 		fprintf(stderr, "Input line must include \"NodeName\", ");
 #ifdef __METASTACK_OPT_APP
-		fprintf(stderr, "\"App\"");
+		fprintf(stderr, "\"App\", ");
 #endif
 		fprintf(stderr, "\"PartitionName\", \"Reservation\", "
 			"\"JobId\", or \"SlurmctldDebug\"\n");
