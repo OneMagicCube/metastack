@@ -1277,23 +1277,59 @@ static int _build_single_appline_info(app_record_t *app)
 	return 0;    
 }
 
-static int _build_all_app_info(void)  
-{  
-	app_record_t **app_array = NULL;  
-	int count = 0;  
-	int i;  
-  
-	count = slurm_conf_app_array(&app_array);  
-	if (count == 0) {  
-		debug("No AppName information available");  
-		return SLURM_ERROR;  
-	}  
-  
-	for (i = 0; i < count; i++)  
-		_build_single_appline_info(app_array[i]);  
-  
-	return SLURM_SUCCESS;  
-}  
+static int _build_all_app_info(void)    
+{    
+	app_record_t **app_array = NULL;    
+	int count = 0;    
+	int i;    
+    
+	count = slurm_conf_app_array(&app_array);    
+	if (count == 0) {    
+		debug("No AppName information available");    
+		return SLURM_ERROR;    
+	}    
+    
+	for (i = 0; i < count; i++) {    
+		app_record_t *app = app_array[i];    
+    
+		if (app->version && strchr(app->version, ',')) {    
+			char *ver_list = xstrdup(app->version);    
+			char *save_ptr = NULL;    
+			char *tok;    
+			bool first = true;    
+    
+			tok = strtok_r(ver_list, ",", &save_ptr);    
+			while (tok) {    
+				while (*tok == ' ' || *tok == '\t')    
+					tok++;    
+				char *end = tok + strlen(tok) - 1;    
+				while (end > tok &&    
+				       (*end == ' ' || *end == '\t'))    
+					*end-- = '\0';    
+    
+				if (*tok != '\0') {    
+					app_record_t tmp;    
+					memset(&tmp, 0, sizeof(tmp));    
+					tmp.app_name = app->app_name;    
+					tmp.version = tok;    
+					tmp.description = app->description;    
+					tmp.watchdog = app->watchdog;    
+					tmp.default_flag = first ?    
+						app->default_flag : false;    
+    
+					_build_single_appline_info(&tmp);    
+					first = false;    
+				}    
+				tok = strtok_r(NULL, ",", &save_ptr);    
+			}    
+			xfree(ver_list);    
+		} else {    
+			_build_single_appline_info(app);    
+		}    
+	}    
+    
+	return SLURM_SUCCESS;    
+}
 
 #define APP_STATE_VERSION "METASTACK_APP_STATE_001"
 
@@ -1652,37 +1688,39 @@ extern int update_app(app_desc_msg_t *app_desc, bool create_flag)
 		info("%s: missing AppName", __func__);  
 		return ESLURM_INVALID_APP_NAME;  
 	}  
-	if (!app_desc->version || !app_desc->version[0]) {  
-		info("%s: missing Version for AppName=%s",  
-		     __func__, app_desc->app_name);  
-		return ESLURM_INVALID_APP_NAME;  
-	}  
   
 	/* Validate watchdog reference if specified */  
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION  
 	if (app_desc->watchdog && app_desc->watchdog[0]) {  
 		if (!list_find_first(watch_dog_list,  
-		                     &list_find_watch_dog,  
-		                     app_desc->watchdog)) {  
-			info("%s: AppName=%s Version=%s references "  
-			     "undefined Watchdog '%s'",  
-			     __func__, app_desc->app_name,  
-			     app_desc->version, app_desc->watchdog);  
+					 &list_find_watch_dog,  
+					 app_desc->watchdog)) {  
+			info("%s: AppName=%s references "  
+				 "undefined Watchdog '%s'",  
+				 __func__, app_desc->app_name,  
+				 app_desc->watchdog);  
 			return ESLURM_INVALID_APP_WATCHDOG;  
 		}  
 	}  
 #endif  
   
-	app_ptr = find_app_record(app_desc->app_name, app_desc->version);  
-  
 	if (create_flag) {  
+		/* --- CREATE --- */  
+		if (!app_desc->version || !app_desc->version[0]) {  
+			info("%s: missing Version for AppName=%s",  
+				 __func__, app_desc->app_name);  
+			return ESLURM_INVALID_APP_NAME;  
+		}  
+		app_ptr = find_app_record(app_desc->app_name,  
+							  app_desc->version);  
 		if (app_ptr) {  
 			info("%s: App '%s-%s' already exists",  
-			     __func__, app_desc->app_name, app_desc->version);  
+				 __func__, app_desc->app_name,  
+				 app_desc->version);  
 			return ESLURM_APP_ALREADY_EXISTS;  
 		}  
 		app_ptr = create_app_record(app_desc->app_name,  
-		                            app_desc->version);  
+								app_desc->version);  
 		if (!app_ptr)  
 			return SLURM_ERROR;  
   
@@ -1691,55 +1729,218 @@ extern int update_app(app_desc_msg_t *app_desc, bool create_flag)
 		if (app_desc->watchdog)  
 			app_ptr->watchdog = xstrdup(app_desc->watchdog);  
 		if (app_desc->default_spec == APP_DESC_DEFAULT_YES) {  
-			/* Clear old default if any */  
 			if (default_app_loc && default_app_loc != app_ptr)  
 				default_app_loc->default_flag = false;  
 			app_ptr->default_flag = true;  
 			xfree(default_app_name);  
 			xstrfmtcat(default_app_name, "%s-%s",  
-			           app_ptr->app_name, app_ptr->version);  
+					   app_ptr->app_name, app_ptr->version);  
 			default_app_loc = app_ptr;  
 		}  
-		last_app_update = time(NULL);
-		schedule_app_save();
-		info("App created: %s-%s", app_ptr->app_name, app_ptr->version);  
+		last_app_update = time(NULL);  
+		schedule_app_save();  
+		info("App created: %s-%s", app_ptr->app_name,  
+			 app_ptr->version);  
 	} else {  
-		/* update existing */  
-		if (!app_ptr) {  
-			info("%s: App '%s-%s' not found",  
-			     __func__, app_desc->app_name, app_desc->version);  
-			return ESLURM_APP_NOT_FOUND;  
+		/* --- UPDATE --- */  
+		if (app_desc->version && app_desc->version[0]) {  
+			/* * Version field contains +/- prefixed tokens  
+			 * from scontrol_process_plus_minus(), e.g.:  
+			 * "+6.0.0,+6.1.0" for Version+=6.0.0,6.1.0  
+			 * "-4.7.1"        for Version-=4.7.1  
+			 * Or plain version for legacy single-version update.  
+			 */  
+			char *ver_cpy = xstrdup(app_desc->version);  
+			char *save_ptr = NULL;  
+			char *tok = strtok_r(ver_cpy, ",", &save_ptr);  
+			int rc = SLURM_SUCCESS;  
+  
+			while (tok) {  
+				while (*tok == ' ' || *tok == '\t')  
+					tok++;  
+  
+				if (*tok == '+') {  
+					/* Add version */  
+					tok++;  
+					if (find_app_record(app_desc->app_name,  
+										tok)) {  
+						info("%s: App '%s-%s' already "  
+							 "exists, skipping",  
+							 __func__,  
+							 app_desc->app_name, tok);  
+						tok = strtok_r(NULL, ",",  
+									   &save_ptr);  
+						continue;  
+					}  
+					app_ptr = create_app_record(  
+						app_desc->app_name, tok);  
+					if (!app_ptr) {  
+						rc = SLURM_ERROR;  
+						break;  
+					}  
+					/* * Inherit description and watchdog  
+					 * from an existing sibling record.  
+					 */  
+					app_record_t *sibling = NULL;  
+					ListIterator itr =  
+						list_iterator_create(app_list);  
+					while ((sibling = list_next(itr))) {  
+						if (sibling != app_ptr &&  
+							!xstrcmp(sibling->app_name,  
+									 app_desc->app_name))  
+							break;  
+					}  
+					list_iterator_destroy(itr);  
+					if (sibling) {  
+						if (sibling->description)  
+							app_ptr->description =  
+								xstrdup(sibling->description);  
+						if (sibling->watchdog)  
+							app_ptr->watchdog =  
+								xstrdup(sibling->watchdog);  
+					}  
+					/* Override with explicit values */  
+					if (app_desc->description) {  
+						xfree(app_ptr->description);  
+						app_ptr->description =  
+							xstrdup(app_desc->description);  
+					}  
+					if (app_desc->watchdog) {  
+						xfree(app_ptr->watchdog);  
+						app_ptr->watchdog =  
+							xstrdup(app_desc->watchdog);  
+					}  
+					info("App version added: %s-%s",  
+						 app_desc->app_name, tok);  
+  
+				} else if (*tok == '-') {  
+					/* Remove version */  
+					tok++;  
+					app_ptr = find_app_record(  
+						app_desc->app_name, tok);  
+					if (!app_ptr) {  
+						info("%s: App '%s-%s' not found,"  
+							 " skipping",  
+							 __func__,  
+							 app_desc->app_name, tok);  
+						tok = strtok_r(NULL, ",",  
+									   &save_ptr);  
+						continue;  
+					}  
+					if (app_ptr->default_flag &&  
+						default_app_loc == app_ptr) {  
+						xfree(default_app_name);  
+						default_app_loc = NULL;  
+					}  
+					xhash_pop_str(app_hash_table,  
+								  app_ptr->combined_name);  
+					char *find_key[2];  
+					find_key[0] = app_ptr->app_name;  
+					find_key[1] = app_ptr->version;  
+					list_delete_first(app_list,  
+									  &list_find_app,  
+									  find_key);  
+					info("App version removed: %s-%s",  
+						 app_desc->app_name, tok);  
+  
+				} else {  
+					/* * No +/- prefix: legacy single-version  
+					 * update (update properties of existing  
+					 * record).  
+					 */  
+					app_ptr = find_app_record(  
+						app_desc->app_name, tok);  
+					if (!app_ptr) {  
+						info("%s: App '%s-%s' not found",  
+							 __func__,  
+							 app_desc->app_name, tok);  
+						rc = ESLURM_APP_NOT_FOUND;  
+						break;  
+					}  
+					if (app_desc->description) {  
+						xfree(app_ptr->description);  
+						app_ptr->description =  
+							xstrdup(app_desc->description);  
+					}  
+					if (app_desc->watchdog) {  
+						xfree(app_ptr->watchdog);  
+						app_ptr->watchdog =  
+							xstrdup(app_desc->watchdog);  
+					}  
+					if (app_desc->default_spec !=  
+						APP_DESC_DEFAULT_IGNORE) {  
+						bool new_default =  
+							(app_desc->default_spec ==  
+							 APP_DESC_DEFAULT_YES);  
+						if (new_default &&  
+							!app_ptr->default_flag) {  
+							if (default_app_loc &&  
+								default_app_loc !=  
+								app_ptr)  
+								default_app_loc->default_flag = false;  
+							app_ptr->default_flag = true;  
+							xfree(default_app_name);  
+							xstrfmtcat(default_app_name,  
+									   "%s-%s",  
+									   app_ptr->app_name,  
+									   app_ptr->version);  
+							default_app_loc = app_ptr;  
+						} else if (!new_default &&  
+								   app_ptr->default_flag) {  
+							app_ptr->default_flag = false;  
+							if (default_app_loc ==  
+								app_ptr) {  
+								xfree(default_app_name);  
+								default_app_loc = NULL;  
+							}  
+						}  
+					}  
+					info("App updated: %s-%s",  
+						 app_ptr->app_name,  
+						 app_ptr->version);  
+				}  
+				tok = strtok_r(NULL, ",", &save_ptr);  
+			}  
+			xfree(ver_cpy);  
+			last_app_update = time(NULL);  
+			schedule_app_save();  
+			return rc;  
 		}  
-		if (app_desc->description) {  
-			xfree(app_ptr->description);  
-			app_ptr->description = xstrdup(app_desc->description);  
-		}  
-		if (app_desc->watchdog) {  
-			xfree(app_ptr->watchdog);  
-			app_ptr->watchdog = xstrdup(app_desc->watchdog);  
-		}  
-		if (app_desc->default_spec != APP_DESC_DEFAULT_IGNORE) {
-			bool new_default =
-				(app_desc->default_spec == APP_DESC_DEFAULT_YES);
-			if (new_default && !app_ptr->default_flag) {  
-				if (default_app_loc && default_app_loc != app_ptr)  
-					default_app_loc->default_flag = false;  
-				app_ptr->default_flag = true;  
-				xfree(default_app_name);  
-				xstrfmtcat(default_app_name, "%s-%s",  
-				           app_ptr->app_name, app_ptr->version);  
-				default_app_loc = app_ptr;  
-			} else if (!new_default && app_ptr->default_flag) {  
-				app_ptr->default_flag = false;  
-				if (default_app_loc == app_ptr) {  
-					xfree(default_app_name);  
-					default_app_loc = NULL;  
+  
+		/* * No version specified — update description/watchdog/default  
+		 * for ALL versions of this app.  
+		 */  
+		{  
+			bool found_any = false;  
+			ListIterator itr = list_iterator_create(app_list);  
+			while ((app_ptr = list_next(itr))) {  
+				if (xstrcmp(app_ptr->app_name,  
+							app_desc->app_name))  
+					continue;  
+				found_any = true;  
+				if (app_desc->description) {  
+					xfree(app_ptr->description);  
+					app_ptr->description =  
+						xstrdup(app_desc->description);  
+				}  
+				if (app_desc->watchdog) {  
+					xfree(app_ptr->watchdog);  
+					app_ptr->watchdog =  
+						xstrdup(app_desc->watchdog);  
 				}  
 			}  
+			list_iterator_destroy(itr);  
+  
+			if (!found_any) {  
+				info("%s: no app records found for AppName=%s",  
+					 __func__, app_desc->app_name);  
+				return ESLURM_APP_NOT_FOUND;  
+			}  
+			last_app_update = time(NULL);  
+			schedule_app_save();  
+			info("App updated (all versions): %s",  
+				 app_desc->app_name);  
 		}  
-		last_app_update = time(NULL);
-		schedule_app_save();
-		info("App updated: %s-%s", app_ptr->app_name, app_ptr->version);  
 	}  
 	return SLURM_SUCCESS;  
 }
