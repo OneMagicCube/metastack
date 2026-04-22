@@ -1187,6 +1187,35 @@ static void _remove_version_from_list(char **versions_ptr, const char *ver)
 	*versions_ptr = new_versions;    
 }
 
+/*    
+ * _version_in_list - Check if a version string is in a comma-separated list.    
+ * IN versions - comma-separated version list (e.g. "5.7.1,5.7.2,6.0")    
+ * IN ver      - version to find    
+ * RET true if found    
+ */    
+static bool _version_in_list(const char *versions, const char *ver)    
+{    
+	if (!versions || !ver)    
+		return false;    
+	char *copy = xstrdup(versions);    
+	char *save_ptr = NULL;    
+	char *tok = strtok_r(copy, ",", &save_ptr);    
+	while (tok) {    
+		while (*tok == ' ' || *tok == '\t')    
+			tok++;    
+		char *end = tok + strlen(tok) - 1;    
+		while (end > tok && (*end == ' ' || *end == '\t'))    
+			*end-- = '\0';    
+		if (!xstrcmp(tok, ver)) {    
+			xfree(copy);    
+			return true;    
+		}    
+		tok = strtok_r(NULL, ",", &save_ptr);    
+	}    
+	xfree(copy);    
+	return false;    
+}  
+
 /*  
  * _app_versions_add - Add comma-separated versions to app's version list.  
  *   Skips duplicates. ver_copy tokens are "+"-prefixed.  
@@ -1294,35 +1323,6 @@ static void _remove_combined_hash_for_app(app_record_t *app_ptr)
 		tok = strtok_r(NULL, ",", &save_ptr);    
 	}    
 	xfree(copy);    
-}  
-  
-/*    
- * _version_in_list - Check if a version string is in a comma-separated list.    
- * IN versions - comma-separated version list (e.g. "5.7.1,5.7.2,6.0")    
- * IN ver      - version to find    
- * RET true if found    
- */    
-static bool _version_in_list(const char *versions, const char *ver)    
-{    
-	if (!versions || !ver)    
-		return false;    
-	char *copy = xstrdup(versions);    
-	char *save_ptr = NULL;    
-	char *tok = strtok_r(copy, ",", &save_ptr);    
-	while (tok) {    
-		while (*tok == ' ' || *tok == '\t')    
-			tok++;    
-		char *end = tok + strlen(tok) - 1;    
-		while (end > tok && (*end == ' ' || *end == '\t'))    
-			*end-- = '\0';    
-		if (!xstrcmp(tok, ver)) {    
-			xfree(copy);    
-			return true;    
-		}    
-		tok = strtok_r(NULL, ",", &save_ptr);    
-	}    
-	xfree(copy);    
-	return false;    
 }  
   
 static void _list_delete_app(void *app_entry)    
