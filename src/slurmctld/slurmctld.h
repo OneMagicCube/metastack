@@ -742,8 +742,7 @@ extern app_record_t *create_app_record(const char *name, const char *version);
  * IN version - version string  
  * RET pointer to app record or NULL if not found  
  */  
-extern app_record_t *find_app_record(const char *app_name,  
-				     const char *version);  
+extern app_record_t *find_app_record(const char *app_name)
   
 /*  
  * find_app_record_by_combined - find an app record by combined name  
