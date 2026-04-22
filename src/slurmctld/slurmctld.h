@@ -382,37 +382,44 @@ extern time_t last_watch_dog_update;	/* time of last update to watch_dog records
 #endif
 
 #ifdef __METASTACK_OPT_APP
-/*  
- * App subsystem global state (slurmctld only).  
- *  
- * Dual data structure design:  
- *   app_list       - Authoritative owner of all app_record_t instances.  
- *                    Destructor _list_delete_app frees all members.  
- *   app_hash_table - Non-owning hash index keyed by combined_name  
- *                    ("name-version") for O(1) lookup. freefunc=NULL.  
- *  
- * Invariant: every record in app_hash_table has a corresponding entry  
- * in app_list. On cleanup, free hash table FIRST (drops references),  
- * then flush/free list (frees actual memory).  
- *  
- * default_app_name / default_app_loc track the app with Default=yes.  
- * At most one app can be the default at any time.  
- */
-extern List app_list;                   /* app preset list */  
-extern xhash_t *app_hash_table;        /* hash table indexed by combined_name */  
-extern time_t last_app_update;          /* time of last update to app records */  
-extern char *default_app_name;          /* combined name of default app, e.g. "general-1.0" */  
-extern app_record_t *default_app_loc;   /* pointer to default app record */  
-/* Save the state of all app records to file */  
-extern int dump_all_app_state(void);  
-  
-/*  
- * Load app state from file, recover on slurmctld restart.  
- * IN recover - 0 = use config file only (reconfigure)  
- *              1+ = recover saved state from disk  
- * RET SLURM_SUCCESS or error code  
+/*    
+ * App subsystem data structures (app_list, app_hash_table, app_combined_hash).    
+ *    
+ * Data model: AppName is the unique primary key. Each app_record_t has    
+ * an optional comma-separated versions list. Two hash tables provide    
+ * O(1) lookup for different use cases:    
+ *    
+ *   app_list       - Owning list of app_record_t.    
+ *                    Destructor _list_delete_app frees all members.    
+ *   app_hash_table - Non-owning hash index keyed by app_name    
+ *                    for O(1) lookup. freefunc=NULL.    
+ *   app_combined_hash - Owning hash of app_combined_entry_t, keyed by    
+ *                    "appname-version" for O(1) --app= validation.    
+ *                    freefunc frees the entry wrapper.    
+ *    
+ * Invariant: every record in app_hash_table has a corresponding entry    
+ * in app_list. On cleanup, free combined hash FIRST, then main hash    
+ * (drops references), then flush/free list (frees actual memory).    
+ *    
+ * default_app_name / default_app_loc track the app with Default=yes.    
+ * At most one app can be the default at any time.    
  */  
-extern int load_all_app_state(uint16_t reconfig_flags);
+extern List app_list;                   /* app preset list */    
+extern xhash_t *app_hash_table;        /* primary hash table indexed by app_name */    
+extern xhash_t *app_combined_hash;     /* secondary hash table indexed by "appname-version" */    
+extern time_t last_app_update;          /* time of last update to app records */    
+extern char *default_app_name;          /* app_name of default app, e.g. "general" */    
+extern app_record_t *default_app_loc;   /* pointer to default app record */    
+/* Save the state of all app records to file */    
+extern int dump_all_app_state(void);    
+    
+/*    
+ * Load app state from file, recover on slurmctld restart.    
+ * IN recover - 0 = use config file only (reconfigure)    
+ *              1+ = recover saved state from disk    
+ * RET SLURM_SUCCESS or error code    
+ */    
+extern int load_all_app_state(uint16_t reconfig_flags);  
 #endif
 
 #ifdef __METASTACK_OPT_HIGH_THROUGHPUT_SRUN_JOB_COM

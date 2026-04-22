@@ -899,15 +899,15 @@ static int _parse_app_options(int argc, char **argv, app_desc_msg_t *app_msg)
 			xfree(app_msg->app_name);  
 			app_msg->app_name = xstrdup(val);  
 			update_cnt++;  
-		} else if (!xstrncasecmp(tag, "Version", MAX(tag_len, 1))) {  
-			xfree(app_msg->version);  
-			if (plus_minus)  
-				app_msg->version =  
-					scontrol_process_plus_minus(  
-						plus_minus, val, false);  
-			else  
-				app_msg->version = xstrdup(val);  
-			update_cnt++;  
+		} else if (!xstrncasecmp(tag, "Version", MAX(tag_len, 1))) {    
+			xfree(app_msg->versions);    
+			if (plus_minus)    
+				app_msg->versions =    
+					scontrol_process_plus_minus(    
+						plus_minus, val, false);    
+			else    
+				app_msg->versions = xstrdup(val);    
+			update_cnt++;
 		} else if (!xstrncasecmp(tag, "Description", MAX(tag_len, 3))) {  
 			xfree(app_msg->description);  
 			app_msg->description = xstrdup(val);  
@@ -929,88 +929,85 @@ static int _parse_app_options(int argc, char **argv, app_desc_msg_t *app_msg)
 	return update_cnt;  
 }
 
-/*  
- * scontrol_create_app — Handle "scontrol create app AppName=X Version=Y ..."  
- * Validates required fields (AppName, Version), sends REQUEST_CREATE_APP  
- * to slurmctld, and prints the created app's combined name on success.  
- */
-int scontrol_create_app(int argc, char **argv)    
-{    
-	int rc = SLURM_SUCCESS;    
-	app_desc_msg_t app_msg;   
-	slurm_init_app_desc_msg(&app_msg);    
-  
-	if (_parse_app_options(argc, argv, &app_msg) == 0) {    
-		exit_code = 1;    
-		error("No parameters specified");    
-		goto cleanup;    
-	}    
-  
-	if (!app_msg.app_name) {    
-		exit_code = 1;    
-		error("AppName must be given.");    
-		goto cleanup;    
-	}    
-	if (!app_msg.version) {    
-		exit_code = 1;    
-		error("Version must be given.");    
-		goto cleanup;    
-	}    
-  
-	if (slurm_create_app(&app_msg)) {    
-		exit_code = 1;    
-		slurm_perror("Error creating the app");    
-		rc = slurm_get_errno();    
-		goto cleanup;    
-	}    
-  
-	printf("App created: %s-%s\n", app_msg.app_name, app_msg.version);    
-  
-cleanup:    
-	xfree(app_msg.app_name);    
-	xfree(app_msg.version);    
-	xfree(app_msg.description);    
-	xfree(app_msg.watchdog);    
-	return rc;
-}    
-
-/*  
- * scontrol_update_app — Handle "scontrol update app AppName=X Version=Y ..."  
- * Sends REQUEST_UPDATE_APP to slurmctld. Only specified fields are modified.  
- */
-int scontrol_update_app(int argc, char **argv)
-{
-	int rc = SLURM_SUCCESS;
-	app_desc_msg_t app_msg;
-	slurm_init_app_desc_msg(&app_msg);
-
-	if (_parse_app_options(argc, argv, &app_msg) == 0) {
-		exit_code = 1;
-		error("No parameters specified");
-		goto cleanup;
-	}
-
-	if (!app_msg.app_name) {
-		exit_code = 1;
-		error("AppName must be given.");
-		goto cleanup;
-	}
-	/* Version is optional for update */
-
-	if (slurm_update_app(&app_msg)) {
-		exit_code = 1;
-		slurm_perror("Error updating the app");
-		rc = slurm_get_errno();
-		goto cleanup;
-	}
-
-cleanup:
-	xfree(app_msg.app_name);
-	xfree(app_msg.version);
-	xfree(app_msg.description);
-	xfree(app_msg.watchdog);
-	return rc;
+/*    
+ * scontrol_create_app — Handle "scontrol create app AppName=X [Version=Y] ..."    
+ * Validates required fields (AppName), sends REQUEST_CREATE_APP    
+ * to slurmctld, and prints the created app name on success.    
+ * Version is optional.    
+ */  
+int scontrol_create_app(int argc, char **argv)      
+{      
+	int rc = SLURM_SUCCESS;      
+	app_desc_msg_t app_msg;     
+	slurm_init_app_desc_msg(&app_msg);      
+    
+	if (_parse_app_options(argc, argv, &app_msg) == 0) {      
+		exit_code = 1;      
+		error("No parameters specified");      
+		goto cleanup;      
+	}      
+    
+	if (!app_msg.app_name) {      
+		exit_code = 1;      
+		error("AppName must be given.");      
+		goto cleanup;      
+	}      
+	/* Version is optional — omitting it means no version restriction */    
+    
+	if (slurm_create_app(&app_msg)) {      
+		exit_code = 1;      
+		slurm_perror("Error creating the app");      
+		rc = slurm_get_errno();      
+		goto cleanup;      
+	}      
+    
+	printf("App created: %s\n", app_msg.app_name);      
+    
+cleanup:      
+	xfree(app_msg.app_name);      
+	xfree(app_msg.versions);      
+	xfree(app_msg.description);      
+	xfree(app_msg.watchdog);      
+	return rc;  
 }
+
+/*    
+ * scontrol_update_app — Handle "scontrol update app AppName=X [Version=Y] ..."    
+ * Sends REQUEST_UPDATE_APP to slurmctld. Only specified fields are modified.    
+ */  
+int scontrol_update_app(int argc, char **argv)  
+{  
+	int rc = SLURM_SUCCESS;  
+	app_desc_msg_t app_msg;  
+	slurm_init_app_desc_msg(&app_msg);  
+  
+	if (_parse_app_options(argc, argv, &app_msg) == 0) {  
+		exit_code = 1;  
+		error("No parameters specified");  
+		goto cleanup;  
+	}  
+  
+	if (!app_msg.app_name) {  
+		exit_code = 1;  
+		error("AppName must be given.");  
+		goto cleanup;  
+	}  
+	/* Version is optional for update */  
+  
+	if (slurm_update_app(&app_msg)) {  
+		exit_code = 1;  
+		slurm_perror("Error updating the app");  
+		rc = slurm_get_errno();  
+		goto cleanup;  
+	}  
+  
+cleanup:  
+	xfree(app_msg.app_name);  
+	xfree(app_msg.versions);  
+	xfree(app_msg.description);  
+	xfree(app_msg.watchdog);  
+	return rc;  
+}  
 #endif /* __METASTACK_OPT_APP */
 
 /*

@@ -4274,16 +4274,15 @@ extern void slurm_free_ctl_conf_watch_dog(slurm_ctl_conf_info_msg_watch_dog_t * 
 #endif
 
 #ifdef __METASTACK_OPT_APP
-extern void slurm_free_app_info_members(app_record_t *app)  
-{  
-	if (app) {  
-		xfree(app->app_name);  
-		xfree(app->version);  
-		xfree(app->combined_name);  
-		xfree(app->description);  
-		xfree(app->watchdog);  
-	}  
-} 
+extern void slurm_free_app_info_members(app_record_t *app)    
+{    
+	if (app) {    
+		xfree(app->app_name);    
+		xfree(app->versions);    
+		xfree(app->description);    
+		xfree(app->watchdog);    
+	}    
+}
   
 extern void slurm_free_app_info_msg(slurm_ctl_conf_info_msg_app_t *msg)  
 {  
@@ -4297,16 +4296,16 @@ extern void slurm_free_app_info_msg(slurm_ctl_conf_info_msg_app_t *msg)
 	}  
 }  
   
-extern void slurm_free_app_desc_msg(app_desc_msg_t *msg)  
-{  
-	if (msg) {  
-		xfree(msg->app_name);  
-		xfree(msg->version);  
-		xfree(msg->description);  
-		xfree(msg->watchdog);  
-		xfree(msg);  
-	}  
-}  
+extern void slurm_free_app_desc_msg(app_desc_msg_t *msg)    
+{    
+	if (msg) {    
+		xfree(msg->app_name);    
+		xfree(msg->versions);    
+		xfree(msg->description);    
+		xfree(msg->watchdog);    
+		xfree(msg);    
+	}    
+}
   
 extern void slurm_free_delete_app_msg(delete_app_msg_t *msg)  
 {  
