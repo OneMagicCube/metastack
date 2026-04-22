@@ -1119,41 +1119,71 @@ static void _app_combined_entry_free(void *item)
  * If versions is NULL (no version restriction), creates a single entry    
  * with key = app_name. Otherwise creates one entry per version.    
  */    
-static void _rebuild_combined_hash_for_app(app_record_t *app_ptr)    
-{    
-	if (!app_ptr || !app_ptr->app_name)    
-		return;    
+static void _rebuild_combined_hash_for_app(app_record_t *app_ptr)  
+{  
+	if (!app_ptr || !app_ptr->app_name)  
+		return;  
   
-	if (!app_ptr->versions || !app_ptr->versions[0]) {    
-		/* No version restriction: key = app_name itself */    
-		app_combined_entry_t *e = xmalloc(sizeof(*e));    
-		e->combined_name = xstrdup(app_ptr->app_name);    
-		e->app_ptr = app_ptr;    
-		xhash_add(app_combined_hash, e);    
-		return;    
-	}    
+	if (!app_ptr->versions || !app_ptr->versions[0]) {  
+		/* No version restriction: key = app_name itself */  
+		app_combined_entry_t *existing;  
+		existing = (app_combined_entry_t *)xhash_get_str(  
+				app_combined_hash, app_ptr->app_name);  
+		if (existing) {  
+			error("%s: combined hash key collision: "  
+			      "app \"%s\" (no version) collides with "  
+			      "app \"%s\", key=\"%s\". Skipping.",  
+			      __func__, app_ptr->app_name,  
+			      existing->app_ptr->app_name,  
+			      app_ptr->app_name);  
+			return;  
+		}  
+		app_combined_entry_t *e = xmalloc(sizeof(*e));  
+		e->combined_name = xstrdup(app_ptr->app_name);  
+		e->app_ptr = app_ptr;  
+		xhash_add(app_combined_hash, e);  
+		return;  
+	}  
   
-	/* Iterate comma-separated versions */    
-	char *copy = xstrdup(app_ptr->versions);    
-	char *save_ptr = NULL;    
-	char *tok = strtok_r(copy, ",", &save_ptr);    
-	while (tok) {    
-		while (*tok == ' ' || *tok == '\t')    
-			tok++;    
-		char *end = tok + strlen(tok) - 1;    
-		while (end > tok && (*end == ' ' || *end == '\t'))    
-			*end-- = '\0';    
-		if (*tok) {    
-			app_combined_entry_t *e = xmalloc(sizeof(*e));    
-			e->combined_name = NULL;    
-			xstrfmtcat(e->combined_name, "%s-%s",    
-				   app_ptr->app_name, tok);    
-			e->app_ptr = app_ptr;    
-			xhash_add(app_combined_hash, e);    
-		}    
-		tok = strtok_r(NULL, ",", &save_ptr);    
-	}    
-	xfree(copy);    
+	/* Iterate comma-separated versions */  
+	char *copy = xstrdup(app_ptr->versions);  
+	char *save_ptr = NULL;  
+	char *tok = strtok_r(copy, ",", &save_ptr);  
+	while (tok) {  
+		while (*tok == ' ' || *tok == '\t')  
+			tok++;  
+		char *end = tok + strlen(tok) - 1;  
+		while (end > tok && (*end == ' ' || *end == '\t'))  
+			*end-- = '\0';  
+		if (*tok) {  
+			char *combined_key = NULL;  
+			app_combined_entry_t *existing;  
+  
+			xstrfmtcat(combined_key, "%s-%s",  
+				   app_ptr->app_name, tok);  
+  
+			existing = (app_combined_entry_t *)xhash_get_str(  
+					app_combined_hash, combined_key);  
+			if (existing) {  
+				error("%s: combined hash key collision: "  
+				      "app \"%s\" version \"%s\" collides "  
+				      "with app \"%s\", key=\"%s\". "  
+				      "Skipping.",  
+				      __func__, app_ptr->app_name, tok,  
+				      existing->app_ptr->app_name,  
+				      combined_key);  
+				xfree(combined_key);  
+			} else {  
+				app_combined_entry_t *e =  
+					xmalloc(sizeof(*e));  
+				e->combined_name = combined_key;  
+				e->app_ptr = app_ptr;  
+				xhash_add(app_combined_hash, e);  
+			}  
+		}  
+		tok = strtok_r(NULL, ",", &save_ptr);  
+	}  
+	xfree(copy);  
 }
 
 /*    
