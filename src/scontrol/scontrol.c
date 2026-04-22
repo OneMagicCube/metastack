@@ -794,8 +794,7 @@ _print_config_watchdog(char *config_param)
 }
 #endif
 
-#ifdef __METASTACK_OPT_APP  
-#ifdef __METASTACK_OPT_APP    
+#ifdef __METASTACK_OPT_APP     
 static void    
 _print_config_app(char *config_param)    
 {    
