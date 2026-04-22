@@ -2014,9 +2014,8 @@ extern int update_app(app_desc_msg_t *app_desc, bool create_flag)
 		 *   "5.7.1,5.7.2"    → replace entire versions list      
 		 */      
 		char *ver_copy = xstrdup(app_desc->versions);      
-		bool has_plus = (strchr(ver_copy, '+') != NULL);      
-		bool has_minus = (ver_copy[0] == '-' ||      
-				  strstr(ver_copy, ",-") != NULL);      
+		bool has_plus = (ver_copy[0] == '+' || strstr(ver_copy, ",+") != NULL);  
+		bool has_minus = (ver_copy[0] == '-' || strstr(ver_copy, ",-") != NULL);    
     
 		if (has_plus && has_minus) {      
 			info("%s: cannot mix + and - in Version for AppName=%s",      
