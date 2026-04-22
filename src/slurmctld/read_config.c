@@ -1597,7 +1597,7 @@ static int _build_all_app_info(void)
 	return SLURM_SUCCESS;      
 }
 
-#define APP_STATE_VERSION "METASTACK_APP_STATE_002"  
+#define APP_STATE_VERSION "METASTACK_APP_STATE_001"  
   
 typedef struct {    
 	buf_t *buffer;    
