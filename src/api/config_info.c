@@ -600,23 +600,23 @@ void slurm_write_ctl_conf ( slurm_ctl_conf_info_msg_t * slurm_ctl_conf_ptr,
 			"###############################################\n");  
 		fprintf(fp, "#\n#\n");  
   
-		app_record_t *write_app = slurm_app_ptr->app_array;  
-		for (i = 0; i < slurm_app_ptr->record_count; i++) {  
-			if (!write_app[i].app_name)  
-				continue;  
-			fprintf(fp, "AppName=%s", write_app[i].app_name);  
-			if (write_app[i].version)  
-				fprintf(fp, " Version=%s", write_app[i].version);  
-			if (write_app[i].description)  
-				fprintf(fp, " Description=\"%s\"",  
-				        write_app[i].description);  
-			if (write_app[i].watchdog)  
-				fprintf(fp, " Watchdog=%s",  
-				        write_app[i].watchdog);  
-			if (write_app[i].default_flag)  
-				fprintf(fp, " Default=YES");  
-			fprintf(fp, "\n");  
-		}  
+		app_record_t *write_app = slurm_app_ptr->app_array;    
+		for (i = 0; i < slurm_app_ptr->record_count; i++) {    
+			if (!write_app[i].app_name)    
+				continue;    
+			fprintf(fp, "AppName=%s", write_app[i].app_name);    
+			if (write_app[i].versions && write_app[i].versions[0])      
+				fprintf(fp, " Version=%s", write_app[i].versions);      
+			if (write_app[i].description && write_app[i].description[0])      
+				fprintf(fp, " Description=\"%s\"",      
+						write_app[i].description);      
+			if (write_app[i].watchdog && write_app[i].watchdog[0])      
+				fprintf(fp, " Watchdog=%s",      
+						write_app[i].watchdog);
+			if (write_app[i].default_flag)
+				fprintf(fp, " Default=YES");
+			fprintf(fp, "\n");    
+		}
 	}  
 #endif
 
@@ -2412,37 +2412,38 @@ int slurm_load_app(time_t update_time,
 /*  
  * slurm_print_app_info - format a single app record for display  
  */  
-char *slurm_sprint_app_info(app_record_t *app_ptr, int one_liner)  
-{  
-	if (!app_ptr)  
-		return NULL;  
-  
-	char *out = NULL;  
-	char *line_end = (one_liner) ? " " : "\n   ";  
-  
-	xstrfmtcat(out, "AppName=%s", app_ptr->app_name);  
-	xstrfmtcat(out, " Version=%s", app_ptr->version);  
-	xstrcat(out, line_end);  
-  
-	if (app_ptr->description) {
-		xstrfmtcat(out, "Description=\"%s\"", app_ptr->description);
-		if (app_ptr->watchdog)
-			xstrfmtcat(out, " Watchdog=%s", app_ptr->watchdog);
-	} else if (app_ptr->watchdog) {
-		xstrfmtcat(out, "Watchdog=%s", app_ptr->watchdog);
-	}
-	if (app_ptr->default_flag)
-		xstrcat(out, " Default=YES");
-	else
-		xstrcat(out, " Default=NO");  
-  
-	if (one_liner)  
-		xstrcat(out, "\n");  
-	else  
-		xstrcat(out, "\n\n");  
-  
-	return out;  
-}  
+char *slurm_sprint_app_info(app_record_t *app_ptr, int one_liner)      
+{      
+	if (!app_ptr)      
+		return NULL;      
+      
+	char *out = NULL;      
+	char *line_end = (one_liner) ? " " : "\n   ";      
+      
+	xstrfmtcat(out, "AppName=%s", app_ptr->app_name);      
+	if (app_ptr->versions && app_ptr->versions[0])      
+		xstrfmtcat(out, " Version=%s", app_ptr->versions);      
+	xstrcat(out, line_end);
+      
+	if (app_ptr->description && app_ptr->description[0]) {    
+		xstrfmtcat(out, "Description=\"%s\"", app_ptr->description);    
+		if (app_ptr->watchdog && app_ptr->watchdog[0])    
+			xstrfmtcat(out, " Watchdog=%s", app_ptr->watchdog);    
+	} else if (app_ptr->watchdog && app_ptr->watchdog[0]) {    
+		xstrfmtcat(out, "Watchdog=%s", app_ptr->watchdog);    
+	}    
+	if (app_ptr->default_flag)    
+		xstrcat(out, " Default=YES");    
+	else    
+		xstrcat(out, " Default=NO");      
+      
+	if (one_liner)      
+		xstrcat(out, "\n");      
+	else      
+		xstrcat(out, "\n\n");      
+      
+	return out;      
+}
   
 void slurm_print_app_info(FILE *out, app_record_t *app_ptr, int one_liner)  
 {  
@@ -2454,6 +2455,42 @@ void slurm_print_app_info(FILE *out, app_record_t *app_ptr, int one_liner)
 	fprintf(out, "%s", print_this);  
 	xfree(print_this);  
 }  
+
+void slurm_print_app_list(slurm_ctl_conf_info_msg_app_t *app_info)  
+{  
+	if (!app_info)  
+		return;  
+  
+	printf("%-20s  %s\n", "NAME", "DESCRIPTION");  
+	printf("%-20s  %s\n", "----", "-----------");  
+  
+	for (uint32_t j = 0; j < app_info->record_count; j++) {  
+		app_record_t *a = &app_info->app_array[j];  
+		if (a->versions && a->versions[0]) {  
+			char *ver_list = xstrdup(a->versions);  
+			char *save_ptr = NULL;  
+			char *tok = strtok_r(ver_list, ",", &save_ptr);  
+			while (tok) {  
+				while (*tok == ' ' || *tok == '\t')  
+					tok++;  
+				if (*tok != '\0') {  
+					char *combined = NULL;  
+					xstrfmtcat(combined, "%s-%s",  
+					           a->app_name, tok);  
+					printf("%-20s  %s\n", combined,  
+					       a->description ?  
+					       a->description : "");  
+					xfree(combined);  
+				}  
+				tok = strtok_r(NULL, ",", &save_ptr);  
+			}  
+			xfree(ver_list);  
+		} else {  
+			printf("%-20s  %s\n", a->app_name,  
+			       a->description ? a->description : "");  
+		}  
+	}  
+}
 #endif /* __METASTACK_OPT_APP */
 
 /*

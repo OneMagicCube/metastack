@@ -3259,28 +3259,33 @@ typedef struct {
 
 } watch_dog_record_t;
 #endif
-#ifdef __METASTACK_OPT_APP
-/*  
- * app_record_t - Core application record.  
- *  
- * Represents a registered application (e.g. "vasp-5.7.1") in the system.  
- * Managed by slurmctld; stored in both app_list (ownership) and  
- * app_hash_table (O(1) lookup by combined_name, references only).  
- *  
- * Lifecycle: created by slurm.conf parsing or scontrol create app,  
- * persisted to app_state file, recovered on slurmctld restart.  
- *  
- * Memory ownership: app_list owns the records via _list_delete_app;  
- * app_hash_table holds non-owning references (freefunc=NULL).  
- */
-typedef struct {  
-	char    *app_name;      /* application name, required */  
-	char    *version;       /* version string, required */  
-	char    *description;   /* description */  
-	char    *watchdog;      /* bound watchdog name */
-	char    *combined_name; /* "app_name-version", hash key (slurmctld only) */
-	bool     default_flag;  /* true if this app is the cluster default */  
-} app_record_t;
+#ifdef __METASTACK_OPT_APP  
+/*    
+ * app_record_t - Core application record.    
+ *    
+ * Represents a registered application (e.g. "vasp") in the system.    
+ * AppName is the unique primary key. Version is an optional comma-separated    
+ * list of allowed versions (like partition's AllowAccounts).    
+ *    
+ * Managed by slurmctld; stored in app_list (ownership) and    
+ * app_hash_table (O(1) lookup by app_name, references only).    
+ * A secondary hash (app_combined_hash) maps "appname-version" strings    
+ * to app records for O(1) --app validation.    
+ *    
+ * Lifecycle: created by slurm.conf parsing or scontrol create app,    
+ * persisted to app_state file, recovered on slurmctld restart.    
+ *    
+ * Memory ownership: app_list owns the records via _list_delete_app;    
+ * app_hash_table holds non-owning references (freefunc=NULL).    
+ * app_combined_hash owns its entry wrappers (freefunc frees them).    
+ */  
+typedef struct {    
+	char    *app_name;      /* application name, unique primary key */    
+	char    *versions;      /* comma-separated version list, optional (NULL = no version restriction) */    
+	char    *description;   /* description */    
+	char    *watchdog;      /* bound watchdog name */  
+	bool     default_flag;  /* true if this app is the cluster default */    
+} app_record_t;  
 #endif
 typedef struct delete_partition_msg {
 	char *name;		/* name of partition to be delete */
@@ -3372,24 +3377,24 @@ typedef struct slurm_ctl_conf_info_msg_app {
 #define APP_DESC_DEFAULT_YES    ((uint8_t)1)
 #define APP_DESC_DEFAULT_IGNORE ((uint8_t)0xff) /* update: leave default unchanged */
 
-/*  
- * app_desc_msg_t - RPC message for create/update app.  
- *  
- * Used by both REQUEST_CREATE_APP and REQUEST_UPDATE_APP.  
- * For update: fields set to NULL mean "don't change".  
- * default_spec uses APP_DESC_DEFAULT_* (tri-state).
- */
-typedef struct app_desc_msg {  
-	char *app_name;  
-	char *version;  
-	char *description;  
-	char *watchdog;  
-	uint8_t default_spec; /* APP_DESC_DEFAULT_* */
-} app_desc_msg_t;  
+/*    
+ * app_desc_msg_t - RPC message for create/update app.    
+ *    
+ * Used by both REQUEST_CREATE_APP and REQUEST_UPDATE_APP.    
+ * For update: fields set to NULL mean "don't change".    
+ * default_spec uses APP_DESC_DEFAULT_* (tri-state).  
+ */  
+typedef struct app_desc_msg {    
+	char *app_name;    
+	char *versions;     /* comma-separated version list, optional */    
+	char *description;    
+	char *watchdog;    
+	uint8_t default_spec; /* APP_DESC_DEFAULT_* */  
+} app_desc_msg_t;
   
 /* Message for delete app */  
 typedef struct delete_app_msg {  
-	char *name; /* combined name e.g. "vasp-5.7.1" */  
+	char *name; /* app_name, e.g. "vasp" */
 } delete_app_msg_t;  
   
 /* API functions */  
@@ -3412,7 +3417,8 @@ extern void slurm_free_app_desc_msg(app_desc_msg_t *msg);
 extern void slurm_free_delete_app_msg(delete_app_msg_t *msg);  
 extern void slurm_init_app_desc_msg(app_desc_msg_t *msg);  
 extern void slurm_print_app_info(FILE *out, app_record_t *app_ptr, int one_liner);  
-extern char *slurm_sprint_app_info(app_record_t *app_ptr, int one_liner);  
+extern char *slurm_sprint_app_info(app_record_t *app_ptr, int one_liner);
+extern void slurm_print_app_list(slurm_ctl_conf_info_msg_app_t *app_info);
 #endif
 
 typedef struct will_run_response_msg {

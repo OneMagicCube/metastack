@@ -2436,14 +2436,15 @@ static void _slurm_rpc_create_app(slurm_msg_t *msg)
 		info("%s AppName=%s Version=%s: %s",  
 		     __func__,  
 		     app_desc_ptr->app_name ? app_desc_ptr->app_name : "?",  
-		     app_desc_ptr->version ? app_desc_ptr->version : "?",  
+		     app_desc_ptr->versions ? app_desc_ptr->versions : "?",  
 		     slurm_strerror(error_code));  
 		slurm_send_rc_msg(msg, error_code);  
 	} else {  
-		info("%s complete for %s-%s %s",  
+		info("%s complete for %s (versions=%s) %s",  
 		     __func__,  
-		     app_desc_ptr->app_name, app_desc_ptr->version,  
-		     TIME_STR);  
+		     app_desc_ptr->app_name,
+		     app_desc_ptr->versions ? app_desc_ptr->versions : "(none)",  
+		     TIME_STR);
 		slurm_send_rc_msg(msg, SLURM_SUCCESS);  
 	}  
 }  
@@ -2475,14 +2476,15 @@ static void _slurm_rpc_update_app(slurm_msg_t *msg)
 		info("%s AppName=%s Version=%s: %s",  
 		     __func__,  
 		     app_desc_ptr->app_name ? app_desc_ptr->app_name : "?",  
-		     app_desc_ptr->version ? app_desc_ptr->version : "?",  
+		     app_desc_ptr->versions ? app_desc_ptr->versions : "?",  
 		     slurm_strerror(error_code));  
 		slurm_send_rc_msg(msg, error_code);  
 	} else {  
-		info("%s complete for %s-%s %s",  
+		info("%s complete for %s (versions=%s) %s",  
 		     __func__,  
-		     app_desc_ptr->app_name, app_desc_ptr->version,  
-		     TIME_STR);  
+		     app_desc_ptr->app_name,
+		     app_desc_ptr->versions ? app_desc_ptr->versions : "(none)",  
+		     TIME_STR);
 		slurm_send_rc_msg(msg, SLURM_SUCCESS);  
 	}  
 }  
