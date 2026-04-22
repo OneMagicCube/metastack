@@ -1670,14 +1670,16 @@ void pack_app(app_record_t *app_ptr, buf_t *buffer,
 #endif  
 }
   
-static int _pack_app(void *object, void *arg)  
-{  
-	app_record_t *app_ptr = object;  
-	_foreach_pack_app_info_t *pack_info = arg;  
-	pack_app(app_ptr, pack_info->buffer, pack_info->protocol_version);  
-	pack_info->apps_packed++;  
-	return SLURM_SUCCESS;  
-}  
+static int _pack_app(void *object, void *arg)    
+{    
+	app_record_t *app_ptr = object;    
+	_foreach_pack_app_info_t *pack_info = arg;    
+	int offset_before = get_buf_offset(pack_info->buffer);    
+	pack_app(app_ptr, pack_info->buffer, pack_info->protocol_version);    
+	if (get_buf_offset(pack_info->buffer) != offset_before)    
+		pack_info->apps_packed++;    
+	return SLURM_SUCCESS;    
+}
 
 /*  
  * dump_all_app_state - save the state of all app records to file  
