@@ -135,27 +135,18 @@ int main(int argc, char **argv)
 	/* Handle --app=list: print preset app list and exit.  
 	 * Must be before _get_script_buffer() which blocks on STDIN  
 	 * when no script file is given. */  
+	/* Handle --app=list */  
 	if (opt.app && !xstrcasecmp(opt.app, "list")) {  
 		slurm_ctl_conf_info_msg_app_t *app_info = NULL;  
 		if (slurm_load_app((time_t)0, &app_info) == SLURM_SUCCESS  
-		    && app_info) {  
-			printf("%-20s  %s\n", "NAME", "DESCRIPTION");  
-			printf("%-20s  %s\n", "----", "-----------");  
-			for (uint32_t j = 0; j < app_info->record_count; j++) {  
-				app_record_t *a = &app_info->app_array[j];  
-				char *combined = NULL;  
-				xstrfmtcat(combined, "%s-%s",  
-				           a->app_name, a->version);  
-				printf("%-20s  %s\n", combined,  
-				       a->description ? a->description : "");  
-				xfree(combined);  
-			}  
+			&& app_info) {  
+			slurm_print_app_list(app_info);  
 			slurm_free_app_info_msg(app_info);  
 		} else {  
 			error("Unable to load app configuration");  
 		}  
 		exit(0);  
-	}  
+	}
 #endif 
 	if (sbopt.wrap != NULL) {
 		script_body = _script_wrap(sbopt.wrap);

@@ -2047,77 +2047,67 @@ static int _parse_watch_dog_name(void **dest, slurm_parser_enum_t type,
  * line entirely to avoid unnecessary parsing and potential errors.  
  */
 #ifdef __METASTACK_OPT_APP  
-static int _parse_app_name(void **dest, slurm_parser_enum_t type,  
-                           const char *key, const char *value,  
-                           const char *line, char **leftover)  
-{  
-    s_p_hashtbl_t *tbl = NULL;  
-    static s_p_options_t _app_name_options[] = {  
-        {"Version", S_P_STRING},  
-        {"Description", S_P_STRING},  
-        {"Watchdog", S_P_STRING},  
-        {"Default", S_P_BOOLEAN},  
-        {NULL}  
-    };  
-
-	if (!running_in_slurmctld()) {
-		*leftover += strlen(*leftover);
-		return 0;
-	}
-
-    tbl = s_p_hashtbl_create(_app_name_options);  
-    if (!s_p_parse_line(tbl, *leftover, leftover)) {  
-		/* Unrecognized key in AppName line — skip entire line.  
-		* Advance leftover to end of string so the main parser  
-		* doesn't try to parse the remaining keys as top-level config. */  
-		error("AppName=%s has invalid configuration (unrecognized key), "  
-			"ignoring entire line", value ? value : "?");  
-		s_p_hashtbl_destroy(tbl);  
+static int _parse_app_name(void **dest, slurm_parser_enum_t type,    
+                           const char *key, const char *value,    
+                           const char *line, char **leftover)    
+{    
+    s_p_hashtbl_t *tbl = NULL;    
+    static s_p_options_t _app_name_options[] = {    
+        {"Version", S_P_STRING},    
+        {"Description", S_P_STRING},    
+        {"Watchdog", S_P_STRING},    
+        {"Default", S_P_BOOLEAN},    
+        {NULL}    
+    };    
+  
+	if (!running_in_slurmctld()) {  
 		*leftover += strlen(*leftover);  
 		return 0;  
-	}
-
-	app_record_t *p = _create_conf_app();  
-
-	if (value == NULL) {  
-		error("AppName line missing name value, ignoring");
-		_destroy_app_name(p);  
-		s_p_hashtbl_destroy(tbl);  
-		return 0;  
-	}
-	p->app_name = xstrdup(value);
-
-	if (!s_p_get_string(&p->version, "Version", tbl) ||
-	    !p->version || !p->version[0]) {
-		error("AppName=%s missing required Version, ignoring",
-		      p->app_name ? p->app_name : "?");
-		_destroy_app_name(p);
-		s_p_hashtbl_destroy(tbl);
-		return 0;
-	}
-
-	s_p_get_string(&p->description, "Description", tbl);
-	s_p_get_string(&p->watchdog, "Watchdog", tbl);
+	}  
   
-    if (!s_p_get_boolean(&p->default_flag, "Default", tbl))  
-        p->default_flag = false;  
+    tbl = s_p_hashtbl_create(_app_name_options);    
+    if (!s_p_parse_line(tbl, *leftover, leftover)) {    
+		error("AppName=%s has invalid configuration (unrecognized key), "    
+			"ignoring entire line", value ? value : "?");    
+		s_p_hashtbl_destroy(tbl);    
+		*leftover += strlen(*leftover);    
+		return 0;    
+	}  
   
-    s_p_hashtbl_destroy(tbl);  
-    *dest = (void *)p;  
-    return 1;  
+	app_record_t *p = _create_conf_app();    
+  
+	if (value == NULL) {    
+		error("AppName line missing name value, ignoring");  
+		_destroy_app_name(p);    
+		s_p_hashtbl_destroy(tbl);    
+		return 0;    
+	}  
+	p->app_name = xstrdup(value);  
+  
+	/* Version is optional — NULL means no version restriction */  
+	s_p_get_string(&p->versions, "Version", tbl);  
+  
+	s_p_get_string(&p->description, "Description", tbl);  
+	s_p_get_string(&p->watchdog, "Watchdog", tbl);  
+    
+    if (!s_p_get_boolean(&p->default_flag, "Default", tbl))    
+        p->default_flag = false;    
+    
+    s_p_hashtbl_destroy(tbl);    
+    *dest = (void *)p;    
+    return 1;    
 }
   
-static void _init_conf_app(app_record_t *conf_app)  
-{  
-	if (conf_app == NULL)  
-		return;  
-	conf_app->app_name = NULL;  
-	conf_app->version = NULL;  
-	conf_app->description = NULL;  
-	conf_app->watchdog = NULL;
-	conf_app->combined_name = NULL;
-	conf_app->default_flag = false;  
-}  
+static void _init_conf_app(app_record_t *conf_app)    
+{    
+	if (conf_app == NULL)    
+		return;    
+	conf_app->app_name = NULL;    
+	conf_app->versions = NULL;    
+	conf_app->description = NULL;    
+	conf_app->watchdog = NULL;  
+	conf_app->default_flag = false;    
+}
   
 static app_record_t *_create_conf_app(void)  
 {  
@@ -2126,17 +2116,16 @@ static app_record_t *_create_conf_app(void)
 	return p;  
 }  
   
-static void _destroy_app_name(void *ptr)  
-{  
-	if (ptr == NULL)  
-		return;  
-	app_record_t *p = (app_record_t *)ptr;  
-	xfree(p->app_name);  
-	xfree(p->version);  
-	xfree(p->combined_name);  
-	xfree(p->description);  
-	xfree(p->watchdog);  
-	xfree(ptr);  
+static void _destroy_app_name(void *ptr)    
+{    
+	if (ptr == NULL)    
+		return;    
+	app_record_t *p = (app_record_t *)ptr;    
+	xfree(p->app_name);    
+	xfree(p->versions);    
+	xfree(p->description);    
+	xfree(p->watchdog);    
+	xfree(ptr);    
 }
 #endif
 

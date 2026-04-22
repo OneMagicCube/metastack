@@ -7844,74 +7844,84 @@ static int _job_create(job_desc_msg_t *job_desc, int allocate, int will_run,
 #ifdef __METASTACK_OPT_APP  
 	/* Validate --app and auto-fill app_name, app_version */  
 	if (job_desc->app && job_desc->app[0]) {  
-		/* User explicitly specified --app=xxx */  
-		app_record_t *app_ptr = find_app_record_by_combined(job_desc->app);  
-		if (!app_ptr) {  
-			info("%s: invalid app specified: %s",  
-				__func__, job_desc->app);  
-			if (err_msg) {  
-				xfree(*err_msg);  
-				xstrfmtcat(*err_msg,  
-						"invalid app specified: %s",  
-						job_desc->app);  
-			}  
-			error_code = ESLURM_INVALID_APP_NAME;  
-			goto cleanup_fail;  
-		}  
-		/* Auto-fill app_name and app_version */  
-		xfree(job_desc->app_name);  
-		job_desc->app_name = xstrdup(app_ptr->app_name);  
-		xfree(job_desc->app_version);  
-		job_desc->app_version = xstrdup(app_ptr->version);  
-		/* Preserve --app-source if explicitly set by user (portal/marketplace),  
-		* otherwise default to APP_SOURCE_USER */  
-		if (job_desc->app_source != APP_SOURCE_PORTAL &&  
-			job_desc->app_source != APP_SOURCE_MARKETPLACE)  
-			job_desc->app_source = APP_SOURCE_USER;
-		/* If the app has a bound watchdog and user didn't specify one,  
-		* use the app's watchdog */  
-		if (app_ptr->watchdog && app_ptr->watchdog[0] &&  
-			(!job_desc->watch_dog || !job_desc->watch_dog[0])) {  
-			xfree(job_desc->watch_dog);  
-			job_desc->watch_dog = xstrdup(app_ptr->watchdog);  
-			watch_dog_ptr = NULL;  
-			error_code = _get_job_watch_dogs_and_check(  
-				job_desc->watch_dog, &watch_dog_ptr, err_msg);  
-			if (error_code != SLURM_SUCCESS)  
-				goto cleanup_fail;  
-		}  
-	} else {  
-		/* User did NOT specify --app.  
-		* Check if auto-recognition (apptype from cli_filter.lua) provided a value. */  
-#ifdef __METASTACK_NEW_APPTYPE_RECOGNITION  
-		if (job_desc->apptype && job_desc->apptype[0] &&  
-			xstrcmp(job_desc->apptype, "unset") != 0) {  
-			/* cli_filter.lua recognized an application type.  
-				* Set app_name from apptype, leave app_version empty,  
-				* and mark source as auto (2). */  
-			xfree(job_desc->app_name);  
-			job_desc->app_name = xstrdup(job_desc->apptype);  
-			xfree(job_desc->app_version);  
-			job_desc->app_version = NULL; /* no version from auto-recognition */  
-			if (job_desc->app_source != APP_SOURCE_PORTAL &&  
-				job_desc->app_source != APP_SOURCE_MARKETPLACE)  
-				job_desc->app_source = APP_SOURCE_AUTO;  
-		}  
-#endif  
-		/* If default app exists with watchdog and user didn't specify one,  
-		* apply the default app's watchdog regardless of auto-recognition. */  
-		if (default_app_loc && default_app_loc->watchdog &&  
-			default_app_loc->watchdog[0]) {  
-			if (!job_desc->watch_dog || !job_desc->watch_dog[0]) {  
-				xfree(job_desc->watch_dog);  
-				job_desc->watch_dog = xstrdup(default_app_loc->watchdog);  
-				watch_dog_ptr = NULL;  
-				error_code = _get_job_watch_dogs_and_check(  
-					job_desc->watch_dog, &watch_dog_ptr, err_msg);  
-				if (error_code != SLURM_SUCCESS)  
-					goto cleanup_fail;  
-			}  
-		}  
+		/* User explicitly specified --app=xxx  
+ 		 * (e.g. "vasp-5.7.1" for versioned apps, or "vasp" for version-less apps) */   
+		app_record_t *app_ptr = find_app_record_by_combined(job_desc->app);    
+		if (!app_ptr) {    
+			info("%s: invalid app specified: %s",    
+				__func__, job_desc->app);    
+			if (err_msg) {    
+				xfree(*err_msg);    
+				xstrfmtcat(*err_msg,    
+						"invalid app specified: %s",    
+						job_desc->app);    
+			}    
+			error_code = ESLURM_INVALID_APP_NAME;    
+			goto cleanup_fail;    
+		}    
+		/* Auto-fill app_name and app_version from the matched record.    
+		 * Version is extracted by stripping the "app_name-" prefix    
+		 * from the --app value. If --app equals app_name (no version    
+		 * suffix), app_version is left NULL. */    
+		xfree(job_desc->app_name);    
+		job_desc->app_name = xstrdup(app_ptr->app_name);    
+		xfree(job_desc->app_version);    
+		if (strlen(job_desc->app) > strlen(app_ptr->app_name) &&    
+		    job_desc->app[strlen(app_ptr->app_name)] == '-') {    
+			job_desc->app_version = xstrdup(    
+				job_desc->app + strlen(app_ptr->app_name) + 1);    
+		} else {    
+			job_desc->app_version = NULL;    
+		}    
+		/* Preserve --app-source if explicitly set by user (portal/marketplace),    
+		* otherwise default to APP_SOURCE_USER */    
+		if (job_desc->app_source != APP_SOURCE_PORTAL &&    
+			job_desc->app_source != APP_SOURCE_MARKETPLACE)    
+			job_desc->app_source = APP_SOURCE_USER;  
+		/* If the app has a bound watchdog and user didn't specify one,    
+		* use the app's watchdog */    
+		if (app_ptr->watchdog && app_ptr->watchdog[0] &&    
+			(!job_desc->watch_dog || !job_desc->watch_dog[0])) {    
+			xfree(job_desc->watch_dog);    
+			job_desc->watch_dog = xstrdup(app_ptr->watchdog);    
+			watch_dog_ptr = NULL;    
+			error_code = _get_job_watch_dogs_and_check(    
+				job_desc->watch_dog, &watch_dog_ptr, err_msg);    
+			if (error_code != SLURM_SUCCESS)    
+				goto cleanup_fail;    
+		}    
+	} else {    
+		/* User did NOT specify --app.    
+		* Check if auto-recognition (apptype from cli_filter.lua) provided a value. */    
+#ifdef __METASTACK_NEW_APPTYPE_RECOGNITION    
+		if (job_desc->apptype && job_desc->apptype[0] &&    
+			xstrcmp(job_desc->apptype, "unset") != 0) {    
+			/* cli_filter.lua recognized an application type.    
+				* Set app_name from apptype, leave app_version empty,    
+				* and mark source as auto (2). */    
+			xfree(job_desc->app_name);    
+			job_desc->app_name = xstrdup(job_desc->apptype);    
+			xfree(job_desc->app_version);    
+			job_desc->app_version = NULL; /* no version from auto-recognition */    
+			if (job_desc->app_source != APP_SOURCE_PORTAL &&    
+				job_desc->app_source != APP_SOURCE_MARKETPLACE)    
+				job_desc->app_source = APP_SOURCE_AUTO;    
+		}    
+#endif    
+		/* If default app exists with watchdog and user didn't specify one,    
+		* apply the default app's watchdog regardless of auto-recognition. */    
+		if (default_app_loc && default_app_loc->watchdog &&    
+			default_app_loc->watchdog[0]) {    
+			if (!job_desc->watch_dog || !job_desc->watch_dog[0]) {    
+				xfree(job_desc->watch_dog);    
+				job_desc->watch_dog = xstrdup(default_app_loc->watchdog);    
+				watch_dog_ptr = NULL;    
+				error_code = _get_job_watch_dogs_and_check(    
+					job_desc->watch_dog, &watch_dog_ptr, err_msg);    
+				if (error_code != SLURM_SUCCESS)    
+					goto cleanup_fail;    
+			}    
+		}    
 	}  
 #endif
 
