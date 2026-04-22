@@ -2036,11 +2036,12 @@ extern int update_app(app_desc_msg_t *app_desc, bool create_flag)
 		xfree(ver_copy);    
   
 		/* Also update other properties if provided */    
-		if (app_desc->description) {    
-			xfree(app_ptr->description);    
-			app_ptr->description =    
-				xstrdup(app_desc->description);    
-		}    
+		if (app_desc->description) {  
+			xfree(app_ptr->description);  
+			if (app_desc->description[0])  
+				app_ptr->description =  
+					xstrdup(app_desc->description);  
+		}
   
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION    
 		if (app_desc->watchdog && app_desc->watchdog[0]) {    
@@ -2055,11 +2056,11 @@ extern int update_app(app_desc_msg_t *app_desc, bool create_flag)
 			}    
 		}    
 #endif    
-		if (app_desc->watchdog) {    
-			xfree(app_ptr->watchdog);    
-			app_ptr->watchdog =    
-				xstrdup(app_desc->watchdog);    
-		}    
+		if (app_desc->watchdog) {  
+			xfree(app_ptr->watchdog);  
+			if (app_desc->watchdog[0])  
+				app_ptr->watchdog = xstrdup(app_desc->watchdog);  
+		}
   
 		if (app_desc->default_spec !=    
 		    APP_DESC_DEFAULT_IGNORE) {    
@@ -2111,16 +2112,18 @@ extern int update_app(app_desc_msg_t *app_desc, bool create_flag)
 		}    
 #endif    
   
-		if (app_desc->description) {    
-			xfree(app_ptr->description);    
-			app_ptr->description =    
-				xstrdup(app_desc->description);    
-		}    
-		if (app_desc->watchdog) {    
-			xfree(app_ptr->watchdog);    
-			app_ptr->watchdog =    
-				xstrdup(app_desc->watchdog);    
-		}    
+		if (app_desc->description) {  
+			xfree(app_ptr->description);  
+			if (app_desc->description[0])  
+				app_ptr->description =  
+					xstrdup(app_desc->description);  
+		}
+		if (app_desc->watchdog) {  
+			xfree(app_ptr->watchdog);  
+			if (app_desc->watchdog[0])  
+				app_ptr->watchdog =  
+					xstrdup(app_desc->watchdog);  
+		}
 		if (app_desc->default_spec !=    
 		    APP_DESC_DEFAULT_IGNORE) {    
 			bool new_default =    
