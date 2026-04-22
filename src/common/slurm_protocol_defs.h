@@ -1016,7 +1016,7 @@ typedef struct batch_job_launch_msg {
 #ifdef __METASTACK_OPT_APP
 	char *app_name;         /* app name for the job */  
 	char *app_version;      /* app version for the job */ 
-	uint8_t app_source;     /* 0=user, 1=auto, 2=portal, 3=marketplace */
+	uint8_t app_source;     /* APP_SOURCE_NOTSET=0, USER=1, AUTO=2, PORTAL=3, MARKETPLACE=4 */
 #endif
 } batch_job_launch_msg_t;
 

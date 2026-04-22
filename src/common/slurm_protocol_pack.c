@@ -6768,9 +6768,9 @@ static void _pack_slurm_ctl_conf_app_msg(slurm_msg_t *msg, buf_t *buffer,
 {  
 	xassert(msg);  
 #ifdef __META_PROTOCOL  
-	buf_t *msg_buffer = msg->data;
-	if (protocol_version >= META_3_2_PROTOCOL_VERSION) {
-		packmem_array(msg_buffer->head, msg_buffer->processed, buffer);  
+	buf_t *msg_buffer = msg->data;  
+	if (protocol_version >= META_3_2_PROTOCOL_VERSION) {  
+		packbuf(msg_buffer, buffer);  
 	}  
 #endif  
 }  
