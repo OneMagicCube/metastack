@@ -7844,7 +7844,8 @@ static int _job_create(job_desc_msg_t *job_desc, int allocate, int will_run,
 #ifdef __METASTACK_OPT_APP  
 	/* Validate --app and auto-fill app_name, app_version */  
 	if (job_desc->app && job_desc->app[0]) {  
-		/* User explicitly specified --app=xxx (e.g. "vasp-5.7.1" or "vasp") */    
+		/* User explicitly specified --app=xxx  
+ 		 * (e.g. "vasp-5.7.1" for versioned apps, or "vasp" for version-less apps) */   
 		app_record_t *app_ptr = find_app_record_by_combined(job_desc->app);    
 		if (!app_ptr) {    
 			info("%s: invalid app specified: %s",    

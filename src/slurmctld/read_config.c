@@ -1160,31 +1160,34 @@ static void _rebuild_combined_hash_for_app(app_record_t *app_ptr)
  * IN/OUT versions_ptr - pointer to versions string (may be reallocated)    
  * IN ver - version to remove    
  */    
-static void _remove_version_from_list(char **versions_ptr, const char *ver)    
-{    
-	char *versions, *new_versions = NULL;    
-	char *copy, *save_ptr = NULL, *tok;    
+static void _remove_version_from_list(char **versions_ptr, const char *ver)      
+{      
+	char *versions, *new_versions = NULL;      
+	char *copy, *save_ptr = NULL, *tok;      
   
-	if (!versions_ptr || !*versions_ptr || !ver)    
-		return;    
+	if (!versions_ptr || !*versions_ptr || !ver)      
+		return;      
   
-	versions = *versions_ptr;    
-	copy = xstrdup(versions);    
-	tok = strtok_r(copy, ",", &save_ptr);    
-	while (tok) {    
-		while (*tok == ' ' || *tok == '\t')    
-			tok++;    
-		if (xstrcmp(tok, ver) != 0) {    
-			if (new_versions)    
-				xstrfmtcat(new_versions, ",%s", tok);    
-			else    
-				new_versions = xstrdup(tok);    
-		}    
-		tok = strtok_r(NULL, ",", &save_ptr);    
-	}    
-	xfree(copy);    
-	xfree(*versions_ptr);    
-	*versions_ptr = new_versions;    
+	versions = *versions_ptr;      
+	copy = xstrdup(versions);      
+	tok = strtok_r(copy, ",", &save_ptr);      
+	while (tok) {      
+		while (*tok == ' ' || *tok == '\t')      
+			tok++;      
+		char *end = tok + strlen(tok) - 1;  
+		while (end > tok && (*end == ' ' || *end == '\t'))  
+			*end-- = '\0';  
+		if (xstrcmp(tok, ver) != 0) {      
+			if (new_versions)      
+				xstrfmtcat(new_versions, ",%s", tok);      
+			else      
+				new_versions = xstrdup(tok);      
+		}      
+		tok = strtok_r(NULL, ",", &save_ptr);      
+	}      
+	xfree(copy);      
+	xfree(*versions_ptr);      
+	*versions_ptr = new_versions;      
 }
 
 /*    
