@@ -2455,6 +2455,42 @@ void slurm_print_app_info(FILE *out, app_record_t *app_ptr, int one_liner)
 	fprintf(out, "%s", print_this);  
 	xfree(print_this);  
 }  
+
+void slurm_print_app_list(slurm_ctl_conf_info_msg_app_t *app_info)  
+{  
+	if (!app_info)  
+		return;  
+  
+	printf("%-20s  %s\n", "NAME", "DESCRIPTION");  
+	printf("%-20s  %s\n", "----", "-----------");  
+  
+	for (uint32_t j = 0; j < app_info->record_count; j++) {  
+		app_record_t *a = &app_info->app_array[j];  
+		if (a->versions && a->versions[0]) {  
+			char *ver_list = xstrdup(a->versions);  
+			char *save_ptr = NULL;  
+			char *tok = strtok_r(ver_list, ",", &save_ptr);  
+			while (tok) {  
+				while (*tok == ' ' || *tok == '\t')  
+					tok++;  
+				if (*tok != '\0') {  
+					char *combined = NULL;  
+					xstrfmtcat(combined, "%s-%s",  
+					           a->app_name, tok);  
+					printf("%-20s  %s\n", combined,  
+					       a->description ?  
+					       a->description : "");  
+					xfree(combined);  
+				}  
+				tok = strtok_r(NULL, ",", &save_ptr);  
+			}  
+			xfree(ver_list);  
+		} else {  
+			printf("%-20s  %s\n", a->app_name,  
+			       a->description ? a->description : "");  
+		}  
+	}  
+}
 #endif /* __METASTACK_OPT_APP */
 
 /*

@@ -1186,7 +1186,83 @@ static void _remove_version_from_list(char **versions_ptr, const char *ver)
 	xfree(*versions_ptr);    
 	*versions_ptr = new_versions;    
 }
+
+/*  
+ * _app_versions_add - Add comma-separated versions to app's version list.  
+ *   Skips duplicates. ver_copy tokens are "+"-prefixed.  
+ */  
+static void _app_versions_add(app_record_t *app_ptr, char *ver_copy,  
+                               const char *app_name)  
+{  
+	char *save_ptr = NULL;  
+	char *tok = strtok_r(ver_copy, ",", &save_ptr);  
+	while (tok) {  
+		if (*tok == '+')  
+			tok++;  
+		while (*tok == ' ' || *tok == '\t')  
+			tok++;  
+		if (*tok != '\0') {  
+			if (!_version_in_list(app_ptr->versions, tok)) {  
+				if (app_ptr->versions &&  
+				    app_ptr->versions[0])  
+					xstrfmtcat(app_ptr->versions,  
+						   ",%s", tok);  
+				else {  
+					xfree(app_ptr->versions);  
+					app_ptr->versions = xstrdup(tok);  
+				}  
+				info("App version added: %s-%s",  
+				     app_name, tok);  
+			} else {  
+				info("%s: version '%s' already exists "  
+				     "for AppName=%s, skipping",  
+				     __func__, tok, app_name);  
+			}  
+		}  
+		tok = strtok_r(NULL, ",", &save_ptr);  
+	}  
+}  
   
+/*  
+ * _app_versions_remove - Remove comma-separated versions from app's  
+ *   version list. ver_copy tokens are "-"-prefixed.  
+ */  
+static void _app_versions_remove(app_record_t *app_ptr, char *ver_copy,  
+                                  const char *app_name)  
+{  
+	char *save_ptr = NULL;  
+	char *tok = strtok_r(ver_copy, ",", &save_ptr);  
+	while (tok) {  
+		if (*tok == '-')  
+			tok++;  
+		while (*tok == ' ' || *tok == '\t')  
+			tok++;  
+		if (*tok != '\0') {  
+			if (_version_in_list(app_ptr->versions, tok)) {  
+				_remove_version_from_list(  
+					&app_ptr->versions, tok);  
+				info("App version removed: %s-%s",  
+				     app_name, tok);  
+			} else {  
+				info("%s: version '%s' not found "  
+				     "for AppName=%s, skipping",  
+				     __func__, tok, app_name);  
+			}  
+		}  
+		tok = strtok_r(NULL, ",", &save_ptr);  
+	}  
+}  
+  
+/*  
+ * _app_versions_replace - Replace app's entire version list.  
+ */  
+static void _app_versions_replace(app_record_t *app_ptr,  
+                                   const char *new_versions)  
+{  
+	xfree(app_ptr->versions);  
+	app_ptr->versions = xstrdup(new_versions);  
+}
+
 /*    
  * _remove_combined_hash_for_app - Remove all secondary hash entries for one app.    
  */    
@@ -1975,76 +2051,13 @@ extern int update_app(app_desc_msg_t *app_desc, bool create_flag)
     
 		/* Remove old combined hash entries before modifying versions */      
 		_remove_combined_hash_for_app(app_ptr);      
-    
-		if (has_plus) {      
-			/* --- Add versions to existing list --- */      
-			char *save_ptr = NULL;      
-			char *tok = strtok_r(ver_copy, ",", &save_ptr);      
-			while (tok) {      
-				if (*tok == '+')      
-					tok++;      
-				while (*tok == ' ' || *tok == '\t')      
-					tok++;      
-				if (*tok != '\0') {      
-					if (!_version_in_list(      
-						    app_ptr->versions, tok)) {      
-						if (app_ptr->versions &&      
-						    app_ptr->versions[0])      
-							xstrfmtcat(      
-								app_ptr->versions,      
-								",%s", tok);      
-						else {      
-							xfree(app_ptr->versions);      
-							app_ptr->versions =      
-								xstrdup(tok);      
-						}      
-						info("App version added: %s-%s",      
-						     app_desc->app_name, tok);      
-					} else {      
-						info("%s: version '%s' already "      
-						     "exists for AppName=%s, "      
-						     "skipping",      
-						     __func__, tok,      
-						     app_desc->app_name);      
-					}      
-				}      
-				tok = strtok_r(NULL, ",", &save_ptr);      
-			}      
-    
-		} else if (has_minus) {      
-			/* --- Remove versions from existing list --- */      
-			char *save_ptr = NULL;      
-			char *tok = strtok_r(ver_copy, ",", &save_ptr);      
-			while (tok) {      
-				if (*tok == '-')      
-					tok++;      
-				while (*tok == ' ' || *tok == '\t')      
-					tok++;      
-				if (*tok != '\0') {      
-					if (_version_in_list(      
-						    app_ptr->versions, tok)) {      
-						_remove_version_from_list(      
-							&app_ptr->versions,      
-							tok);      
-						info("App version removed: "      
-						     "%s-%s",      
-						     app_desc->app_name, tok);      
-					} else {      
-						info("%s: version '%s' not "      
-						     "found for AppName=%s, "      
-						     "skipping",      
-						     __func__, tok,      
-						     app_desc->app_name);      
-					}      
-				}      
-				tok = strtok_r(NULL, ",", &save_ptr);      
-			}      
-    
-		} else {      
-			/* --- Plain replace: set entire versions list --- */      
-			xfree(app_ptr->versions);      
-			app_ptr->versions = xstrdup(app_desc->versions);      
-		}      
+  
+		if (has_plus)  
+			_app_versions_add(app_ptr, ver_copy, app_desc->app_name);  
+		else if (has_minus)  
+			_app_versions_remove(app_ptr, ver_copy, app_desc->app_name);  
+		else  
+			_app_versions_replace(app_ptr, app_desc->versions);  
     
 		/* Rebuild combined hash entries with updated versions */      
 		_rebuild_combined_hash_for_app(app_ptr);      

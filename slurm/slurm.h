@@ -3417,7 +3417,8 @@ extern void slurm_free_app_desc_msg(app_desc_msg_t *msg);
 extern void slurm_free_delete_app_msg(delete_app_msg_t *msg);  
 extern void slurm_init_app_desc_msg(app_desc_msg_t *msg);  
 extern void slurm_print_app_info(FILE *out, app_record_t *app_ptr, int one_liner);  
-extern char *slurm_sprint_app_info(app_record_t *app_ptr, int one_liner);  
+extern char *slurm_sprint_app_info(app_record_t *app_ptr, int one_liner);
+extern void slurm_print_app_list(slurm_ctl_conf_info_msg_app_t *app_info);
 #endif
 
 typedef struct will_run_response_msg {
