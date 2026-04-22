@@ -912,7 +912,7 @@ static int _parse_app_options(int argc, char **argv, app_desc_msg_t *app_msg)
 			xfree(app_msg->app_name);  
 			app_msg->app_name = xstrdup(val);  
 			update_cnt++;  
-		} else if (!xstrncasecmp(tag, "Versions", MAX(tag_len, 1))) {    
+		} else if (!xstrncasecmp(tag, "Version", MAX(tag_len, 1))) {    
 			xfree(app_msg->versions);    
 			if (plus_minus)    
 				app_msg->versions =    

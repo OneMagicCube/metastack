@@ -2422,7 +2422,7 @@ char *slurm_sprint_app_info(app_record_t *app_ptr, int one_liner)
       
 	xstrfmtcat(out, "AppName=%s", app_ptr->app_name);      
 	if (app_ptr->versions && app_ptr->versions[0])      
-		xstrfmtcat(out, " Versions=%s", app_ptr->versions);      
+		xstrfmtcat(out, " Version=%s", app_ptr->versions);      
 	xstrcat(out, line_end);
       
 	if (app_ptr->description && app_ptr->description[0]) {    
