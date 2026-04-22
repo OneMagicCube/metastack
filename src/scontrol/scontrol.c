@@ -795,72 +795,86 @@ _print_config_watchdog(char *config_param)
 #endif
 
 #ifdef __METASTACK_OPT_APP  
-static void  
-_print_config_app(char *config_param)  
-{  
-	int error_code, print_cnt = 0;  
-	uint32_t i = 0;  
-	slurm_ctl_conf_info_msg_app_t *slurm_app_ptr = NULL;  
-	app_record_t *app_ptr = NULL;  
-  
-	if (old_slurm_app_ptr) {  
-		old_slurm_app_ptr->last_update = (time_t) 0;  
-		error_code = slurm_load_app(  
-			old_slurm_app_ptr->last_update,  
-			&slurm_app_ptr);  
-		if (error_code == SLURM_SUCCESS)  
-			slurm_free_app_info_msg(old_slurm_app_ptr);  
-		else if (slurm_get_errno() == SLURM_NO_CHANGE_IN_DATA) {  
-			slurm_app_ptr = old_slurm_app_ptr;  
-			error_code = SLURM_SUCCESS;  
-			if (quiet_flag == -1)  
-				printf("slurm_load_app no change in data\n");  
-		}  
-	} else  
-		error_code = slurm_load_app((time_t) NULL, &slurm_app_ptr);  
-  
-	if (error_code) {  
-		exit_code = 1;  
-		if (quiet_flag != 1)  
-			slurm_perror("slurm_load_app error");  
-	} else  
-		old_slurm_app_ptr = slurm_app_ptr;  
-  
-	if (slurm_app_ptr) {  
-		app_ptr = slurm_app_ptr->app_array;  
-		if (error_code == SLURM_SUCCESS) {  
-			for (i = 0; i < slurm_app_ptr->record_count; i++) {  
-				if (config_param) {  
-					bool match = false;  
-					if (xstrcmp(config_param, app_ptr[i].app_name) == 0) {  
-						match = true;  
-					} else if (app_ptr[i].versions) {  
-						char *combined = NULL;  
-						xstrfmtcat(combined, "%s-%s",  
-								app_ptr[i].app_name,  
-								app_ptr[i].versions);  
-						match = (xstrcmp(config_param, combined) == 0);  
-						xfree(combined);  
-					}  
-					if (!match)  
-						continue;  
-				}
-				print_cnt++;  
-				slurm_print_app_info(stdout, &app_ptr[i],  
-				                     one_liner);  
-			}  
-			if (print_cnt > 0)
-				fprintf(stdout, "\n");
-		}  
-	}  
-  
-	if (print_cnt == 0) {  
-		if (config_param)  
-			printf("No app '%s' found.\n", config_param);  
-		else  
-			printf("No apps configured.\n");  
-	}  
-}  
+#ifdef __METASTACK_OPT_APP    
+static void    
+_print_config_app(char *config_param)    
+{    
+	int error_code, print_cnt = 0;    
+	uint32_t i = 0;    
+	slurm_ctl_conf_info_msg_app_t *slurm_app_ptr = NULL;    
+	app_record_t *app_ptr = NULL;    
+    
+	if (old_slurm_app_ptr) {    
+		old_slurm_app_ptr->last_update = (time_t) 0;    
+		error_code = slurm_load_app(    
+			old_slurm_app_ptr->last_update,    
+			&slurm_app_ptr);    
+		if (error_code == SLURM_SUCCESS)    
+			slurm_free_app_info_msg(old_slurm_app_ptr);    
+		else if (slurm_get_errno() == SLURM_NO_CHANGE_IN_DATA) {    
+			slurm_app_ptr = old_slurm_app_ptr;    
+			error_code = SLURM_SUCCESS;    
+			if (quiet_flag == -1)    
+				printf("slurm_load_app no change in data\n");    
+		}    
+	} else    
+		error_code = slurm_load_app((time_t) NULL, &slurm_app_ptr);    
+    
+	if (error_code) {    
+		exit_code = 1;    
+		if (quiet_flag != 1)    
+			slurm_perror("slurm_load_app error");    
+	} else    
+		old_slurm_app_ptr = slurm_app_ptr;    
+    
+	if (slurm_app_ptr) {    
+		app_ptr = slurm_app_ptr->app_array;    
+		if (error_code == SLURM_SUCCESS) {    
+			for (i = 0; i < slurm_app_ptr->record_count; i++) {    
+				if (config_param) {    
+					bool match = false;    
+					if (xstrcmp(config_param,    
+					            app_ptr[i].app_name) == 0) {    
+						match = true;    
+					} else if (app_ptr[i].versions &&    
+					           app_ptr[i].versions[0]) {    
+						/* Tokenize versions and check    
+						 * each "appname-version" */    
+						char *ver_copy = xstrdup(app_ptr[i].versions);    
+						char *save_ptr = NULL;    
+						char *tok = strtok_r(ver_copy, ",", &save_ptr);    
+						while (tok && !match) {    
+							while (*tok == ' ' ||  *tok == '\t')    
+								tok++;    
+							if (*tok) {    
+								char *combined = NULL;    
+								xstrfmtcat(combined, "%s-%s", app_ptr[i].app_name, tok);    
+								if (xstrcmp(config_param,combined) == 0)    
+									match = true;    
+								xfree(combined);    
+							}    
+							tok = strtok_r(NULL, ",", &save_ptr);    
+						}    
+						xfree(ver_copy);    
+					}    
+					if (!match)    
+						continue;    
+				}    
+				print_cnt++;    
+				slurm_print_app_info(stdout, &app_ptr[i], one_liner);    
+			}    
+			if (print_cnt > 0)    
+				fprintf(stdout, "\n");    
+		}    
+	}    
+    
+	if (print_cnt == 0) {    
+		if (config_param)    
+			printf("No app '%s' found.\n", config_param);    
+		else    
+			printf("No apps configured.\n");    
+	}    
+}
 /*  
  * scontrol_create_app — Handle "scontrol create app AppName=X Version=Y ..."  
  * Validates required fields (AppName, Version), sends REQUEST_CREATE_APP  
