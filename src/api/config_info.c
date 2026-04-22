@@ -605,16 +605,16 @@ void slurm_write_ctl_conf ( slurm_ctl_conf_info_msg_t * slurm_ctl_conf_ptr,
 			if (!write_app[i].app_name)    
 				continue;    
 			fprintf(fp, "AppName=%s", write_app[i].app_name);    
-			if (write_app[i].versions)    
-				fprintf(fp, " Version=%s", write_app[i].versions);    
-			if (write_app[i].description)    
-				fprintf(fp, " Description=\"%s\"",    
-				        write_app[i].description);    
-			if (write_app[i].watchdog)    
-				fprintf(fp, " Watchdog=%s",    
-				        write_app[i].watchdog);    
-			if (write_app[i].default_flag)    
-				fprintf(fp, " Default=YES");    
+			if (write_app[i].versions && write_app[i].versions[0])      
+				fprintf(fp, " Version=%s", write_app[i].versions);      
+			if (write_app[i].description && write_app[i].description[0])      
+				fprintf(fp, " Description=\"%s\"",      
+						write_app[i].description);      
+			if (write_app[i].watchdog && write_app[i].watchdog[0])      
+				fprintf(fp, " Watchdog=%s",      
+						write_app[i].watchdog);
+			if (write_app[i].default_flag)
+				fprintf(fp, " Default=YES");
 			fprintf(fp, "\n");    
 		}
 	}  
@@ -2412,37 +2412,37 @@ int slurm_load_app(time_t update_time,
 /*  
  * slurm_print_app_info - format a single app record for display  
  */  
-char *slurm_sprint_app_info(app_record_t *app_ptr, int one_liner)    
-{    
-	if (!app_ptr)    
-		return NULL;    
-    
-	char *out = NULL;    
-	char *line_end = (one_liner) ? " " : "\n   ";    
-    
-	xstrfmtcat(out, "AppName=%s", app_ptr->app_name);    
-	if (app_ptr->versions)    
-		xstrfmtcat(out, " Version=%s", app_ptr->versions);    
-	xstrcat(out, line_end);    
-    
-	if (app_ptr->description) {  
-		xstrfmtcat(out, "Description=\"%s\"", app_ptr->description);  
-		if (app_ptr->watchdog)  
-			xstrfmtcat(out, " Watchdog=%s", app_ptr->watchdog);  
-	} else if (app_ptr->watchdog) {  
-		xstrfmtcat(out, "Watchdog=%s", app_ptr->watchdog);  
-	}  
-	if (app_ptr->default_flag)  
-		xstrcat(out, " Default=YES");  
-	else  
-		xstrcat(out, " Default=NO");    
-    
-	if (one_liner)    
-		xstrcat(out, "\n");    
+char *slurm_sprint_app_info(app_record_t *app_ptr, int one_liner)      
+{      
+	if (!app_ptr)      
+		return NULL;      
+      
+	char *out = NULL;      
+	char *line_end = (one_liner) ? " " : "\n   ";      
+      
+	xstrfmtcat(out, "AppName=%s", app_ptr->app_name);      
+	if (app_ptr->versions && app_ptr->versions[0])      
+		xstrfmtcat(out, " Versions=%s", app_ptr->versions);      
+	xstrcat(out, line_end);
+      
+	if (app_ptr->description && app_ptr->description[0]) {    
+		xstrfmtcat(out, "Description=\"%s\"", app_ptr->description);    
+		if (app_ptr->watchdog && app_ptr->watchdog[0])    
+			xstrfmtcat(out, " Watchdog=%s", app_ptr->watchdog);    
+	} else if (app_ptr->watchdog && app_ptr->watchdog[0]) {    
+		xstrfmtcat(out, "Watchdog=%s", app_ptr->watchdog);    
+	}    
+	if (app_ptr->default_flag)    
+		xstrcat(out, " Default=YES");    
 	else    
-		xstrcat(out, "\n\n");    
-    
-	return out;    
+		xstrcat(out, " Default=NO");      
+      
+	if (one_liner)      
+		xstrcat(out, "\n");      
+	else      
+		xstrcat(out, "\n\n");      
+      
+	return out;      
 }
   
 void slurm_print_app_info(FILE *out, app_record_t *app_ptr, int one_liner)  
