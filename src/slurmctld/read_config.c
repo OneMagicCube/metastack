@@ -1196,7 +1196,7 @@ static void _remove_combined_hash_for_app(app_record_t *app_ptr)
 		return;    
   
 	if (!app_ptr->versions || !app_ptr->versions[0]) {    
-		xhash_pop_str(app_combined_hash, app_ptr->app_name);    
+		xhash_delete_str(app_combined_hash, app_ptr->app_name);    
 		return;    
 	}    
   
@@ -1212,7 +1212,7 @@ static void _remove_combined_hash_for_app(app_record_t *app_ptr)
 		if (*tok) {    
 			char *buf = NULL;    
 			xstrfmtcat(buf, "%s-%s", app_ptr->app_name, tok);    
-			xhash_pop_str(app_combined_hash, buf);    
+			xhash_delete_str(app_combined_hash, buf);    
 			xfree(buf);    
 		}    
 		tok = strtok_r(NULL, ",", &save_ptr);    
@@ -1875,286 +1875,286 @@ extern buf_t *pack_all_app(uid_t uid, uint16_t protocol_version)
  * default clears the old one. default_app_name (string) and default_app_loc    
  * (pointer) are always kept in sync.    
  */  
-extern int update_app(app_desc_msg_t *app_desc, bool create_flag)      
-{      
-	app_record_t *app_ptr = NULL;      
+extern int update_app(app_desc_msg_t *app_desc, bool create_flag)        
+{        
+	app_record_t *app_ptr = NULL;        
+      
+	if (!app_desc->app_name || !app_desc->app_name[0]) {        
+		info("%s: missing AppName", __func__);        
+		return ESLURM_INVALID_APP_NAME;        
+	}        
+      
+	if (create_flag) {      
+		/* --- CREATE path: app_name must be unique --- */      
     
-	if (!app_desc->app_name || !app_desc->app_name[0]) {      
-		info("%s: missing AppName", __func__);      
-		return ESLURM_INVALID_APP_NAME;      
+#ifdef __METASTACK_NEW_CUSTOM_EXCEPTION      
+		if (app_desc->watchdog && app_desc->watchdog[0]) {      
+			if (!list_find_first(watch_dog_list,      
+			                     &list_find_watch_dog,      
+			                     app_desc->watchdog)) {      
+				info("%s: AppName=%s references "      
+				     "undefined Watchdog '%s'",      
+				     __func__, app_desc->app_name,      
+				     app_desc->watchdog);      
+				return ESLURM_INVALID_APP_WATCHDOG;      
+			}      
+		}      
+#endif      
+      
+		app_ptr = find_app_record(app_desc->app_name);      
+		if (app_ptr) {      
+			info("%s: App '%s' already exists",      
+			     __func__, app_desc->app_name);      
+			return ESLURM_APP_ALREADY_EXISTS;      
+		}      
+		app_ptr = create_app_record(app_desc->app_name,      
+		                            app_desc->versions);      
+		if (!app_ptr)      
+			return SLURM_ERROR;      
+      
+		if (app_desc->description)      
+			app_ptr->description = xstrdup(app_desc->description);      
+		if (app_desc->watchdog)      
+			app_ptr->watchdog = xstrdup(app_desc->watchdog);      
+		if (app_desc->default_spec == APP_DESC_DEFAULT_YES) {      
+			if (default_app_loc && default_app_loc != app_ptr)      
+				default_app_loc->default_flag = false;      
+			app_ptr->default_flag = true;      
+			xfree(default_app_name);      
+			default_app_name = xstrdup(app_ptr->app_name);      
+			default_app_loc = app_ptr;      
+		}      
+		last_app_update = time(NULL);      
+		schedule_app_save();      
+		info("App created: %s", app_ptr->app_name);      
+    
+	} else if (app_desc->versions && app_desc->versions[0]) {      
+		/* --- UPDATE path with Version specified --- */      
+		/*      
+		 * Version string may contain +/- prefixed tokens from      
+		 * scontrol_process_plus_minus(), e.g.:      
+		 *   "+6.0.0,+6.1.0"  → add versions      
+		 *   "-4.7.1,-3.7.1"  → remove versions      
+		 *   "5.7.1,5.7.2"    → replace entire versions list      
+		 */      
+		char *ver_copy = xstrdup(app_desc->versions);      
+		bool has_plus = (strchr(ver_copy, '+') != NULL);      
+		bool has_minus = (ver_copy[0] == '-' ||      
+				  strstr(ver_copy, ",-") != NULL);      
+    
+		if (has_plus && has_minus) {      
+			info("%s: cannot mix + and - in Version for AppName=%s",      
+			     __func__, app_desc->app_name);      
+			xfree(ver_copy);      
+			return ESLURM_INVALID_APP_NAME;      
+		}      
+    
+		app_ptr = find_app_record(app_desc->app_name);      
+		if (!app_ptr) {      
+			info("%s: App '%s' not found",      
+			     __func__, app_desc->app_name);      
+			xfree(ver_copy);      
+			return ESLURM_APP_NOT_FOUND;      
+		}      
+    
+		/* Validate watchdog BEFORE modifying versions (atomicity) */      
+#ifdef __METASTACK_NEW_CUSTOM_EXCEPTION      
+		if (app_desc->watchdog && app_desc->watchdog[0]) {      
+			if (!list_find_first(watch_dog_list,      
+			                     &list_find_watch_dog,      
+			                     app_desc->watchdog)) {      
+				info("%s: AppName=%s references undefined "      
+				     "Watchdog '%s'",      
+				     __func__, app_desc->app_name,      
+				     app_desc->watchdog);      
+				xfree(ver_copy);      
+				return ESLURM_INVALID_APP_WATCHDOG;      
+			}      
+		}      
+#endif      
+    
+		/* Remove old combined hash entries before modifying versions */      
+		_remove_combined_hash_for_app(app_ptr);      
+    
+		if (has_plus) {      
+			/* --- Add versions to existing list --- */      
+			char *save_ptr = NULL;      
+			char *tok = strtok_r(ver_copy, ",", &save_ptr);      
+			while (tok) {      
+				if (*tok == '+')      
+					tok++;      
+				while (*tok == ' ' || *tok == '\t')      
+					tok++;      
+				if (*tok != '\0') {      
+					if (!_version_in_list(      
+						    app_ptr->versions, tok)) {      
+						if (app_ptr->versions &&      
+						    app_ptr->versions[0])      
+							xstrfmtcat(      
+								app_ptr->versions,      
+								",%s", tok);      
+						else {      
+							xfree(app_ptr->versions);      
+							app_ptr->versions =      
+								xstrdup(tok);      
+						}      
+						info("App version added: %s-%s",      
+						     app_desc->app_name, tok);      
+					} else {      
+						info("%s: version '%s' already "      
+						     "exists for AppName=%s, "      
+						     "skipping",      
+						     __func__, tok,      
+						     app_desc->app_name);      
+					}      
+				}      
+				tok = strtok_r(NULL, ",", &save_ptr);      
+			}      
+    
+		} else if (has_minus) {      
+			/* --- Remove versions from existing list --- */      
+			char *save_ptr = NULL;      
+			char *tok = strtok_r(ver_copy, ",", &save_ptr);      
+			while (tok) {      
+				if (*tok == '-')      
+					tok++;      
+				while (*tok == ' ' || *tok == '\t')      
+					tok++;      
+				if (*tok != '\0') {      
+					if (_version_in_list(      
+						    app_ptr->versions, tok)) {      
+						_remove_version_from_list(      
+							&app_ptr->versions,      
+							tok);      
+						info("App version removed: "      
+						     "%s-%s",      
+						     app_desc->app_name, tok);      
+					} else {      
+						info("%s: version '%s' not "      
+						     "found for AppName=%s, "      
+						     "skipping",      
+						     __func__, tok,      
+						     app_desc->app_name);      
+					}      
+				}      
+				tok = strtok_r(NULL, ",", &save_ptr);      
+			}      
+    
+		} else {      
+			/* --- Plain replace: set entire versions list --- */      
+			xfree(app_ptr->versions);      
+			app_ptr->versions = xstrdup(app_desc->versions);      
+		}      
+    
+		/* Rebuild combined hash entries with updated versions */      
+		_rebuild_combined_hash_for_app(app_ptr);      
+    
+		xfree(ver_copy);      
+    
+		/* Also update other properties if provided */      
+		if (app_desc->description) {      
+			xfree(app_ptr->description);      
+			app_ptr->description =      
+				xstrdup(app_desc->description);      
+		}      
+    
+		if (app_desc->watchdog) {      
+			xfree(app_ptr->watchdog);      
+			app_ptr->watchdog =      
+				xstrdup(app_desc->watchdog);      
+		}      
+    
+		if (app_desc->default_spec !=      
+		    APP_DESC_DEFAULT_IGNORE) {      
+			bool new_default =      
+				(app_desc->default_spec ==      
+				 APP_DESC_DEFAULT_YES);      
+			if (new_default && !app_ptr->default_flag) {      
+				if (default_app_loc &&      
+				    default_app_loc != app_ptr)      
+					default_app_loc->default_flag =      
+						false;      
+				app_ptr->default_flag = true;      
+				xfree(default_app_name);      
+				default_app_name =      
+					xstrdup(app_ptr->app_name);      
+				default_app_loc = app_ptr;      
+			} else if (!new_default &&      
+				   app_ptr->default_flag) {      
+				app_ptr->default_flag = false;      
+				if (default_app_loc == app_ptr) {      
+					xfree(default_app_name);      
+					default_app_loc = NULL;      
+				}      
+			}      
+		}      
+    
+		last_app_update = time(NULL);      
+		schedule_app_save();      
+		info("App updated: %s", app_ptr->app_name);      
+    
+	} else {      
+		/* --- No Version specified: update properties only --- */      
+		app_ptr = find_app_record(app_desc->app_name);      
+		if (!app_ptr) {      
+			info("%s: App '%s' not found",      
+			     __func__, app_desc->app_name);      
+			return ESLURM_APP_NOT_FOUND;      
+		}      
+    
+#ifdef __METASTACK_NEW_CUSTOM_EXCEPTION      
+		if (app_desc->watchdog && app_desc->watchdog[0]) {      
+			if (!list_find_first(watch_dog_list,      
+			                     &list_find_watch_dog,      
+			                     app_desc->watchdog)) {      
+				info("%s: undefined Watchdog '%s'",      
+				     __func__, app_desc->watchdog);      
+				return ESLURM_INVALID_APP_WATCHDOG;      
+			}      
+		}      
+#endif      
+    
+		if (app_desc->description) {      
+			xfree(app_ptr->description);      
+			app_ptr->description =      
+				xstrdup(app_desc->description);      
+		}      
+		if (app_desc->watchdog) {      
+			xfree(app_ptr->watchdog);      
+			app_ptr->watchdog =      
+				xstrdup(app_desc->watchdog);      
+		}      
+		if (app_desc->default_spec !=      
+		    APP_DESC_DEFAULT_IGNORE) {      
+			bool new_default =      
+				(app_desc->default_spec ==      
+				 APP_DESC_DEFAULT_YES);      
+			if (new_default && !app_ptr->default_flag) {      
+				if (default_app_loc &&      
+				    default_app_loc != app_ptr)      
+					default_app_loc->default_flag =      
+						false;      
+				app_ptr->default_flag = true;      
+				xfree(default_app_name);      
+				default_app_name =      
+					xstrdup(app_ptr->app_name);      
+				default_app_loc = app_ptr;      
+			} else if (!new_default &&      
+				   app_ptr->default_flag) {      
+				app_ptr->default_flag = false;      
+				if (default_app_loc == app_ptr) {      
+					xfree(default_app_name);      
+					default_app_loc = NULL;      
+				}      
+			}      
+		}      
+    
+		last_app_update = time(NULL);      
+		schedule_app_save();      
+		info("App updated: %s", app_ptr->app_name);      
 	}      
-    
-	if (create_flag) {    
-		/* --- CREATE path: app_name must be unique --- */    
-  
-#ifdef __METASTACK_NEW_CUSTOM_EXCEPTION    
-		if (app_desc->watchdog && app_desc->watchdog[0]) {    
-			if (!list_find_first(watch_dog_list,    
-			                     &list_find_watch_dog,    
-			                     app_desc->watchdog)) {    
-				info("%s: AppName=%s references "    
-				     "undefined Watchdog '%s'",    
-				     __func__, app_desc->app_name,    
-				     app_desc->watchdog);    
-				return ESLURM_INVALID_APP_WATCHDOG;    
-			}    
-		}    
-#endif    
-    
-		app_ptr = find_app_record(app_desc->app_name);    
-		if (app_ptr) {    
-			info("%s: App '%s' already exists",    
-			     __func__, app_desc->app_name);    
-			return ESLURM_APP_ALREADY_EXISTS;    
-		}    
-		app_ptr = create_app_record(app_desc->app_name,    
-		                            app_desc->versions);    
-		if (!app_ptr)    
-			return SLURM_ERROR;    
-    
-		if (app_desc->description)    
-			app_ptr->description = xstrdup(app_desc->description);    
-		if (app_desc->watchdog)    
-			app_ptr->watchdog = xstrdup(app_desc->watchdog);    
-		if (app_desc->default_spec == APP_DESC_DEFAULT_YES) {    
-			if (default_app_loc && default_app_loc != app_ptr)    
-				default_app_loc->default_flag = false;    
-			app_ptr->default_flag = true;    
-			xfree(default_app_name);    
-			default_app_name = xstrdup(app_ptr->app_name);    
-			default_app_loc = app_ptr;    
-		}    
-		last_app_update = time(NULL);    
-		schedule_app_save();    
-		info("App created: %s", app_ptr->app_name);    
-  
-	} else if (app_desc->versions && app_desc->versions[0]) {    
-		/* --- UPDATE path with Version specified --- */    
-		/*    
-		 * Version string may contain +/- prefixed tokens from    
-		 * scontrol_process_plus_minus(), e.g.:    
-		 *   "+6.0.0,+6.1.0"  → add versions    
-		 *   "-4.7.1,-3.7.1"  → remove versions    
-		 *   "5.7.1,5.7.2"    → replace entire versions list    
-		 */    
-		char *ver_copy = xstrdup(app_desc->versions);    
-		bool has_plus = (strchr(ver_copy, '+') != NULL);    
-		bool has_minus = (ver_copy[0] == '-' ||    
-				  strstr(ver_copy, ",-") != NULL);    
-  
-		if (has_plus && has_minus) {    
-			info("%s: cannot mix + and - in Version for AppName=%s",    
-			     __func__, app_desc->app_name);    
-			xfree(ver_copy);    
-			return ESLURM_INVALID_APP_NAME;    
-		}    
-  
-		app_ptr = find_app_record(app_desc->app_name);    
-		if (!app_ptr) {    
-			info("%s: App '%s' not found",    
-			     __func__, app_desc->app_name);    
-			xfree(ver_copy);    
-			return ESLURM_APP_NOT_FOUND;    
-		}    
-  
-		/* Remove old combined hash entries before modifying versions */    
-		_remove_combined_hash_for_app(app_ptr);    
-  
-		if (has_plus) {    
-			/* --- Add versions to existing list --- */    
-			char *save_ptr = NULL;    
-			char *tok = strtok_r(ver_copy, ",", &save_ptr);    
-			while (tok) {    
-				if (*tok == '+')    
-					tok++;    
-				while (*tok == ' ' || *tok == '\t')    
-					tok++;    
-				if (*tok != '\0') {    
-					if (!_version_in_list(    
-						    app_ptr->versions, tok)) {    
-						if (app_ptr->versions &&    
-						    app_ptr->versions[0])    
-							xstrfmtcat(    
-								app_ptr->versions,    
-								",%s", tok);    
-						else {    
-							xfree(app_ptr->versions);    
-							app_ptr->versions =    
-								xstrdup(tok);    
-						}    
-						info("App version added: %s-%s",    
-						     app_desc->app_name, tok);    
-					} else {    
-						info("%s: version '%s' already "    
-						     "exists for AppName=%s, "    
-						     "skipping",    
-						     __func__, tok,    
-						     app_desc->app_name);    
-					}    
-				}    
-				tok = strtok_r(NULL, ",", &save_ptr);    
-			}    
-  
-		} else if (has_minus) {    
-			/* --- Remove versions from existing list --- */    
-			char *save_ptr = NULL;    
-			char *tok = strtok_r(ver_copy, ",", &save_ptr);    
-			while (tok) {    
-				if (*tok == '-')    
-					tok++;    
-				while (*tok == ' ' || *tok == '\t')    
-					tok++;    
-				if (*tok != '\0') {    
-					if (_version_in_list(    
-						    app_ptr->versions, tok)) {    
-						_remove_version_from_list(    
-							&app_ptr->versions,    
-							tok);    
-						info("App version removed: "    
-						     "%s-%s",    
-						     app_desc->app_name, tok);    
-					} else {    
-						info("%s: version '%s' not "    
-						     "found for AppName=%s, "    
-						     "skipping",    
-						     __func__, tok,    
-						     app_desc->app_name);    
-					}    
-				}    
-				tok = strtok_r(NULL, ",", &save_ptr);    
-			}    
-  
-		} else {    
-			/* --- Plain replace: set entire versions list --- */    
-			xfree(app_ptr->versions);    
-			app_ptr->versions = xstrdup(app_desc->versions);    
-		}    
-  
-		/* Rebuild combined hash entries with updated versions */    
-		_rebuild_combined_hash_for_app(app_ptr);    
-  
-		xfree(ver_copy);    
-  
-		/* Also update other properties if provided */    
-		if (app_desc->description) {  
-			xfree(app_ptr->description);  
-			if (app_desc->description[0])  
-				app_ptr->description =  
-					xstrdup(app_desc->description);  
-		}
-  
-#ifdef __METASTACK_NEW_CUSTOM_EXCEPTION    
-		if (app_desc->watchdog && app_desc->watchdog[0]) {    
-			if (!list_find_first(watch_dog_list,    
-			                     &list_find_watch_dog,    
-			                     app_desc->watchdog)) {    
-				info("%s: AppName=%s references undefined "    
-				     "Watchdog '%s'",    
-				     __func__, app_desc->app_name,    
-				     app_desc->watchdog);    
-				return ESLURM_INVALID_APP_WATCHDOG;    
-			}    
-		}    
-#endif    
-		if (app_desc->watchdog) {  
-			xfree(app_ptr->watchdog);  
-			if (app_desc->watchdog[0])  
-				app_ptr->watchdog = xstrdup(app_desc->watchdog);  
-		}
-  
-		if (app_desc->default_spec !=    
-		    APP_DESC_DEFAULT_IGNORE) {    
-			bool new_default =    
-				(app_desc->default_spec ==    
-				 APP_DESC_DEFAULT_YES);    
-			if (new_default && !app_ptr->default_flag) {    
-				if (default_app_loc &&    
-				    default_app_loc != app_ptr)    
-					default_app_loc->default_flag =    
-						false;    
-				app_ptr->default_flag = true;    
-				xfree(default_app_name);    
-				default_app_name =    
-					xstrdup(app_ptr->app_name);    
-				default_app_loc = app_ptr;    
-			} else if (!new_default &&    
-				   app_ptr->default_flag) {    
-				app_ptr->default_flag = false;    
-				if (default_app_loc == app_ptr) {    
-					xfree(default_app_name);    
-					default_app_loc = NULL;    
-				}    
-			}    
-		}    
-  
-		last_app_update = time(NULL);    
-		schedule_app_save();    
-		info("App updated: %s", app_ptr->app_name);    
-  
-	} else {    
-		/* --- No Version specified: update properties only --- */    
-		app_ptr = find_app_record(app_desc->app_name);    
-		if (!app_ptr) {    
-			info("%s: App '%s' not found",    
-			     __func__, app_desc->app_name);    
-			return ESLURM_APP_NOT_FOUND;    
-		}    
-  
-#ifdef __METASTACK_NEW_CUSTOM_EXCEPTION    
-		if (app_desc->watchdog && app_desc->watchdog[0]) {    
-			if (!list_find_first(watch_dog_list,    
-			                     &list_find_watch_dog,    
-			                     app_desc->watchdog)) {    
-				info("%s: undefined Watchdog '%s'",    
-				     __func__, app_desc->watchdog);    
-				return ESLURM_INVALID_APP_WATCHDOG;    
-			}    
-		}    
-#endif    
-  
-		if (app_desc->description) {  
-			xfree(app_ptr->description);  
-			if (app_desc->description[0])  
-				app_ptr->description =  
-					xstrdup(app_desc->description);  
-		}
-		if (app_desc->watchdog) {  
-			xfree(app_ptr->watchdog);  
-			if (app_desc->watchdog[0])  
-				app_ptr->watchdog =  
-					xstrdup(app_desc->watchdog);  
-		}
-		if (app_desc->default_spec !=    
-		    APP_DESC_DEFAULT_IGNORE) {    
-			bool new_default =    
-				(app_desc->default_spec ==    
-				 APP_DESC_DEFAULT_YES);    
-			if (new_default && !app_ptr->default_flag) {    
-				if (default_app_loc &&    
-				    default_app_loc != app_ptr)    
-					default_app_loc->default_flag =    
-						false;    
-				app_ptr->default_flag = true;    
-				xfree(default_app_name);    
-				default_app_name =    
-					xstrdup(app_ptr->app_name);    
-				default_app_loc = app_ptr;    
-			} else if (!new_default &&    
-				   app_ptr->default_flag) {    
-				app_ptr->default_flag = false;    
-				if (default_app_loc == app_ptr) {    
-					xfree(default_app_name);    
-					default_app_loc = NULL;    
-				}    
-			}    
-		}    
-  
-		last_app_update = time(NULL);    
-		schedule_app_save();    
-		info("App updated: %s", app_desc->app_name);    
-	}    
-    
-	return SLURM_SUCCESS;      
+      
+	return SLURM_SUCCESS;        
 }
 
 

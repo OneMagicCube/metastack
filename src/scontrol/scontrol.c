@@ -831,20 +831,20 @@ _print_config_app(char *config_param)
 		if (error_code == SLURM_SUCCESS) {  
 			for (i = 0; i < slurm_app_ptr->record_count; i++) {  
 				if (config_param) {  
-					/* Match by combined name or app_name */  
-					char *combined = NULL;  
-					xstrfmtcat(combined, "%s-%s",  
-					           app_ptr[i].app_name,  
-					           app_ptr[i].versions);  
-					if (xstrcmp(config_param,  
-					            combined) != 0 &&  
-					    xstrcmp(config_param,  
-					            app_ptr[i].app_name) != 0) {  
+					bool match = false;  
+					if (xstrcmp(config_param, app_ptr[i].app_name) == 0) {  
+						match = true;  
+					} else if (app_ptr[i].versions) {  
+						char *combined = NULL;  
+						xstrfmtcat(combined, "%s-%s",  
+								app_ptr[i].app_name,  
+								app_ptr[i].versions);  
+						match = (xstrcmp(config_param, combined) == 0);  
 						xfree(combined);  
-						continue;  
 					}  
-					xfree(combined);  
-				}  
+					if (!match)  
+						continue;  
+				}
 				print_cnt++;  
 				slurm_print_app_info(stdout, &app_ptr[i],  
 				                     one_liner);  
