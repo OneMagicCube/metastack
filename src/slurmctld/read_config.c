@@ -1108,9 +1108,11 @@ static void _app_combined_hash_identity(void *item, const char **key,
 static void _app_combined_entry_free(void *item)    
 {    
 	app_combined_entry_t *e = (app_combined_entry_t *)item;    
+	if (!e)
+		return;
 	xfree(e->combined_name);    
 	xfree(e);    
-}  
+}
   
 /*    
  * _rebuild_combined_hash_for_app - Build secondary hash entries for one app.    
@@ -1480,14 +1482,29 @@ static int _build_single_appline_info(app_record_t *app)
 			/* Remove old combined hash entries before changing versions */    
 			_remove_combined_hash_for_app(app_ptr);    
   
-			if (app_ptr->versions && app_ptr->versions[0]) {    
-				/* Append: "old,new" */    
-				xstrfmtcat(app_ptr->versions, ",%s",    
-					   app->versions);    
-			} else {    
-				xfree(app_ptr->versions);    
-				app_ptr->versions = xstrdup(app->versions);    
-			}    
+			if (app_ptr->versions && app_ptr->versions[0]) {  
+				/* Append only versions not already present */  
+				char *copy = xstrdup(app->versions);  
+				char *save_ptr = NULL;  
+				char *tok = strtok_r(copy, ",", &save_ptr);  
+				while (tok) {  
+					while (*tok == ' ' || *tok == '\t')  
+						tok++;  
+					char *end = tok + strlen(tok) - 1;  
+					while (end > tok && (*end == ' ' || *end == '\t'))  
+						*end-- = '\0';  
+					if (*tok && !_version_in_list(  
+							app_ptr->versions, tok)) {  
+						xstrfmtcat(app_ptr->versions,  
+								",%s", tok);  
+					}  
+					tok = strtok_r(NULL, ",", &save_ptr);  
+				}  
+				xfree(copy);  
+			} else {  
+				xfree(app_ptr->versions);  
+				app_ptr->versions = xstrdup(app->versions);  
+			} 
   
 			/* Rebuild combined hash entries with updated versions */    
 			_rebuild_combined_hash_for_app(app_ptr);    
