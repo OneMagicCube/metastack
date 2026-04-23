@@ -1391,15 +1391,22 @@ static void _handle_include(char *include_file, char *conf_file)
  * _is_app_only_file - Quick peek at an included file to check whether  
  * it contains only AppName configuration lines (plus comments and blanks).  
  *  
- * Reads up to PEEK_LINES non-empty, non-comment lines. If ALL of them  
- * start with "AppName" (case-insensitive), returns true. This allows  
- * the caller to skip the entire file for non-slurmctld processes,  
+ * Reads up to APP_ONLY_PEEK_LINES non-empty, non-comment lines. If ALL  
+ * of them start with "AppName" (case-insensitive), returns true. This  
+ * allows the caller to skip the entire file for non-slurmctld processes,  
  * avoiding all per-line I/O, hash computation, and string processing.  
  *  
- * Cost: one fopen + a few short fgets calls (256 bytes each).  
- * Returns false on any I/O error or if the file is empty.  
+ * Uses a small 256-byte buffer for prefix checking only. Lines longer  
+ * than the buffer (e.g. AppName with 100+ comma-separated versions) are  
+ * handled by consuming the remainder of the line via fgetc() after a  
+ * successful prefix match, ensuring the next fgets() starts at a fresh  
+ * line boundary.  
+ *  
+ * Cost: one fopen + a few short fgets/fgetc calls.  
+ * Returns false on any I/O error, if the file is empty, or if any  
+ * non-empty non-comment line does not start with "AppName".  
  */  
-#define APP_ONLY_PEEK_LINES 2 
+#define APP_ONLY_PEEK_LINES 3  
 static bool _is_app_only_file(const char *path)  
 {  
 	FILE *f;  
@@ -1415,19 +1422,33 @@ static bool _is_app_only_file(const char *path)
 		return false;  
   
 	while (fgets(buf, sizeof(buf), f)) {  
-		/* skip blank lines and comment lines */  
+		/* Skip leading whitespace */  
 		p = buf;  
 		while (isspace((int)*p))  
 			p++;  
+  
+		/* Skip blank lines and comments */  
 		if (*p == '\0' || *p == '#' || *p == '\n')  
 			continue;  
   
-		/* check "AppName" prefix (case-insensitive) */  
+		/* Check for "AppName" prefix (case-insensitive) */  
 		if (xstrncasecmp(p, "AppName", 7) != 0 ||  
 		    (p[7] != '=' && !isspace((int)p[7]))) {  
 			fclose(f);  
 			return false;  
 		}  
+  
+		/* If the line is longer than buf, consume the rest so that  
+		 * the next fgets() starts at a fresh line. Without this,  
+		 * fgets() would return the middle of the same long line  
+		 * (e.g. "1.0.30,1.0.31,...") which would fail the AppName  
+		 * prefix check and incorrectly return false. */  
+		if (!strchr(buf, '\n')) {  
+			int c;  
+			while ((c = fgetc(f)) != EOF && c != '\n')  
+				;  
+		}  
+  
 		if (++checked >= APP_ONLY_PEEK_LINES)  
 			break;  
 	}  
