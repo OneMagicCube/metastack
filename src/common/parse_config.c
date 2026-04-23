@@ -1386,6 +1386,57 @@ static void _handle_include(char *include_file, char *conf_file)
 	}
 }
 
+#ifdef __METASTACK_OPT_APP  
+/*  
+ * _is_app_only_file - Quick peek at an included file to check whether  
+ * it contains only AppName configuration lines (plus comments and blanks).  
+ *  
+ * Reads up to PEEK_LINES non-empty, non-comment lines. If ALL of them  
+ * start with "AppName" (case-insensitive), returns true. This allows  
+ * the caller to skip the entire file for non-slurmctld processes,  
+ * avoiding all per-line I/O, hash computation, and string processing.  
+ *  
+ * Cost: one fopen + a few short fgets calls (256 bytes each).  
+ * Returns false on any I/O error or if the file is empty.  
+ */  
+#define APP_ONLY_PEEK_LINES 2 
+static bool _is_app_only_file(const char *path)  
+{  
+	FILE *f;  
+	char buf[256];  
+	char *p;  
+	int checked = 0;  
+  
+	if (!path)  
+		return false;  
+  
+	f = fopen(path, "r");  
+	if (!f)  
+		return false;  
+  
+	while (fgets(buf, sizeof(buf), f)) {  
+		/* skip blank lines and comment lines */  
+		p = buf;  
+		while (isspace((int)*p))  
+			p++;  
+		if (*p == '\0' || *p == '#' || *p == '\n')  
+			continue;  
+  
+		/* check "AppName" prefix (case-insensitive) */  
+		if (xstrncasecmp(p, "AppName", 7) != 0 ||  
+		    (p[7] != '=' && !isspace((int)p[7]))) {  
+			fclose(f);  
+			return false;  
+		}  
+		if (++checked >= APP_ONLY_PEEK_LINES)  
+			break;  
+	}  
+  
+	fclose(f);  
+	return (checked > 0);  
+}  
+#endif
+
 /*
  * Returns 1 if the line contained an include directive and the included
  * file was parsed without error.  Returns -1 if the line was an include
@@ -1433,7 +1484,23 @@ static int _parse_include_directive(s_p_hashtbl_t *hashtbl, uint32_t *hash_val,
 			      temp.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO));
 		if (!last_ancestor)
 			last_ancestor = xbasename(slurm_conf_path);
-
+#ifdef __METASTACK_OPT_APP  
+		/*  
+		 * File-level skip: if this is a non-slurmctld process  
+		 * and the included file contains only AppName lines,  
+		 * skip the entire file to avoid per-line I/O overhead.  
+		 * This reduces client command latency from O(n*line_len)  
+		 * to O(1) for large app config files.  
+		 */  
+		if (!running_in_slurmctld() &&  
+		    _is_app_only_file(path_name)) {  
+			debug2("%s: skipping app-only include file %s "  
+			       "(non-slurmctld process)", __func__, path_name);  
+			xfree(path_name);  
+			xfree(file_name);  
+			return 1;  
+		}  
+#endif 
 		if (xstrstr(file_name, "*")) {
 			if ((!xstrcasecmp(last_ancestor,"slurm.conf")) ||
 			    (!(slurm_conf.debug_flags & DEBUG_FLAG_GLOB_SILENCE))) {
