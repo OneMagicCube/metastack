@@ -119,6 +119,11 @@ char *job_req_inx[] = {
 	"t1.resource_node_detail",
 #endif
 	"t2.lineage",
+#ifdef __METASTACK_OPT_APP  
+	"t5.app_name",  
+	"t5.app_version",  
+	"t5.app_source",
+#endif 
 	"t2.user"
 };
 
@@ -189,6 +194,11 @@ enum {
 	JOB_REQ_RESC_NODE,
 #endif
 	JOB_REQ_LINEAGE,
+#ifdef __METASTACK_OPT_APP  
+	JOB_REQ_APP_NAME,  
+	JOB_REQ_APP_VERSION,  
+	JOB_REQ_APP_SOURCE,  
+#endif
 	JOB_REQ_USER_NAME,
 	JOB_REQ_COUNT
 };
@@ -576,7 +586,14 @@ static int _cluster_get_jobs(mysql_conn_t *mysql_conn,
 			   " left join \"%s_%s\" as t4 "
 			   "on t1.env_hash_inx=t4.hash_inx",
 			   cluster_name, job_env_table);
-
+#ifdef __METASTACK_OPT_APP  
+	/* Only LEFT JOIN app table when app info is actually needed */
+	if (job_cond->flags & JOBCOND_FLAG_APP)  
+		xstrfmtcat(query,  
+			   " left join \"%s_%s\" as t5 "  
+			   "on t1.job_db_inx=t5.job_db_inx",  
+			   cluster_name, job_app_table);  
+#endif  
 	if (job_cond->flags & JOBCOND_FLAG_RUNAWAY) {
 		if (extra)
 			xstrcat(extra, " && (t1.time_end=0)");
@@ -708,7 +725,16 @@ static int _cluster_get_jobs(mysql_conn_t *mysql_conn,
 			job->mcs_label = xstrdup("");
 		if (row[JOB_REQ_USER_NAME])
 			job->user = xstrdup(row[JOB_REQ_USER_NAME]);
-
+#ifdef __METASTACK_OPT_APP  
+		if (row[JOB_REQ_APP_NAME] && row[JOB_REQ_APP_NAME][0])  
+			job->app_name = xstrdup(row[JOB_REQ_APP_NAME]);  
+		if (row[JOB_REQ_APP_VERSION] && row[JOB_REQ_APP_VERSION][0])  
+			job->app_version = xstrdup(row[JOB_REQ_APP_VERSION]);  
+		if (row[JOB_REQ_APP_SOURCE] && row[JOB_REQ_APP_SOURCE][0])  
+			job->app_source = slurm_atoul(row[JOB_REQ_APP_SOURCE]);  
+		else  
+			job->app_source = APP_SOURCE_NOTSET;
+#endif
 		if (row[JOB_REQ_UID])
 			job->uid = slurm_atoul(row[JOB_REQ_UID]);
 
@@ -1411,6 +1437,68 @@ no_resv:
 			   *extra ? "&&" : "where",
 			   JOB_REVOKED);
 
+#ifdef __METASTACK_OPT_APP  
+	if (job_cond->appname_list &&  
+	    list_count(job_cond->appname_list)) {  
+		set = 0;  
+		if (*extra)  
+			xstrcat(*extra, " && (");  
+		else  
+			xstrcat(*extra, " where (");  
+		itr = list_iterator_create(job_cond->appname_list);  
+		while ((object = list_next(itr))) {  
+			char *esc_obj = slurm_add_slash_to_quotes(object);  
+			if (set)  
+				xstrcat(*extra, " || ");  
+			xstrfmtcat(*extra, "t5.app_name='%s'",  
+				   esc_obj ? esc_obj : "");  
+			xfree(esc_obj);  
+			set = 1;  
+		}  
+		list_iterator_destroy(itr);  
+		xstrcat(*extra, ")");  
+	}  
+  
+	if (job_cond->appversion_list &&  
+	    list_count(job_cond->appversion_list)) {  
+		set = 0;  
+		if (*extra)  
+			xstrcat(*extra, " && (");  
+		else  
+			xstrcat(*extra, " where (");  
+		itr = list_iterator_create(job_cond->appversion_list);  
+		while ((object = list_next(itr))) {  
+			char *esc_obj = slurm_add_slash_to_quotes(object);  
+			if (set)  
+				xstrcat(*extra, " || ");  
+			xstrfmtcat(*extra, "t5.app_version='%s'",  
+				   esc_obj ? esc_obj : "");  
+			xfree(esc_obj);  
+			set = 1;  
+		}  
+		list_iterator_destroy(itr);  
+		xstrcat(*extra, ")");  
+	}  
+	if (job_cond->appsource_list &&  
+	    list_count(job_cond->appsource_list)) {  
+		set = 0;  
+		if (*extra)  
+			xstrcat(*extra, " && (");  
+		else  
+			xstrcat(*extra, " where (");  
+		itr = list_iterator_create(job_cond->appsource_list);  
+		while ((object = list_next(itr))) {  
+			if (set)  
+				xstrcat(*extra, " || ");  
+			/* appsource_list stores numeric strings like "3","4" */  
+			xstrfmtcat(*extra, "t5.app_source=%lu", slurm_atoul(object));
+			set = 1;  
+		}  
+		list_iterator_destroy(itr);  
+		xstrcat(*extra, ")");  
+	}  
+#endif  
+
 	return SLURM_SUCCESS;
 }
 
@@ -1766,7 +1854,11 @@ extern List as_mysql_jobacct_process_get_jobs(mysql_conn_t *mysql_conn,
 	    (job_cond->flags & JOBCOND_FLAG_SCRIPT) ||
 	    (job_cond->flags & JOBCOND_FLAG_ENV)) {
 		if (!(is_admin = is_user_min_admin_level(
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+			      mysql_conn, uid, SLURMDB_ADMIN_READ_ONLY))) {
+#else
 			      mysql_conn, uid, SLURMDB_ADMIN_OPERATOR))) {
+#endif
 			/*
 			 * Only fill in the coordinator accounts here we will
 			 * check them later when we actually try to get the jobs
@@ -1811,7 +1903,14 @@ extern List as_mysql_jobacct_process_get_jobs(mysql_conn_t *mysql_conn,
 		if (((i == JOB_REQ_SCRIPT) &&
 		     (!job_cond || !(job_cond->flags & JOBCOND_FLAG_SCRIPT))) ||
 		    ((i == JOB_REQ_ENV) &&
-		     (!job_cond || !(job_cond->flags & JOBCOND_FLAG_ENV))))
+		     (!job_cond || !(job_cond->flags & JOBCOND_FLAG_ENV)))
+#ifdef __METASTACK_OPT_APP  
+		    || ((i == JOB_REQ_APP_NAME ||  
+		         i == JOB_REQ_APP_VERSION ||  
+		         i == JOB_REQ_APP_SOURCE) &&  
+		        (!job_cond || !(job_cond->flags & JOBCOND_FLAG_APP)))  
+#endif
+			 )
 			xstrcat(tmp, ", ''");
 		else
 			xstrfmtcat(tmp, ", %s", job_req_inx[i]);

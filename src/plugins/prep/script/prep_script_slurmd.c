@@ -358,6 +358,16 @@ static char **_build_env(job_env_t *job_env, slurm_cred_t *cred,
 			setenvf(&env, "SLURM_JOB_USER", "%s",
 				cred_arg->id->pw_name);
 		}
+#ifdef __METASTACK_OPT_APP
+		if (cred_arg->job_app_name)  
+			setenvf(&env, "SLURM_JOB_APP_NAME", "%s",  
+				cred_arg->job_app_name);  
+		if (cred_arg->job_app_version)  
+			setenvf(&env, "SLURM_JOB_APP_VERSION", "%s",  
+				cred_arg->job_app_version);  
+		if (cred_arg->job_app_name)
+			setenvf(&env, "SLURM_JOB_APP_SOURCE", "%s", app_source_to_str(cred_arg->job_app_source));
+#endif 
 		slurm_cred_unlock_args(cred);
 	}
 

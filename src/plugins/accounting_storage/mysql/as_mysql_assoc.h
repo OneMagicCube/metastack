@@ -56,7 +56,16 @@ extern List as_mysql_modify_assocs(mysql_conn_t *mysql_conn, uint32_t uid,
 				   slurmdb_assoc_rec_t *assoc);
 
 extern List as_mysql_remove_assocs(mysql_conn_t *mysql_conn, uint32_t uid,
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+				   bool is_deactivate,
+#endif
 				   slurmdb_assoc_cond_t *assoc_cond);
+
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+extern List as_mysql_activate_assocs(mysql_conn_t *mysql_conn, uint32_t uid,
+				   slurmdb_assoc_cond_t *assoc_cond,
+				   slurmdb_assoc_rec_t *assoc);
+#endif
 
 #ifdef __METASTACK_OPT_LIST_USER
 extern List as_mysql_get_assocs(mysql_conn_t *mysql_conn, uid_t uid,

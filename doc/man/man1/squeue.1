@@ -26,6 +26,20 @@ hidden, partitions that are unavailable to a user's group, and federated jobs
 that are in a "revoked" state.
 .IP
 
+.\" __METASTACK_OPT_APP  
+.TP  
+\fB\-\-app\-name\fR=<\fIname(s)\fR>  
+Comma separated list of application names to filter jobs by.  
+Only jobs with a matching AppName will be displayed.  
+.IP  
+
+.TP  
+\fB\-\-app\-source\fR=<\fIsource(s)\fR>  
+Comma separated list of application sources to filter jobs by.  
+Valid values: user, auto, portal, marketplace.  
+.IP  
+.\" __METASTACK_OPT_APP
+
 .TP
 \fB\-\-cache\fR
 When CacheQuery is set to "enable", specify querying job information from 
@@ -540,6 +554,20 @@ Valid \fItype\fR specifications include:
 Print the account associated with the job.
 (Valid for jobs only)
 .IP
+
+.\" __METASTACK_OPT_APP  
+.TP  
+\fBApp\fR  
+Combined application name and version for the job (e.g. "vasp\-5.7.1").  
+If no version is set, only the application name is displayed.  
+(Valid for jobs only)  
+.IP
+
+.TP  
+\fBAPPSOURCE\fR  
+Source of the application information: user, auto, portal, or marketplace.  
+.IP 
+.\" __METASTACK_OPT_APP  
 
 .TP
 \fBAccrueTime\fR

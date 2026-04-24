@@ -139,6 +139,10 @@ static void _print_config(char *config_param, int argc, char **argv);
 static void _print_config_watchdog(char *config_param);
 slurm_ctl_conf_info_msg_watch_dog_t *old_slurm_watch_dog_ptr = NULL;
 #endif
+#ifdef __METASTACK_OPT_APP  
+static void _print_config_app(char *config_param);  
+slurm_ctl_conf_info_msg_app_t *old_slurm_app_ptr = NULL;  
+#endif
 static void     _print_daemons(void);
 static void     _print_aliases(char* node_hostname);
 static void _print_ping(int argc, char **argv);
@@ -684,12 +688,45 @@ static void _write_config(char *file_name)
 	} else {
 		old_slurm_watch_dog_ptr = slurm_watch_dog_ptr;
 	}
+#endif
+
+#ifdef __METASTACK_OPT_APP  
+	int error_code2 = SLURM_SUCCESS;  
+	slurm_ctl_conf_info_msg_app_t *slurm_app_ptr = NULL;  
+  
+	if (old_slurm_app_ptr) {  
+		old_slurm_app_ptr->last_update = (time_t) 0;  
+		error_code2 = slurm_load_app(  
+			old_slurm_app_ptr->last_update, &slurm_app_ptr);  
+		if (error_code2 == SLURM_SUCCESS)  
+			slurm_free_app_info_msg(old_slurm_app_ptr);  
+		else if (slurm_get_errno() == SLURM_NO_CHANGE_IN_DATA) {  
+			slurm_app_ptr = old_slurm_app_ptr;  
+			error_code2 = SLURM_SUCCESS;  
+		}  
+	} else  
+		error_code2 = slurm_load_app((time_t) NULL, &slurm_app_ptr);  
+  
+	if (error_code2) {  
+		exit_code = 1;  
+		if (quiet_flag != 1)  
+			slurm_perror("slurm_load_app error");  
+	} else {  
+		old_slurm_app_ptr = slurm_app_ptr;  
+	}  
+#endif
 
 		/* send the info off to be written */
-	slurm_write_ctl_conf (slurm_ctl_conf_ptr,
-					node_info_ptr,
-					part_info_ptr,
-					slurm_watch_dog_ptr);
+#ifdef __METASTACK_OPT_APP  
+	slurm_write_ctl_conf(slurm_ctl_conf_ptr, node_info_ptr,  
+	                     part_info_ptr, slurm_watch_dog_ptr,  
+	                     slurm_app_ptr);  
+#elif defined(__METASTACK_NEW_CUSTOM_EXCEPTION)  
+	slurm_write_ctl_conf(slurm_ctl_conf_ptr, node_info_ptr,  
+	                     part_info_ptr, slurm_watch_dog_ptr);  
+#else
+	slurm_write_ctl_conf(slurm_ctl_conf_ptr, node_info_ptr,  
+	                     part_info_ptr);  
 #endif
 	}
 }
@@ -756,6 +793,235 @@ _print_config_watchdog(char *config_param)
 	}
 }
 #endif
+
+#ifdef __METASTACK_OPT_APP     
+static void    
+_print_config_app(char *config_param)    
+{    
+	int error_code, print_cnt = 0;    
+	uint32_t i = 0;    
+	slurm_ctl_conf_info_msg_app_t *slurm_app_ptr = NULL;    
+	app_record_t *app_ptr = NULL;    
+    
+	if (old_slurm_app_ptr) {    
+		old_slurm_app_ptr->last_update = (time_t) 0;    
+		error_code = slurm_load_app(    
+			old_slurm_app_ptr->last_update,    
+			&slurm_app_ptr);    
+		if (error_code == SLURM_SUCCESS)    
+			slurm_free_app_info_msg(old_slurm_app_ptr);    
+		else if (slurm_get_errno() == SLURM_NO_CHANGE_IN_DATA) {    
+			slurm_app_ptr = old_slurm_app_ptr;    
+			error_code = SLURM_SUCCESS;    
+			if (quiet_flag == -1)    
+				printf("slurm_load_app no change in data\n");    
+		}    
+	} else    
+		error_code = slurm_load_app((time_t) NULL, &slurm_app_ptr);    
+    
+	if (error_code) {    
+		exit_code = 1;    
+		if (quiet_flag != 1)    
+			slurm_perror("slurm_load_app error");    
+	} else    
+		old_slurm_app_ptr = slurm_app_ptr;    
+    
+	if (slurm_app_ptr) {    
+		app_ptr = slurm_app_ptr->app_array;    
+		if (error_code == SLURM_SUCCESS) {    
+			for (i = 0; i < slurm_app_ptr->record_count; i++) {    
+				if (config_param) {    
+					bool match = false;    
+					if (xstrcmp(config_param,    
+					            app_ptr[i].app_name) == 0) {    
+						match = true;    
+					} else if (app_ptr[i].versions &&    
+					           app_ptr[i].versions[0]) {    
+						/* Tokenize versions and check    
+						 * each "appname-version" */    
+						char *ver_copy = xstrdup(app_ptr[i].versions);    
+						char *save_ptr = NULL;    
+						char *tok = strtok_r(ver_copy, ",", &save_ptr);    
+						while (tok && !match) {    
+							while (*tok == ' ' ||  *tok == '\t')    
+								tok++;    
+							if (*tok) {    
+								char *combined = NULL;    
+								xstrfmtcat(combined, "%s-%s", app_ptr[i].app_name, tok);    
+								if (xstrcmp(config_param,combined) == 0)    
+									match = true;    
+								xfree(combined);    
+							}    
+							tok = strtok_r(NULL, ",", &save_ptr);    
+						}    
+						xfree(ver_copy);    
+					}    
+					if (!match)    
+						continue;    
+				}    
+				print_cnt++;    
+				slurm_print_app_info(stdout, &app_ptr[i], one_liner);    
+			}    
+			if (print_cnt > 0)    
+				fprintf(stdout, "\n");    
+		}    
+	}    
+    
+	if (print_cnt == 0) {    
+		if (config_param)    
+			printf("No app '%s' found.\n", config_param);    
+		else    
+			printf("No apps configured.\n");    
+	}    
+}
+/*  
+ * scontrol_create_app — Handle "scontrol create app AppName=X Version=Y ..."  
+ * Validates required fields (AppName, Version), sends REQUEST_CREATE_APP  
+ * to slurmctld, and prints the created app's combined name on success.  
+ */
+static int _parse_app_options(int argc, char **argv, app_desc_msg_t *app_msg)  
+{  
+	int update_cnt = 0;  
+	for (int i = 0; i < argc; i++) {  
+		char *tag = argv[i];  
+		char *val = strchr(argv[i], '=');  
+		int tag_len;  
+		char plus_minus = '\0';  
+  
+		if (val) {  
+			tag_len = val - argv[i];  
+			/* Detect += or -= before the '=' */  
+			if (tag_len > 0 &&  
+				(*(val - 1) == '+' || *(val - 1) == '-')) {  
+				plus_minus = *(val - 1);  
+				tag_len--;  
+			}  
+			val++;  
+		} else {  
+			tag_len = strlen(tag);  
+		}  
+  
+		if (!val) {  
+			if (!xstrncasecmp(tag, "app", MAX(tag_len, 3)))  
+				continue;  
+			error("Missing value for option '%s' (expected '=')", tag);  
+			continue;  
+		}  
+  
+		if (!xstrncasecmp(tag, "AppName", MAX(tag_len, 4))) {  
+			xfree(app_msg->app_name);  
+			app_msg->app_name = xstrdup(val);  
+			update_cnt++;  
+		} else if (!xstrncasecmp(tag, "Version", MAX(tag_len, 1))) {    
+			xfree(app_msg->versions);    
+			if (plus_minus)    
+				app_msg->versions =    
+					scontrol_process_plus_minus(    
+						plus_minus, val, false);    
+			else    
+				app_msg->versions = xstrdup(val);    
+			update_cnt++;
+		} else if (!xstrncasecmp(tag, "Description", MAX(tag_len, 3))) {  
+			xfree(app_msg->description);  
+			app_msg->description = xstrdup(val);  
+			update_cnt++;  
+		} else if (!xstrncasecmp(tag, "Watchdog", MAX(tag_len, 1))) {  
+			xfree(app_msg->watchdog);  
+			app_msg->watchdog = xstrdup(val);  
+			update_cnt++;  
+		} else if (!xstrncasecmp(tag, "Default", MAX(tag_len, 3))) {  
+			if (!xstrcasecmp(val, "YES") ||  
+				!xstrcasecmp(val, "1") ||  
+				!xstrcasecmp(val, "TRUE"))  
+				app_msg->default_spec = APP_DESC_DEFAULT_YES;  
+			else  
+				app_msg->default_spec = APP_DESC_DEFAULT_NO;  
+			update_cnt++;  
+		}  
+	}  
+	return update_cnt;  
+}
+
+/*    
+ * scontrol_create_app — Handle "scontrol create app AppName=X [Version=Y] ..."    
+ * Validates required fields (AppName), sends REQUEST_CREATE_APP    
+ * to slurmctld, and prints the created app name on success.    
+ * Version is optional.    
+ */  
+int scontrol_create_app(int argc, char **argv)      
+{      
+	int rc = SLURM_SUCCESS;      
+	app_desc_msg_t app_msg;     
+	slurm_init_app_desc_msg(&app_msg);      
+    
+	if (_parse_app_options(argc, argv, &app_msg) == 0) {      
+		exit_code = 1;      
+		error("No parameters specified");      
+		goto cleanup;      
+	}      
+    
+	if (!app_msg.app_name) {      
+		exit_code = 1;      
+		error("AppName must be given.");      
+		goto cleanup;      
+	}      
+	/* Version is optional — omitting it means no version restriction */    
+    
+	if (slurm_create_app(&app_msg)) {      
+		exit_code = 1;      
+		slurm_perror("Error creating the app");      
+		rc = slurm_get_errno();      
+		goto cleanup;      
+	}      
+    
+	printf("App created: %s\n", app_msg.app_name);      
+    
+cleanup:      
+	xfree(app_msg.app_name);      
+	xfree(app_msg.versions);      
+	xfree(app_msg.description);      
+	xfree(app_msg.watchdog);      
+	return rc;  
+}
+
+/*    
+ * scontrol_update_app — Handle "scontrol update app AppName=X [Version=Y] ..."    
+ * Sends REQUEST_UPDATE_APP to slurmctld. Only specified fields are modified.    
+ */  
+int scontrol_update_app(int argc, char **argv)  
+{  
+	int rc = SLURM_SUCCESS;  
+	app_desc_msg_t app_msg;  
+	slurm_init_app_desc_msg(&app_msg);  
+  
+	if (_parse_app_options(argc, argv, &app_msg) == 0) {  
+		exit_code = 1;  
+		error("No parameters specified");  
+		goto cleanup;  
+	}  
+  
+	if (!app_msg.app_name) {  
+		exit_code = 1;  
+		error("AppName must be given.");  
+		goto cleanup;  
+	}  
+	/* Version is optional for update */  
+  
+	if (slurm_update_app(&app_msg)) {  
+		exit_code = 1;  
+		slurm_perror("Error updating the app");  
+		rc = slurm_get_errno();  
+		goto cleanup;  
+	}  
+  
+cleanup:  
+	xfree(app_msg.app_name);  
+	xfree(app_msg.versions);  
+	xfree(app_msg.description);  
+	xfree(app_msg.watchdog);  
+	return rc;  
+}  
+#endif /* __METASTACK_OPT_APP */
 
 /*
  * _print_config - print the specified configuration parameter and value
@@ -1978,6 +2244,12 @@ static void _create_it(int argc, char **argv)
 			error_code = scontrol_create_res(argc, argv);
 			break;
 		}
+#ifdef __METASTACK_OPT_APP  
+		else if (!xstrncasecmp(tag, "app", MAX(tag_len, 3))) {  
+			error_code = scontrol_create_app(argc, argv);  
+			break;  
+		}  
+#endif
 	}
 
 	if (i >= argc) {
@@ -2053,6 +2325,19 @@ static void _delete_it(int argc, char **argv)
 			slurm_perror(errmsg);
 			exit_code = 1;
 		}
+#ifdef __METASTACK_OPT_APP  
+	} else if (xstrncasecmp(tag, "app", MAX(tag_len, 3)) == 0) {  
+		delete_app_msg_t app_msg;  
+		memset(&app_msg, 0, sizeof(app_msg));  
+		app_msg.name = val;  
+		if (slurm_delete_app(&app_msg)) {  
+			char errmsg[128];  
+			snprintf(errmsg, sizeof(errmsg),  
+			         "delete_app %s", val);  
+			slurm_perror(errmsg);  
+			exit_code = 1;  
+		}  
+#endif
 	} else {
 		exit_code = 1;
 		fprintf(stderr, "Invalid deletion entity: %s\n", argv[0]);
@@ -2130,6 +2415,10 @@ static void _show_it(int argc, char **argv)
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
 	} else if (xstrncasecmp(tag, "watchdog", MAX(tag_len, 5)) == 0) {
 		_print_config_watchdog (val);
+#endif
+#ifdef __METASTACK_OPT_APP  
+	} else if (xstrncasecmp(tag, "app", MAX(tag_len, 3)) == 0) {  
+		_print_config_app(val);  
 #endif
 	} else if (xstrncasecmp(tag, "daemons", MAX(tag_len, 1)) == 0) {
 		if (val) {
@@ -2219,6 +2508,9 @@ static void _update_it(int argc, char **argv)
 	int i, error_code = SLURM_SUCCESS;
 	int node_tag = 0, part_tag = 0, job_tag = 0;
 	int res_tag = 0;
+#ifdef __METASTACK_OPT_APP  
+	int app_tag = 0;  
+#endif
 	int debug_tag = 0, step_tag = 0, front_end_tag = 0;
 	int suspend_exc_nodes_tag = 0, suspend_exc_parts_tag = 0,
 	    suspend_exc_states_tag = 0;
@@ -2274,6 +2566,11 @@ static void _update_it(int argc, char **argv)
 					 MAX(tag_len, 11))) {
 			suspend_exc_states_tag = 1;
 		}
+#ifdef __METASTACK_OPT_APP  
+		else if (!xstrncasecmp(tag, "app", MAX(tag_len, 3))) {  
+			app_tag = 1;  
+		}  
+#endif
 	}
 	/* The order of tests matters here.  An update job request can include
 	 * partition and reservation tags, possibly before the jobid tag, but
@@ -2302,10 +2599,17 @@ static void _update_it(int argc, char **argv)
 		error_code = slurm_update_suspend_exc_parts(val, mode);
 	else if (suspend_exc_states_tag)
 		error_code = slurm_update_suspend_exc_states(val, mode);
+#ifdef __METASTACK_OPT_APP  
+	else if (app_tag)
+		error_code = scontrol_update_app(argc, argv);   
+#endif
 	else {
 		exit_code = 1;
 		fprintf(stderr, "No valid entity in update command\n");
 		fprintf(stderr, "Input line must include \"NodeName\", ");
+#ifdef __METASTACK_OPT_APP
+		fprintf(stderr, "\"App\", ");
+#endif
 		fprintf(stderr, "\"PartitionName\", \"Reservation\", "
 			"\"JobId\", or \"SlurmctldDebug\"\n");
 	}

@@ -6,6 +6,10 @@ if BUILD_DSMI
 SUBDIRS += dsmi
 endif
 
+if BUILD_DTK
+SUBDIRS += dtk
+endif
+
 if BUILD_RSMI
 SUBDIRS += rsmi
 endif

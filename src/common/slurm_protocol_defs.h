@@ -515,7 +515,14 @@ typedef struct step_gather_msg {
 	uint64_t vmem_real;			/* Average memory utilization of individual job steps on the node */
 	uint64_t page_fault;		/* The total number of page fault exceptions in individual job steps on the node */
 	uint64_t load_flag; 
-	uint64_t node_alloc_cpu;
+	// uint64_t node_alloc_cpu;
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+	double dcu_util;
+	uint64_t dcu_mem_step;
+#endif
+#ifdef __METASTACK_NEW_PROFILE_TIME_SYNC
+	time_t send_timestamp;
+#endif
 } step_gather_msg_t;
 #endif
 
@@ -648,6 +655,11 @@ typedef struct job_step_create_response_msg {
 	bool enable_all_stepds;   
 	uint32_t style_step;     /*which stepd, 0x001 is sbatch submit, 0x010 is srun submit, 0x100 is salloc submit*/
 #endif
+#ifdef __METASTACK_OPT_APP
+	char *app_name;  
+	char *app_version;  
+	uint8_t app_source;  
+#endif
 } job_step_create_response_msg_t;
 
 #define LAUNCH_PARALLEL_DEBUG	SLURM_BIT(0)
@@ -779,6 +791,16 @@ typedef struct launch_tasks_request_msg {
 	bool enable_all_nodes;      
 	bool enable_all_stepds;    
 	uint32_t style_step;  /*which stepd, 0x001 is sbatch submit, 0x010 is srun submit, 0x100 is salloc submit*/ 
+#endif
+#ifdef __METASTACK_OPT_APP
+	char *app_name;  
+	char *app_version;  
+	uint8_t app_source;  
+#endif
+#ifdef   __METASTACK_NEW_GRES_GATHER_DCU
+	uint32_t cpu_count;	/* current count of CPUs held
+					 * by the job, decremented while job is
+					 * completing */
 #endif
 } launch_tasks_request_msg_t;
 
@@ -920,6 +942,12 @@ typedef struct prolog_launch_msg {
 	bool enable_all_stepds;   
 	uint32_t style_step;      /*which stepd, 0x001 is sbatch submit, 0x010 is srun submit, 0x100 is salloc submit*/  
 #endif
+#ifdef   __METASTACK_NEW_GRES_GATHER_DCU
+	char *acctg_freq;	/* accounting polling intervals	*/
+	uint32_t	cpu_count;	/* current count of CPUs held
+					 * by the job, decremented while job is
+					 * completing */
+#endif
 } prolog_launch_msg_t;
 
 typedef struct batch_job_launch_msg {
@@ -1002,6 +1030,11 @@ typedef struct batch_job_launch_msg {
 #endif
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
 	char *apptype;		/*	--apptype	*/
+#endif
+#ifdef __METASTACK_OPT_APP
+	char *app_name;         /* app name for the job */  
+	char *app_version;      /* app version for the job */ 
+	uint8_t app_source;     /* APP_SOURCE_NOTSET=0, USER=1, AUTO=2, PORTAL=3, MARKETPLACE=4 */
 #endif
 } batch_job_launch_msg_t;
 

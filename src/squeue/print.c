@@ -154,6 +154,45 @@ extern void print_jobs_array(job_info_t *jobs, int size, list_t *format)
 	for (i = 0; i < size; i++) {
 		if (_filter_job(&jobs[i]))
 			continue;
+#ifdef __METASTACK_OPT_APP  
+		if (params.app_source_list &&  
+			list_count(params.app_source_list)) {  
+			bool match = false;  
+			if (jobs[i].app_name && jobs[i].app_name[0]) {
+				list_itr_t *as_itr = list_iterator_create(  
+					params.app_source_list);  
+				uint8_t *src_val;  
+				while ((src_val = list_next(as_itr))) {  
+					if (*src_val == jobs[i].app_source) {  
+						match = true;  
+						break;  
+					}  
+				}  
+				list_iterator_destroy(as_itr);  
+			}  
+			if (!match)  
+				continue;  
+		}
+		/* Filter by --app-name */  
+		if (params.app_name_list &&  
+		    list_count(params.app_name_list)) {  
+			bool match = false;  
+			if (jobs[i].app_name && jobs[i].app_name[0]) {  
+				list_itr_t *an_itr = list_iterator_create(  
+					params.app_name_list);  
+				char *name_val;  
+				while ((name_val = list_next(an_itr))) {  
+					if (!xstrcasecmp(name_val, jobs[i].app_name)) {  
+						match = true;  
+						break;  
+					}  
+				}  
+				list_iterator_destroy(an_itr);  
+			}  
+			if (!match)  
+				continue;  
+		} 
+#endif
 		if (params.priority_flag) {
 			_create_priority_list(l, &jobs[i]);
 		} else {
@@ -219,6 +258,52 @@ extern void squeue_filter_jobs_for_json(job_info_msg_t *job_info)
 	for (int i = 0; i < job_info->record_count; i++) {
 		if (!(_filter_job(&job_info->job_array[i])) &&
 		    !(_filter_job_part(job_info->job_array[i].partition))) {
+#ifdef __METASTACK_OPT_APP  
+			/* Filter by --app-source */  
+			if (params.app_source_list &&  
+				list_count(params.app_source_list)) {  
+				bool match = false;  
+				if (job_info->job_array[i].app_name &&  
+					job_info->job_array[i].app_name[0]) {  
+					list_itr_t *as_itr = list_iterator_create(  
+						params.app_source_list);  
+					uint8_t *src_val;  
+					while ((src_val = list_next(as_itr))) {  
+						if (*src_val == job_info->job_array[i].app_source) {  
+							match = true;  
+							break;  
+						}  
+					}  
+					list_iterator_destroy(as_itr);  
+				}  
+				if (!match) {  
+					slurm_free_job_info_members(&job_info->job_array[i]);  
+					continue;  
+				}  
+			}  
+			/* Filter by --app-name */  
+			if (params.app_name_list &&  
+				list_count(params.app_name_list)) {  
+				bool match = false;  
+				if (job_info->job_array[i].app_name &&  
+					job_info->job_array[i].app_name[0]) {  
+					list_itr_t *an_itr = list_iterator_create(  
+						params.app_name_list);  
+					char *name_val;  
+					while ((name_val = list_next(an_itr))) {  
+						if (!xstrcasecmp(name_val, job_info->job_array[i].app_name)) {  
+							match = true;  
+							break;  
+						}  
+					}  
+					list_iterator_destroy(an_itr);  
+				}  
+				if (!match) {  
+					slurm_free_job_info_members(&job_info->job_array[i]);  
+					continue;  
+				}  
+			}  
+#endif 
 			tmp_jobs[new_array_size] = job_info->job_array[i];
 			new_array_size++;
 		} else {
@@ -2988,6 +3073,51 @@ int _print_step_tres_per_task(job_step_info_t * step, int width, bool right,
 		printf("%s", suffix);
 	return SLURM_SUCCESS;
 }
+
+#ifdef __METASTACK_OPT_APP  
+/*  
+ * _print_job_app - print combined app name-version for squeue  
+ * Format: "vasp-5.7.1" or "vasp" (if no version) or empty  
+ */  
+int _print_job_app(job_info_t *job, int width, bool right_justify,  
+		   char *suffix)  
+{  
+	if (job == NULL) {  
+		/* Print the Header */  
+		_print_str("APP", width, right_justify, true);  
+	} else {  
+		char *app_str = NULL;  
+		if (job->app_name && job->app_name[0]) {  
+			if (job->app_version && job->app_version[0])  
+				xstrfmtcat(app_str, "%s-%s",  
+					   job->app_name, job->app_version);  
+			else  
+				app_str = xstrdup(job->app_name);  
+		}  
+		_print_str(app_str ? app_str : "", width, right_justify, true);  
+		xfree(app_str);  
+	}  
+	if (suffix)  
+		printf("%s", suffix);  
+	return SLURM_SUCCESS;  
+}  
+int _print_job_app_source(job_info_t *job, int width, bool right_justify,    
+			   char *suffix)    
+{    
+	if (job == NULL) {    
+		_print_str("APPSOURCE", width, right_justify, true);    
+	} else {    
+		if (job->app_name && job->app_name[0])    
+			_print_str((char *)app_source_to_str(job->app_source),    
+				   width, right_justify, true);    
+		else    
+			_print_str("", width, right_justify, true);    
+	}    
+	if (suffix)    
+		printf("%s", suffix);    
+	return SLURM_SUCCESS;    
+}    
+#endif
 
 /*
  * Filter job records per input specifications.

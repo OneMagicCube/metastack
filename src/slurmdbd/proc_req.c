@@ -125,6 +125,25 @@ static bool _validate_operator(slurmdbd_conn_t *dbd_conn)
 	return false;
 }
 
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+/*
+ * _validate_read_only_user - validate that the uid is authorized at the
+ *      root, SlurmUser, or SLURMDB_ADMIN_READ_ONLY level
+ */
+static bool _validate_read_only_user(slurmdbd_conn_t *dbd_conn)
+{
+	uint32_t uid = dbd_conn->conn->auth_uid;
+#ifndef NDEBUG
+	if (drop_priv)
+		return false;
+#endif
+	if ((uid == 0) || (uid == slurm_conf.slurm_user_id) ||
+	    assoc_mgr_get_admin_level(dbd_conn, uid) >= SLURMDB_ADMIN_READ_ONLY)
+		return true;
+
+	return false;
+}
+#endif
 
 #ifdef __METASTACK_BUG_CONN_FIX
 /* Determine if the outer layer is locked according to “locked”, 
@@ -1247,7 +1266,11 @@ static int _get_jobs_cond(slurmdbd_conn_t *slurmdbd_conn, persist_msg_t *msg,
 
 	/* fail early if requesting runaways and not super user */
 	if ((job_cond->flags & JOBCOND_FLAG_RUNAWAY) &&
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+		!_validate_read_only_user(slurmdbd_conn)) {
+#else
 	    !_validate_operator(slurmdbd_conn)) {
+#endif
 		debug("Rejecting query of runaways from uid %u",
 		      slurmdbd_conn->conn->auth_uid);
 		*out_buffer = slurm_persist_make_rc_msg(
@@ -1258,7 +1281,11 @@ static int _get_jobs_cond(slurmdbd_conn_t *slurmdbd_conn, persist_msg_t *msg,
 		return SLURM_ERROR;
 	}
 	/* fail early if too wide a query */
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+	if (!job_cond->step_list && !_validate_read_only_user(slurmdbd_conn)
+#else
 	if (!job_cond->step_list && !_validate_operator(slurmdbd_conn)
+#endif
 	    && (slurmdbd_conf->max_time_range != INFINITE)) {
 		time_t start, end;
 
@@ -1580,7 +1607,11 @@ static int _get_wckeys(slurmdbd_conn_t *slurmdbd_conn, persist_msg_t *msg,
 	/* We have to check this here, and not in the plugin.  There
 	 * are places in the plugin that a non-admin can call this and
 	 * it be ok. */
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+	if (!_validate_read_only_user(slurmdbd_conn)) {
+#else
 	if (!_validate_operator(slurmdbd_conn)) {
+#endif
 		comment = "Your user doesn't have privilege to perform this action";
 		error("CONN:%d %s", slurmdbd_conn->conn->fd, comment);
 		*out_buffer = slurm_persist_make_rc_msg(slurmdbd_conn->conn,
@@ -1954,6 +1985,9 @@ end_it:
 }
 
 static int _modify_accounts(slurmdbd_conn_t *slurmdbd_conn, persist_msg_t *msg,
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+			    bool is_activate,
+#endif
 			    buf_t **out_buffer)
 {
 	dbd_list_msg_t list_msg = { NULL };
@@ -1961,11 +1995,18 @@ static int _modify_accounts(slurmdbd_conn_t *slurmdbd_conn, persist_msg_t *msg,
 	dbd_modify_msg_t *get_msg = msg->data;
 	char *comment = NULL;
 
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	debug2("%s: called in CONN %d", is_activate ? "DBD_ACTIVATE_ACCOUNTS" : "DBD_MODIFY_ACCOUNTS", slurmdbd_conn->conn->fd);
+#else
 	debug2("DBD_MODIFY_ACCOUNTS: called in CONN %d",
 	       slurmdbd_conn->conn->fd);
+#endif
 
 	if (!(list_msg.my_list = acct_storage_g_modify_accounts(
 		      slurmdbd_conn->db_conn, slurmdbd_conn->conn->auth_uid,
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+		      is_activate, 
+#endif
 		      get_msg->cond, get_msg->rec))) {
 		if (errno == ESLURM_ACCESS_DENIED) {
 			comment = "Your user doesn't have privilege to perform this action";
@@ -1974,7 +2015,16 @@ static int _modify_accounts(slurmdbd_conn_t *slurmdbd_conn, persist_msg_t *msg,
 			comment = "Something was wrong with your query";
 			rc = SLURM_ERROR;
 		} else if (errno == SLURM_NO_CHANGE_IN_DATA) {
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+			if(is_activate)
+				comment = "Request didn't affect anything.\n "
+						" Make sure the account is inactive on the system/cluster.\n";
+			else
+				comment = "Request didn't affect anything.\n "
+						" Make sure the account is active on the system/cluster.\n";
+#else
 			comment = "Request didn't affect anything";
+#endif
 			rc = SLURM_SUCCESS;
 		} else if (errno == ESLURM_DB_CONNECTION) {
 			comment = slurm_strerror(errno);
@@ -1987,7 +2037,11 @@ static int _modify_accounts(slurmdbd_conn_t *slurmdbd_conn, persist_msg_t *msg,
 		error("CONN:%d %s", slurmdbd_conn->conn->fd, comment);
 		*out_buffer = slurm_persist_make_rc_msg(slurmdbd_conn->conn,
 							rc, comment,
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+							is_activate ? DBD_ACTIVATE_ACCOUNTS : DBD_MODIFY_ACCOUNTS);
+#else
 							DBD_MODIFY_ACCOUNTS);
+#endif
 		return rc;
 	}
 
@@ -2001,6 +2055,9 @@ static int _modify_accounts(slurmdbd_conn_t *slurmdbd_conn, persist_msg_t *msg,
 }
 
 static int _modify_assocs(slurmdbd_conn_t *slurmdbd_conn, persist_msg_t *msg,
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+			  bool is_activate,
+#endif
 			  buf_t **out_buffer)
 {
 	dbd_list_msg_t list_msg = { NULL };
@@ -2008,7 +2065,11 @@ static int _modify_assocs(slurmdbd_conn_t *slurmdbd_conn, persist_msg_t *msg,
 	dbd_modify_msg_t *get_msg = msg->data;
 	char *comment = NULL;
 
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	debug2("%s: called in CONN %d", is_activate ? "DBD_ACTIVATE_ASSOCS" : "DBD_MODIFY_ASSOCS", slurmdbd_conn->conn->fd);
+#else
 	debug2("DBD_MODIFY_ASSOCS: called in CONN %d", slurmdbd_conn->conn->fd);
+#endif
 
 	/* All authentication needs to be done inside the plugin since we are
 	 * unable to know what accounts this request is talking about
@@ -2017,6 +2078,9 @@ static int _modify_assocs(slurmdbd_conn_t *slurmdbd_conn, persist_msg_t *msg,
 
 	if (!(list_msg.my_list = acct_storage_g_modify_assocs(
 		      slurmdbd_conn->db_conn, slurmdbd_conn->conn->auth_uid,
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+		      is_activate,
+#endif
 		      get_msg->cond, get_msg->rec)) ||
 	    (errno != SLURM_SUCCESS)) {
 		error("CONN:%d %s", slurmdbd_conn->conn->fd,
@@ -2028,7 +2092,16 @@ static int _modify_assocs(slurmdbd_conn_t *slurmdbd_conn, persist_msg_t *msg,
 			comment = "Something was wrong with your query";
 			rc = SLURM_ERROR;
 		} else if (errno == SLURM_NO_CHANGE_IN_DATA) {
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+			if (is_activate) 
+				comment = "Request didn't affect anything.\n"
+						" Make sure the association is inactive on the system/cluster.\n";
+			else 
+				comment = "Request didn't affect anything.\n"
+						" Make sure the association is active on the system/cluster.\n";
+#else
 			comment = "Request didn't affect anything";
+#endif
 			rc = SLURM_SUCCESS;
 		} else if (errno == ESLURM_DB_CONNECTION) {
 			comment = slurm_strerror(errno);
@@ -2045,7 +2118,11 @@ static int _modify_assocs(slurmdbd_conn_t *slurmdbd_conn, persist_msg_t *msg,
 
 		*out_buffer = slurm_persist_make_rc_msg(slurmdbd_conn->conn,
 							rc, comment,
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+							is_activate ? DBD_ACTIVATE_ASSOCS : DBD_MODIFY_ASSOCS);
+#else
 							DBD_MODIFY_ASSOCS);
+#endif
 		FREE_NULL_LIST(list_msg.my_list);
 		return rc;
 	}
@@ -2305,6 +2382,9 @@ static int _modify_res(slurmdbd_conn_t *slurmdbd_conn, persist_msg_t *msg,
 }
 
 static int _modify_users(slurmdbd_conn_t *slurmdbd_conn, persist_msg_t *msg,
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+			 bool is_activate,
+#endif
 			 buf_t **out_buffer)
 {
 	dbd_list_msg_t list_msg = { NULL };
@@ -2315,7 +2395,11 @@ static int _modify_users(slurmdbd_conn_t *slurmdbd_conn, persist_msg_t *msg,
 	slurmdb_user_cond_t *user_cond = NULL;
 	slurmdb_user_rec_t *user_rec = NULL;
 
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	debug2("%s: called in CONN %d", is_activate ? "DBD_ACTIVATE_USERS" : "DBD_MODIFY_USERS", slurmdbd_conn->conn->fd);
+#else
 	debug2("DBD_MODIFY_USERS: called in CONN %d", slurmdbd_conn->conn->fd);
+#endif
 
 	user_cond = (slurmdb_user_cond_t *)get_msg->cond;
 	user_rec = (slurmdb_user_rec_t *)get_msg->rec;
@@ -2338,7 +2422,11 @@ static int _modify_users(slurmdbd_conn_t *slurmdbd_conn, persist_msg_t *msg,
 		*out_buffer = slurm_persist_make_rc_msg(slurmdbd_conn->conn,
 							ESLURM_ACCESS_DENIED,
 							comment,
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+							is_activate ? DBD_ACTIVATE_USERS : DBD_MODIFY_USERS);
+#else
 							DBD_MODIFY_USERS);
+#endif
 
 		return ESLURM_ACCESS_DENIED;
 	}
@@ -2372,12 +2460,19 @@ is_same_user:
 			slurmdbd_conn->conn,
 			ESLURM_ACCESS_DENIED,
 			comment,
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+			is_activate ? DBD_ACTIVATE_USERS : DBD_MODIFY_USERS);
+#else
 			DBD_MODIFY_USERS);
+#endif
 		return ESLURM_ACCESS_DENIED;
 	}
 
 	if (!(list_msg.my_list = acct_storage_g_modify_users(
 		      slurmdbd_conn->db_conn, slurmdbd_conn->conn->auth_uid,
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+		      is_activate,
+#endif
 		      user_cond, user_rec))) {
 		if (errno == ESLURM_ACCESS_DENIED) {
 			comment = "Your user doesn't have privilege to perform this action";
@@ -2386,7 +2481,16 @@ is_same_user:
 			comment = "Something was wrong with your query";
 			rc = SLURM_ERROR;
 		} else if (errno == SLURM_NO_CHANGE_IN_DATA) {
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+			if (is_activate)
+				comment = "Request didn't affect anything.\n"
+						" Make sure the user is inactive on the system/cluster.\n";
+			else 
+				comment = "Request didn't affect anything.\n"
+						" Make sure the user is active on the system/cluster.\n";
+#else
 			comment = "Request didn't affect anything";
+#endif
 			rc = SLURM_SUCCESS;
 		} else if (errno == ESLURM_DB_CONNECTION) {
 			comment = slurm_strerror(errno);
@@ -2398,7 +2502,11 @@ is_same_user:
 		}
 		error("CONN:%d %s", slurmdbd_conn->conn->fd, comment);
 		*out_buffer = slurm_persist_make_rc_msg(
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+			slurmdbd_conn->conn, rc, comment, is_activate ? DBD_ACTIVATE_USERS : DBD_MODIFY_USERS);
+#else
 			slurmdbd_conn->conn, rc, comment, DBD_MODIFY_USERS);
+#endif
 		return rc;
 	}
 
@@ -2627,6 +2735,11 @@ static void _process_job_start(slurmdbd_conn_t *slurmdbd_conn,
 	job.db_flags = job_start_msg->db_flags;
 	details.features = _replace_double_quotes(job_start_msg->constraints);
 	job.state_reason_prev_db = job_start_msg->state_reason_prev;
+#ifdef __METASTACK_OPT_APP  
+	job.app_name = _replace_double_quotes(job_start_msg->app_name);  
+	job.app_version = _replace_double_quotes(job_start_msg->app_version);  
+	job.app_source = job_start_msg->app_source;  
+#endif
 
 	job.array_recs = &array_recs;
 	job.details = &details;
@@ -2838,6 +2951,10 @@ end_it:
 }
 
 static int _remove_accounts(slurmdbd_conn_t *slurmdbd_conn, persist_msg_t *msg,
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+			    bool is_deactivate,
+#endif
+
 			    buf_t **out_buffer)
 {
 	int rc = SLURM_SUCCESS;
@@ -2845,11 +2962,19 @@ static int _remove_accounts(slurmdbd_conn_t *slurmdbd_conn, persist_msg_t *msg,
 	dbd_list_msg_t list_msg = { NULL };
 	char *comment = NULL;
 
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	debug2("%s: called in CONN %d", is_deactivate ? "DBD_DEACTIVATE_ACCOUNTS" : "DBD_REMOVE_ACCOUNTS",
+		slurmdbd_conn->conn->fd);
+#else
 	debug2("DBD_REMOVE_ACCOUNTS: called in CONN %d",
 	       slurmdbd_conn->conn->fd);
+#endif
 
 	if (!(list_msg.my_list = acct_storage_g_remove_accounts(
 		      slurmdbd_conn->db_conn, slurmdbd_conn->conn->auth_uid,
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+		      is_deactivate,
+#endif
 		      get_msg->cond))) {
 		if (errno == ESLURM_ACCESS_DENIED) {
 			comment = "Your user doesn't have privilege to perform this action";
@@ -2869,8 +2994,13 @@ static int _remove_accounts(slurmdbd_conn_t *slurmdbd_conn, persist_msg_t *msg,
 				comment = "Unknown issue";
 		}
 		error("CONN:%d %s", slurmdbd_conn->conn->fd, comment);
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+		*out_buffer = slurm_persist_make_rc_msg(
+			slurmdbd_conn->conn, rc, comment, is_deactivate ? DBD_DEACTIVATE_ACCOUNTS : DBD_REMOVE_ACCOUNTS);
+#else
 		*out_buffer = slurm_persist_make_rc_msg(
 			slurmdbd_conn->conn, rc, comment, DBD_REMOVE_ACCOUNTS);
+#endif
 		return rc;
 	}
 	list_msg.return_code = errno;
@@ -2938,6 +3068,10 @@ static int _remove_account_coords(slurmdbd_conn_t *slurmdbd_conn,
 }
 
 static int _remove_assocs(slurmdbd_conn_t *slurmdbd_conn, persist_msg_t *msg,
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+			  bool is_deactivate,
+#endif
+
 			  buf_t **out_buffer)
 {
 	int rc = SLURM_SUCCESS;
@@ -2945,7 +3079,12 @@ static int _remove_assocs(slurmdbd_conn_t *slurmdbd_conn, persist_msg_t *msg,
 	dbd_list_msg_t list_msg = { NULL };
 	char *comment = NULL;
 
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	debug2("%s: called in CONN %d", is_deactivate ? "DBD_DEACTIVATE_ASSOCS" : "DBD_REMOVE_ASSOCS", 
+		slurmdbd_conn->conn->fd);
+#else
 	debug2("DBD_REMOVE_ASSOCS: called in CONN %d", slurmdbd_conn->conn->fd);
+#endif
 
 	/* All authentication needs to be done inside the plugin since we are
 	 * unable to know what accounts this request is talking about
@@ -2954,6 +3093,9 @@ static int _remove_assocs(slurmdbd_conn_t *slurmdbd_conn, persist_msg_t *msg,
 
 	if (!(list_msg.my_list = acct_storage_g_remove_assocs(
 		      slurmdbd_conn->db_conn, slurmdbd_conn->conn->auth_uid,
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+		      is_deactivate,
+#endif
 		      get_msg->cond))) {
 		if (errno == ESLURM_ACCESS_DENIED) {
 			comment = "Your user doesn't have privilege to perform this action";
@@ -2974,7 +3116,11 @@ static int _remove_assocs(slurmdbd_conn_t *slurmdbd_conn, persist_msg_t *msg,
 		}
 		error("CONN:%d %s", slurmdbd_conn->conn->fd, comment);
 		*out_buffer = slurm_persist_make_rc_msg(
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+			slurmdbd_conn->conn, rc, comment, is_deactivate ? DBD_DEACTIVATE_ASSOCS : DBD_REMOVE_ASSOCS);
+#else
 			slurmdbd_conn->conn, rc, comment, DBD_REMOVE_ASSOCS);
+#endif
 		return rc;
 	}
 	list_msg.return_code = errno;
@@ -3178,6 +3324,9 @@ static int _remove_res(slurmdbd_conn_t *slurmdbd_conn, persist_msg_t *msg,
 }
 
 static int _remove_users(slurmdbd_conn_t *slurmdbd_conn, persist_msg_t *msg,
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+			 bool is_deactivate,
+#endif
 			 buf_t **out_buffer)
 {
 	int rc = SLURM_SUCCESS;
@@ -3185,10 +3334,19 @@ static int _remove_users(slurmdbd_conn_t *slurmdbd_conn, persist_msg_t *msg,
 	dbd_list_msg_t list_msg = { NULL };
 	char *comment = NULL;
 
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	debug2("%s: called in CONN %d", is_deactivate ? "DBD_DEACTIVATE_USERS" : "DBD_REMOVE_USERS", slurmdbd_conn->conn->fd);
+#else
 	debug2("DBD_REMOVE_USERS: called in CONN %d", slurmdbd_conn->conn->fd);
+#endif
+
+
 
 	if (!(list_msg.my_list = acct_storage_g_remove_users(
 		      slurmdbd_conn->db_conn, slurmdbd_conn->conn->auth_uid,
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+		      is_deactivate,
+#endif
 		      get_msg->cond))) {
 		if (errno == ESLURM_ACCESS_DENIED) {
 			comment = "Your user doesn't have privilege to perform this action";
@@ -3209,7 +3367,11 @@ static int _remove_users(slurmdbd_conn_t *slurmdbd_conn, persist_msg_t *msg,
 		}
 		error("CONN:%d %s", slurmdbd_conn->conn->fd, comment);
 		*out_buffer = slurm_persist_make_rc_msg(
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+			slurmdbd_conn->conn, rc, comment, is_deactivate ? DBD_DEACTIVATE_USERS : DBD_REMOVE_USERS);
+#else
 			slurmdbd_conn->conn, rc, comment, DBD_REMOVE_USERS);
+#endif
 		return rc;
 	}
 	list_msg.return_code = errno;
@@ -3602,7 +3764,11 @@ static int _get_stats(slurmdbd_conn_t *slurmdbd_conn, persist_msg_t *msg,
 	int rc = SLURM_SUCCESS;
 	char *comment = NULL;
 
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+	if (!_validate_read_only_user(slurmdbd_conn)) {
+#else
 	if (!_validate_super_user(slurmdbd_conn)) {
+#endif
 		comment = "Your user doesn't have privilege to perform this action";
 		error("CONN:%d %s", slurmdbd_conn->conn->fd, comment);
 		*out_buffer = slurm_persist_make_rc_msg(slurmdbd_conn->conn,
@@ -3846,12 +4012,27 @@ extern int proc_req(void *conn, persist_msg_t *msg, buf_t **out_buffer)
 	case DBD_JOB_SUSPEND:
 		rc = _job_suspend(slurmdbd_conn, msg, out_buffer);
 		break;
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	case DBD_ACTIVATE_ACCOUNTS:
+		rc = _modify_accounts(slurmdbd_conn, msg, true, out_buffer);
+		break;
+	case DBD_MODIFY_ACCOUNTS:
+		rc = _modify_accounts(slurmdbd_conn, msg, false, out_buffer);
+		break;
+	case DBD_ACTIVATE_ASSOCS:
+		rc = _modify_assocs(slurmdbd_conn, msg, true, out_buffer);	
+		break;
+	case DBD_MODIFY_ASSOCS:
+		rc = _modify_assocs(slurmdbd_conn, msg, false, out_buffer);
+		break;	
+#else
 	case DBD_MODIFY_ACCOUNTS:
 		rc = _modify_accounts(slurmdbd_conn, msg, out_buffer);
 		break;
 	case DBD_MODIFY_ASSOCS:
 		rc = _modify_assocs(slurmdbd_conn, msg, out_buffer);
 		break;
+#endif
 	case DBD_MODIFY_CLUSTERS:
 		rc = _modify_clusters(slurmdbd_conn, msg, out_buffer);
 		break;
@@ -3867,9 +4048,18 @@ extern int proc_req(void *conn, persist_msg_t *msg, buf_t **out_buffer)
 	case DBD_MODIFY_RES:
 		rc = _modify_res(slurmdbd_conn, msg, out_buffer);
 		break;
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	case DBD_ACTIVATE_USERS:
+		rc = _modify_users(slurmdbd_conn, msg, true, out_buffer);
+		break;
+	case DBD_MODIFY_USERS:
+		rc = _modify_users(slurmdbd_conn, msg, false, out_buffer);
+		break;
+#else
 	case DBD_MODIFY_USERS:
 		rc = _modify_users(slurmdbd_conn, msg, out_buffer);
 		break;
+#endif
 	case DBD_MODIFY_WCKEYS:
 		rc = _modify_wckeys(slurmdbd_conn, msg, out_buffer);
 		break;
@@ -3891,15 +4081,33 @@ extern int proc_req(void *conn, persist_msg_t *msg, buf_t **out_buffer)
 		 */
 		slurmdbd_conn->conn->flags |= PERSIST_FLAG_DONT_UPDATE_CLUSTER;
 		break;
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	case DBD_DEACTIVATE_ACCOUNTS:
+		rc = _remove_accounts(slurmdbd_conn, msg, true, out_buffer);
+		break;
+	case DBD_REMOVE_ACCOUNTS:
+		rc = _remove_accounts(slurmdbd_conn, msg, false, out_buffer);
+		break;
+#else
 	case DBD_REMOVE_ACCOUNTS:
 		rc = _remove_accounts(slurmdbd_conn, msg, out_buffer);
 		break;
+#endif
 	case DBD_REMOVE_ACCOUNT_COORDS:
 		rc = _remove_account_coords(slurmdbd_conn, msg, out_buffer);
 		break;
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	case DBD_DEACTIVATE_ASSOCS:
+		rc = _remove_assocs(slurmdbd_conn, msg, true, out_buffer);
+		break;
+	case DBD_REMOVE_ASSOCS:
+		rc = _remove_assocs(slurmdbd_conn, msg, false, out_buffer);
+		break;
+#else
 	case DBD_REMOVE_ASSOCS:
 		rc = _remove_assocs(slurmdbd_conn, msg, out_buffer);
 		break;
+#endif
 	case DBD_REMOVE_CLUSTERS:
 		rc = _remove_clusters(slurmdbd_conn, msg, out_buffer);
 		break;
@@ -3912,9 +4120,18 @@ extern int proc_req(void *conn, persist_msg_t *msg, buf_t **out_buffer)
 	case DBD_REMOVE_RES:
 		rc = _remove_res(slurmdbd_conn, msg, out_buffer);
 		break;
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	case DBD_DEACTIVATE_USERS:
+		rc = _remove_users(slurmdbd_conn, msg, true, out_buffer);
+		break;
+	case DBD_REMOVE_USERS:
+		rc = _remove_users(slurmdbd_conn, msg, false, out_buffer);
+		break;
+#else
 	case DBD_REMOVE_USERS:
 		rc = _remove_users(slurmdbd_conn, msg, out_buffer);
 		break;
+#endif
 	case DBD_REMOVE_WCKEYS:
 		rc = _remove_wckeys(slurmdbd_conn, msg, out_buffer);
 		break;

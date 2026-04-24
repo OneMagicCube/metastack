@@ -2490,6 +2490,10 @@ static int _spawn_prolog_stepd(slurm_msg_t *msg)
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
 	launch_req->apptype			= req->apptype;
 #endif
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+	launch_req->cpu_count	    = req->cpu_count;
+	launch_req->acctg_freq	    = req->acctg_freq;	
+#endif
 	/*
 	 * determine which node this is in the allocation and if
 	 * it should setup the x11 forwarding or not
@@ -4113,6 +4117,42 @@ done:
 }
 #endif
 
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+static slurmdb_admin_level_t get_admin_level(uid_t uid)
+{
+    assoc_mgr_info_request_msg_t req;
+    assoc_mgr_info_msg_t *msg = NULL;
+    char *user = NULL;
+    int cc = 0;
+    list_itr_t *itr = NULL;
+    slurmdb_user_rec_t *user_rec = NULL;
+	slurmdb_admin_level_t level = SLURMDB_ADMIN_NOTSET;
+
+    memset(&req, 0, sizeof(assoc_mgr_info_request_msg_t));
+
+
+    user = uid_to_string(uid);
+    req.flags |= ASSOC_MGR_INFO_FLAG_USERS;
+    req.user_list = list_create(xfree_ptr);
+    slurm_addto_char_list_with_case(req.user_list, user, 0);
+
+    cc = slurm_load_assoc_mgr_info(&req, &msg);
+    if (cc == SLURM_SUCCESS && msg->user_list && list_count(msg->user_list)) {
+        itr = list_iterator_create(msg->user_list);
+        while ((user_rec = list_next(itr))) {
+            level =  user_rec->admin_level;
+        }
+		list_iterator_destroy(itr);
+    }
+	
+	xfree(user);
+	slurm_free_assoc_mgr_info_msg(msg);
+	slurm_free_assoc_mgr_info_request_members(&req);
+
+	return level;
+}
+#endif
+
 static void _rpc_stat_jobacct(slurm_msg_t *msg)
 {
 	slurm_step_id_t *req = msg->data;
@@ -4146,6 +4186,9 @@ static void _rpc_stat_jobacct(slurm_msg_t *msg)
 	 * check that requesting user ID is the Slurm UID or root
 	 */
 	if ((msg->auth_uid != uid) &&
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+		(get_admin_level(msg->auth_uid) != SLURMDB_ADMIN_READ_ONLY) &&
+#endif
 	    !_slurm_authorized_user(msg->auth_uid)) {
 		error("stat_jobacct from uid %u for job %u owned by uid %u",
 		      msg->auth_uid, req->job_id, uid);
@@ -5027,6 +5070,9 @@ _rpc_reattach_tasks(slurm_msg_t *msg)
 	debug2("_rpc_reattach_tasks: nodeid %d in the job step", nodeid);
 
 	if ((msg->auth_uid != uid) &&
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+		(get_admin_level(msg->auth_uid) != SLURMDB_ADMIN_READ_ONLY) &&
+#endif
 	    !_slurm_authorized_user(msg->auth_uid)) {
 		error("uid %u attempt to attach to %ps owned by %u",
 		      msg->auth_uid, &req->step_id, uid);

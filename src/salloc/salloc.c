@@ -283,6 +283,20 @@ int main(int argc, char **argv)
 		if(desc)
 			desc->style_step = JOB_SUBMIT_ALLOC;
 #endif
+#ifdef __METASTACK_OPT_APP  
+		/* Handle --app=list */  
+		if (opt.app && !xstrcasecmp(opt.app, "list")) {  
+			slurm_ctl_conf_info_msg_app_t *app_info = NULL;  
+			if (slurm_load_app((time_t)0, &app_info) == SLURM_SUCCESS  
+				&& app_info) {  
+				slurm_print_app_list(app_info);  
+				slurm_free_app_info_msg(app_info);  
+			} else {  
+				error("Unable to load app configuration");  
+			}  
+			exit(0);  
+		}
+#endif
 		if (_fill_job_desc_from_opts(desc) == -1)
 			exit(error_exit);
 

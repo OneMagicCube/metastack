@@ -128,6 +128,11 @@ typedef struct srun_job {
 	char *user_name; /* resolved user name of job */
 	gid_t gid; /* resolved group id of job */
 	char *group_name; /* resolved group name of job */
+#ifdef __METASTACK_OPT_APP
+	char *app_name;  
+	char *app_version;  
+	uint8_t app_source;
+#endif
 } srun_job_t;
 
 void    update_job_state(srun_job_t *job, srun_job_state_t newstate);

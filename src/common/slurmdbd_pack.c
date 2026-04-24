@@ -227,6 +227,9 @@ static void _pack_cond_msg(dbd_cond_msg_t *msg, uint16_t rpc_version,
 	switch (type) {
 	case DBD_GET_ACCOUNTS:
 	case DBD_REMOVE_ACCOUNTS:
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	case DBD_DEACTIVATE_ACCOUNTS:
+#endif
 		my_function = slurmdb_pack_account_cond;
 		break;
 	case DBD_GET_TRES:
@@ -235,6 +238,9 @@ static void _pack_cond_msg(dbd_cond_msg_t *msg, uint16_t rpc_version,
 	case DBD_GET_ASSOCS:
 	case DBD_GET_PROBS:
 	case DBD_REMOVE_ASSOCS:
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	case DBD_DEACTIVATE_ASSOCS:
+#endif
 		my_function = slurmdb_pack_assoc_cond;
 		break;
 	case DBD_GET_CLUSTERS:
@@ -258,10 +264,16 @@ static void _pack_cond_msg(dbd_cond_msg_t *msg, uint16_t rpc_version,
 		break;
 	case DBD_GET_WCKEYS:
 	case DBD_REMOVE_WCKEYS:
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	case DBD_DEACTIVATE_WCKEYS:
+#endif
 		my_function = slurmdb_pack_wckey_cond;
 		break;
 	case DBD_GET_USERS:
 	case DBD_REMOVE_USERS:
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	case DBD_DEACTIVATE_USERS:
+#endif
 		my_function = slurmdb_pack_user_cond;
 		break;
 	case DBD_GET_TXN:
@@ -301,6 +313,9 @@ static int _unpack_cond_msg(dbd_cond_msg_t **msg, uint16_t rpc_version,
 	switch (type) {
 	case DBD_GET_ACCOUNTS:
 	case DBD_REMOVE_ACCOUNTS:
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	case DBD_DEACTIVATE_ACCOUNTS:
+#endif
 		my_function = slurmdb_unpack_account_cond;
 		break;
 	case DBD_GET_TRES:
@@ -309,6 +324,9 @@ static int _unpack_cond_msg(dbd_cond_msg_t **msg, uint16_t rpc_version,
 	case DBD_GET_ASSOCS:
 	case DBD_GET_PROBS:
 	case DBD_REMOVE_ASSOCS:
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	case DBD_DEACTIVATE_ASSOCS:
+#endif
 		my_function = slurmdb_unpack_assoc_cond;
 		break;
 	case DBD_GET_CLUSTERS:
@@ -332,10 +350,16 @@ static int _unpack_cond_msg(dbd_cond_msg_t **msg, uint16_t rpc_version,
 		break;
 	case DBD_GET_WCKEYS:
 	case DBD_REMOVE_WCKEYS:
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	case DBD_DEACTIVATE_WCKEYS:
+#endif
 		my_function = slurmdb_unpack_wckey_cond;
 		break;
 	case DBD_GET_USERS:
 	case DBD_REMOVE_USERS:
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	case DBD_DEACTIVATE_USERS:
+#endif
 		my_function = slurmdb_unpack_user_cond;
 		break;
 	case DBD_GET_TXN:
@@ -571,7 +595,58 @@ static void _pack_job_start_msg(void *in, uint16_t rpc_version, buf_t *buffer)
 		msg->node_inx = acct_storage_g_node_inx(NULL, msg->nodes);
 
 #ifdef __META_PROTOCOL
-	if (rpc_version >= SLURM_24_05_PROTOCOL_VERSION) {
+	if (rpc_version >= META_3_2_PROTOCOL_VERSION) {
+		packstr(msg->account, buffer);
+		pack32(msg->alloc_nodes, buffer);
+		pack32(msg->array_job_id, buffer);
+		pack32(msg->array_max_tasks, buffer);
+		pack32(msg->array_task_id, buffer);
+		packstr(msg->array_task_str, buffer);
+		pack32(msg->array_task_pending, buffer);
+		pack32(msg->assoc_id, buffer);
+		packstr(msg->constraints, buffer);
+		packstr(msg->container, buffer);
+		pack32(msg->db_flags, buffer);
+		pack64(msg->db_index, buffer);
+		pack_time(msg->eligible_time, buffer);
+		pack32(msg->gid, buffer);
+		packstr(msg->gres_used, buffer);
+		pack32(msg->job_id, buffer);
+		pack32(msg->job_state, buffer);
+		pack32(msg->state_reason_prev, buffer);
+		packstr(msg->licenses, buffer);
+		packstr(msg->mcs_label, buffer);
+		packstr(msg->name, buffer);
+		packstr(msg->nodes, buffer);
+		packstr(msg->node_inx, buffer);
+		pack32(msg->het_job_id, buffer);
+		pack32(msg->het_job_offset, buffer);
+		packstr(msg->partition, buffer);
+		pack32(msg->priority, buffer);
+		pack32(msg->qos_id, buffer);
+		pack32(msg->req_cpus, buffer);
+		pack64(msg->req_mem, buffer);
+		pack32(msg->resv_id, buffer);
+		pack_time(msg->start_time, buffer);
+		packstr(msg->std_err, buffer);
+		packstr(msg->std_in, buffer);
+		packstr(msg->std_out, buffer);
+		packstr(msg->submit_line, buffer);
+		pack_time(msg->submit_time, buffer);
+		pack32(msg->timelimit, buffer);
+		packstr(msg->tres_alloc_str, buffer);
+		packstr(msg->tres_req_str, buffer);
+		pack32(msg->uid, buffer);
+		packstr(msg->wckey, buffer);
+		packstr(msg->work_dir, buffer);
+		packstr(msg->env_hash, buffer);
+		packstr(msg->script_hash, buffer);
+#ifdef __METASTACK_OPT_APP  
+		packstr(msg->app_name, buffer);  
+		packstr(msg->app_version, buffer);  
+		pack8(msg->app_source, buffer);  
+#endif
+	} else if (rpc_version >= SLURM_24_05_PROTOCOL_VERSION) {
 		packstr(msg->account, buffer);
 		pack32(msg->alloc_nodes, buffer);
 		pack32(msg->array_job_id, buffer);
@@ -716,7 +791,58 @@ static int _unpack_job_start_msg(void **msg, uint16_t rpc_version,
 	msg_ptr->array_task_id = NO_VAL;
 
 #ifdef __META_PROTOCOL
-	if (rpc_version >= SLURM_24_05_PROTOCOL_VERSION) {
+	if (rpc_version >= META_3_2_PROTOCOL_VERSION) {
+		safe_unpackstr(&msg_ptr->account, buffer);
+		safe_unpack32(&msg_ptr->alloc_nodes, buffer);
+		safe_unpack32(&msg_ptr->array_job_id, buffer);
+		safe_unpack32(&msg_ptr->array_max_tasks, buffer);
+		safe_unpack32(&msg_ptr->array_task_id, buffer);
+		safe_unpackstr(&msg_ptr->array_task_str, buffer);
+		safe_unpack32(&msg_ptr->array_task_pending, buffer);
+		safe_unpack32(&msg_ptr->assoc_id, buffer);
+		safe_unpackstr(&msg_ptr->constraints, buffer);
+		safe_unpackstr(&msg_ptr->container, buffer);
+		safe_unpack32(&msg_ptr->db_flags, buffer);
+		safe_unpack64(&msg_ptr->db_index, buffer);
+		safe_unpack_time(&msg_ptr->eligible_time, buffer);
+		safe_unpack32(&msg_ptr->gid, buffer);
+		safe_unpackstr(&msg_ptr->gres_used, buffer);
+		safe_unpack32(&msg_ptr->job_id, buffer);
+		safe_unpack32(&msg_ptr->job_state, buffer);
+		safe_unpack32(&msg_ptr->state_reason_prev, buffer);
+		safe_unpackstr(&msg_ptr->licenses, buffer);
+		safe_unpackstr(&msg_ptr->mcs_label, buffer);
+		safe_unpackstr(&msg_ptr->name, buffer);
+		safe_unpackstr(&msg_ptr->nodes, buffer);
+		safe_unpackstr(&msg_ptr->node_inx, buffer);
+		safe_unpack32(&msg_ptr->het_job_id, buffer);
+		safe_unpack32(&msg_ptr->het_job_offset, buffer);
+		safe_unpackstr(&msg_ptr->partition, buffer);
+		safe_unpack32(&msg_ptr->priority, buffer);
+		safe_unpack32(&msg_ptr->qos_id, buffer);
+		safe_unpack32(&msg_ptr->req_cpus, buffer);
+		safe_unpack64(&msg_ptr->req_mem, buffer);
+		safe_unpack32(&msg_ptr->resv_id, buffer);
+		safe_unpack_time(&msg_ptr->start_time, buffer);
+		safe_unpackstr(&msg_ptr->std_err, buffer);
+		safe_unpackstr(&msg_ptr->std_in, buffer);
+		safe_unpackstr(&msg_ptr->std_out, buffer);
+		safe_unpackstr(&msg_ptr->submit_line, buffer);
+		safe_unpack_time(&msg_ptr->submit_time, buffer);
+		safe_unpack32(&msg_ptr->timelimit, buffer);
+		safe_unpackstr(&msg_ptr->tres_alloc_str, buffer);
+		safe_unpackstr(&msg_ptr->tres_req_str, buffer);
+		safe_unpack32(&msg_ptr->uid, buffer);
+		safe_unpackstr(&msg_ptr->wckey, buffer);
+		safe_unpackstr(&msg_ptr->work_dir, buffer);
+		safe_unpackstr(&msg_ptr->env_hash, buffer);
+		safe_unpackstr(&msg_ptr->script_hash, buffer);
+#ifdef __METASTACK_OPT_APP
+		safe_unpackstr(&msg_ptr->app_name, buffer);  
+		safe_unpackstr(&msg_ptr->app_version, buffer);  
+		safe_unpack8(&msg_ptr->app_source, buffer);  
+#endif
+	} else if (rpc_version >= SLURM_24_05_PROTOCOL_VERSION) {
 		safe_unpackstr(&msg_ptr->account, buffer);
 		safe_unpack32(&msg_ptr->alloc_nodes, buffer);
 		safe_unpack32(&msg_ptr->array_job_id, buffer);
@@ -947,10 +1073,16 @@ static void _pack_modify_msg(dbd_modify_msg_t *msg, uint16_t rpc_version,
 
 	switch (type) {
 	case DBD_MODIFY_ACCOUNTS:
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	case DBD_ACTIVATE_ACCOUNTS:
+#endif
 		my_cond = slurmdb_pack_account_cond;
 		my_rec = slurmdb_pack_account_rec;
 		break;
 	case DBD_MODIFY_ASSOCS:
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	case DBD_ACTIVATE_ASSOCS:
+#endif
 		my_cond = slurmdb_pack_assoc_cond;
 		my_rec = slurmdb_pack_assoc_rec;
 		break;
@@ -975,6 +1107,9 @@ static void _pack_modify_msg(dbd_modify_msg_t *msg, uint16_t rpc_version,
 		my_rec = slurmdb_pack_res_rec;
 		break;
 	case DBD_MODIFY_USERS:
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	case DBD_ACTIVATE_USERS:
+#endif
 		my_cond = slurmdb_pack_user_cond;
 		my_rec = slurmdb_pack_user_rec;
 		break;
@@ -1006,10 +1141,16 @@ static int _unpack_modify_msg(dbd_modify_msg_t **msg, uint16_t rpc_version,
 
 	switch (type) {
 	case DBD_MODIFY_ACCOUNTS:
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	case DBD_ACTIVATE_ACCOUNTS:
+#endif
 		my_cond = slurmdb_unpack_account_cond;
 		my_rec = slurmdb_unpack_account_rec;
 		break;
 	case DBD_MODIFY_ASSOCS:
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	case DBD_ACTIVATE_ASSOCS:
+#endif
 		my_cond = slurmdb_unpack_assoc_cond;
 		my_rec = slurmdb_unpack_assoc_rec;
 		break;
@@ -1034,6 +1175,9 @@ static int _unpack_modify_msg(dbd_modify_msg_t **msg, uint16_t rpc_version,
 		my_rec = slurmdb_unpack_res_rec;
 		break;
 	case DBD_MODIFY_USERS:
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	case DBD_ACTIVATE_USERS:
+#endif
 		my_cond = slurmdb_unpack_user_cond;
 		my_rec = slurmdb_unpack_user_rec;
 		break;
@@ -1834,6 +1978,10 @@ extern buf_t *pack_slurmdbd_msg(persist_msg_t *req, uint16_t rpc_version)
 		break;
 	case DBD_ADD_ACCOUNT_COORDS:
 	case DBD_REMOVE_ACCOUNT_COORDS:
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	case DBD_ACTIVATE_ACCOUNT_COORDS:
+	case DBD_DEACTIVATE_ACCOUNT_COORDS:
+#endif
 		_pack_acct_coord_msg(
 			(dbd_acct_coord_msg_t *)req->data, rpc_version,
 			buffer);
@@ -1870,6 +2018,12 @@ extern buf_t *pack_slurmdbd_msg(persist_msg_t *req, uint16_t rpc_version)
 	case DBD_REMOVE_RES:
 	case DBD_REMOVE_WCKEYS:
 	case DBD_REMOVE_USERS:
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	case DBD_DEACTIVATE_ACCOUNTS:
+	case DBD_DEACTIVATE_ASSOCS:
+	case DBD_DEACTIVATE_USERS:
+	case DBD_DEACTIVATE_WCKEYS:
+#endif
 	case DBD_ARCHIVE_DUMP:
 #ifdef __METASTACK_NEW_AUTO_SUPPLEMENT_AVAIL_NODES
 	case DBD_GET_BORROW:
@@ -1921,6 +2075,11 @@ extern buf_t *pack_slurmdbd_msg(persist_msg_t *req, uint16_t rpc_version)
 	case DBD_MODIFY_USERS:
 	case DBD_ADD_ACCOUNTS_COND:
 	case DBD_ADD_USERS_COND:
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	case DBD_ACTIVATE_ACCOUNTS:
+	case DBD_ACTIVATE_USERS:
+	case DBD_ACTIVATE_ASSOCS:
+#endif
 		_pack_modify_msg(
 			(dbd_modify_msg_t *)req->data, rpc_version,
 			req->msg_type, buffer);
@@ -2057,6 +2216,10 @@ extern int unpack_slurmdbd_msg(persist_msg_t *resp, uint16_t rpc_version,
 		break;
 	case DBD_ADD_ACCOUNT_COORDS:
 	case DBD_REMOVE_ACCOUNT_COORDS:
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	case DBD_ACTIVATE_ACCOUNT_COORDS:
+	case DBD_DEACTIVATE_ACCOUNT_COORDS:
+#endif
 		rc = _unpack_acct_coord_msg(
 			(dbd_acct_coord_msg_t **)&resp->data,
 			rpc_version, buffer);
@@ -2097,6 +2260,12 @@ extern int unpack_slurmdbd_msg(persist_msg_t *resp, uint16_t rpc_version,
 	case DBD_REMOVE_RES:
 	case DBD_REMOVE_WCKEYS:
 	case DBD_REMOVE_USERS:
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	case DBD_DEACTIVATE_ACCOUNTS:
+	case DBD_DEACTIVATE_ASSOCS:
+	case DBD_DEACTIVATE_USERS:
+	case DBD_DEACTIVATE_WCKEYS:
+#endif
 	case DBD_ARCHIVE_DUMP:
 		rc = _unpack_cond_msg(
 			(dbd_cond_msg_t **)&resp->data, rpc_version,
@@ -2148,6 +2317,11 @@ extern int unpack_slurmdbd_msg(persist_msg_t *resp, uint16_t rpc_version,
 	case DBD_MODIFY_USERS:
 	case DBD_ADD_ACCOUNTS_COND:
 	case DBD_ADD_USERS_COND:
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	case DBD_ACTIVATE_ACCOUNTS:
+	case DBD_ACTIVATE_USERS:
+	case DBD_ACTIVATE_ASSOCS:
+#endif
 		rc = _unpack_modify_msg(
 			(dbd_modify_msg_t **)&resp->data,
 			rpc_version,

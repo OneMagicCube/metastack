@@ -1519,6 +1519,29 @@ int s_p_parse_file(s_p_hashtbl_t *hashtbl, uint32_t *hash_val, char *filename,
 						  line, &leftover, flags,
 						  filename, last_ancestor);
 		if (inc_rc == 0 && !(flags & PARSE_FLAGS_INCLUDE_ONLY)) {
+#ifdef __METASTACK_OPT_APP  
+			/*  
+			 * Fast-path: skip AppName lines entirely for  
+			 * non-slurmctld processes (slurmd, sinfo, squeue, …).  
+			 *  
+			 * Without this, every AppName line still goes through  
+			 * _keyvalue_regex() (regexec), xstrndup x2, hash  
+			 * lookup, handler call, and xfree x2 — even though  
+			 * the handler immediately returns 0.  With 5000+  
+			 * AppName lines the cumulative regex + malloc cost is  
+			 * significant for short-lived client commands.  
+			 *  
+			 * A 7-char case-insensitive prefix check is ~1000x  
+			 * cheaper than a single regexec() call, so this  
+			 * eliminates virtually all overhead.  
+			 */  
+			if (!running_in_slurmctld() &&  
+			    xstrncasecmp(line, "AppName", 7) == 0 &&  
+			    (line[7] == '=' || isspace((int)line[7]))) {  
+				line_number += merged_lines;  
+				continue;  
+			}  
+#endif
 			if (!_parse_next_key(hashtbl, line, &leftover,
 					     ignore_new)) {
 				rc = SLURM_ERROR;

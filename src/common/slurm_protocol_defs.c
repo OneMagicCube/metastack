@@ -1289,6 +1289,11 @@ slurm_copy_resource_allocation_response_msg(
 	new->uid = msg->uid;
 	new->user_name = xstrdup(msg->user_name);
 	new->working_cluster_rec = NULL;
+#ifdef __METASTACK_OPT_APP
+	new->app_name = xstrdup(msg->app_name);  
+	new->app_version = xstrdup(msg->app_version);  
+	new->app_source = msg->app_source;  
+#endif  	
 	return new;
 }
 
@@ -1682,6 +1687,11 @@ extern void slurm_free_job_desc_msg(job_desc_msg_t *msg)
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
 		xfree(msg->apptype);
 #endif
+#ifdef __METASTACK_OPT_APP  
+		xfree(msg->app);  
+		xfree(msg->app_name);  
+		xfree(msg->app_version);  
+#endif
 		xfree(msg);
 	}
 }
@@ -1744,6 +1754,9 @@ extern void slurm_free_prolog_launch_msg(prolog_launch_msg_t * msg)
 		/* agent rpc for slurmd or slurmstepd,don't need accout or explain struct */
 		xfree(msg->watch_dog);
 		xfree(msg->watch_dog_script);
+#endif
+#ifdef   __METASTACK_NEW_GRES_GATHER_DCU
+		xfree(msg->acctg_freq);
 #endif
 		FREE_NULL_LIST(msg->job_node_array);
 		FREE_NULL_BUFFER(msg->job_ptr_buf);
@@ -1813,6 +1826,10 @@ extern void slurm_free_job_launch_msg(batch_job_launch_msg_t * msg)
 #ifdef __METASTACK_BUG_UPDATE_JOB_ENV
 		xfree(msg->tres_per_task);
 #endif
+#ifdef __METASTACK_OPT_APP
+		xfree(msg->app_name);  
+		xfree(msg->app_version);  
+#endif  
 		xfree(msg);
 	}
 }
@@ -1902,6 +1919,10 @@ extern void slurm_free_job_info_members(job_info_t * job)
 		xfree(job->user_name);
 		xfree(job->wckey);
 		xfree(job->work_dir);
+#ifdef __METASTACK_OPT_APP  
+		xfree(job->app_name);  
+		xfree(job->app_version);  
+#endif
 	}
 }
 
@@ -2282,6 +2303,10 @@ extern void slurm_free_launch_tasks_request_msg(launch_tasks_request_msg_t * msg
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
 	xfree(msg->apptype);
 #endif
+#ifdef __METASTACK_OPT_APP
+	xfree(msg->app_name);  
+	xfree(msg->app_version);  
+#endif 
 	xfree(msg);
 }
 
@@ -4131,6 +4156,10 @@ extern void slurm_free_resource_allocation_response_msg_members (
 		xfree(msg->tres_per_task);
 		xfree(msg->tres_bind);
 #endif
+#ifdef __METASTACK_OPT_APP
+		xfree(msg->app_name);  
+		xfree(msg->app_version);  
+#endif  
 	}
 }
 
@@ -4180,7 +4209,10 @@ extern void slurm_free_job_step_create_response_msg(
 			select_g_select_jobinfo_free(msg->select_jobinfo);
 		if (msg->switch_step)
 			switch_g_free_stepinfo(msg->switch_step);
-
+#ifdef __METASTACK_OPT_APP  
+		xfree(msg->app_name);  
+		xfree(msg->app_version);  
+#endif
 		xfree(msg);
 	}
 
@@ -4242,6 +4274,88 @@ extern void slurm_free_ctl_conf_watch_dog(slurm_ctl_conf_info_msg_watch_dog_t * 
 	}
 }
 
+#endif
+
+#ifdef __METASTACK_OPT_APP
+extern void slurm_free_app_info_members(app_record_t *app)    
+{    
+	if (app) {    
+		xfree(app->app_name);    
+		xfree(app->versions);    
+		xfree(app->description);    
+		xfree(app->watchdog);    
+	}    
+}
+  
+extern void slurm_free_app_info_msg(slurm_ctl_conf_info_msg_app_t *msg)  
+{  
+	if (msg) {  
+		if (msg->app_array) {  
+			for (uint32_t i = 0; i < msg->record_count; i++)  
+				slurm_free_app_info_members(&msg->app_array[i]);  
+			xfree(msg->app_array);  
+		}  
+		xfree(msg);  
+	}  
+}  
+  
+extern void slurm_free_app_desc_msg(app_desc_msg_t *msg)    
+{    
+	if (msg) {    
+		xfree(msg->app_name);    
+		xfree(msg->versions);    
+		xfree(msg->description);    
+		xfree(msg->watchdog);    
+		xfree(msg);    
+	}    
+}
+  
+extern void slurm_free_delete_app_msg(delete_app_msg_t *msg)  
+{  
+	if (msg) {  
+		xfree(msg->name);  
+		xfree(msg);  
+	}  
+}  
+  
+extern void slurm_init_app_desc_msg(app_desc_msg_t *msg)  
+{  
+	memset(msg, 0, sizeof(app_desc_msg_t));  
+	msg->default_spec = APP_DESC_DEFAULT_IGNORE;  
+}  
+#endif
+
+#ifdef __METASTACK_OPT_APP
+/*  
+ * app_source — Indicates how the app identity was assigned to a job.  
+ *   APP_SOURCE_USER        — User explicitly specified via --app/--app-name  
+ *   APP_SOURCE_AUTO        — Automatically detected by the system  
+ *   APP_SOURCE_PORTAL      — Set by web portal submission  
+ *   APP_SOURCE_MARKETPLACE — Set by marketplace/app-store submission  
+ * Used in job_record, squeue/sacct filtering, and environment variables.  
+ */
+extern const char *app_source_to_str(app_source_t source)
+{
+	switch (source) {
+	case APP_SOURCE_NOTSET:      return APP_SOURCE_STR_NOTSET;
+	case APP_SOURCE_USER:        return APP_SOURCE_STR_USER;
+	case APP_SOURCE_AUTO:        return APP_SOURCE_STR_AUTO;
+	case APP_SOURCE_PORTAL:      return APP_SOURCE_STR_PORTAL;
+	case APP_SOURCE_MARKETPLACE: return APP_SOURCE_STR_MARKETPLACE;
+	default:                     return APP_SOURCE_STR_NOTSET;
+	}
+}
+
+extern uint8_t app_source_from_str(const char *str)
+{  
+	if (!str) return NO_VAL8;  
+	if (!xstrcasecmp(str, APP_SOURCE_STR_NOTSET))      return APP_SOURCE_NOTSET;  
+	if (!xstrcasecmp(str, APP_SOURCE_STR_USER))         return APP_SOURCE_USER;  
+	if (!xstrcasecmp(str, APP_SOURCE_STR_AUTO))         return APP_SOURCE_AUTO;  
+	if (!xstrcasecmp(str, APP_SOURCE_STR_PORTAL))       return APP_SOURCE_PORTAL;  
+	if (!xstrcasecmp(str, APP_SOURCE_STR_MARKETPLACE))  return APP_SOURCE_MARKETPLACE;  
+	return NO_VAL8;  
+}
 #endif
 
 /*
@@ -5513,6 +5627,21 @@ extern int slurm_free_msg_data(slurm_msg_type_t type, void *data)
 	case RESPONSE_NODE_ALIAS_ADDRS:
 		slurm_free_node_alias_addrs(data);
 		break;
+#ifdef __METASTACK_OPT_APP  
+	case REQUEST_CREATE_APP:  
+	case REQUEST_UPDATE_APP:  
+		slurm_free_app_desc_msg(data);  
+		break;  
+	case REQUEST_DELETE_APP:  
+		slurm_free_delete_app_msg(data);  
+		break;  
+	case RESPONSE_BUILD_APP_INFO:  
+		slurm_free_app_info_msg(data);  
+		break;  
+	case REQUEST_BUILD_APP_INFO:  
+		slurm_free_last_update_msg(data);  
+		break;  
+#endif
 	default:
 		error("invalid type trying to be freed %u", type);
 		break;

@@ -2235,6 +2235,52 @@ extern void print_fields(type_t type, void *object)
 					     (curr_inx == field_count));
 			break;
 #endif
+#ifdef __METASTACK_OPT_APP  
+		case PRINT_APPNAME:  
+			switch(type) {  
+			case JOB:  
+				tmp_char = job->app_name;  
+				break;  
+			default:
+				tmp_char = "";
+				break;  
+			}  
+			field->print_routine(field,  
+					     tmp_char,  
+					     (curr_inx == field_count));  
+			break;  
+		case PRINT_APPVERSION:  
+			switch(type) {  
+			case JOB:  
+				tmp_char = job->app_version;  
+				break;  
+			default:
+				tmp_char = "";  
+				break;  
+			}  
+			field->print_routine(field,  
+					     tmp_char,  
+					     (curr_inx == field_count));  
+			break;  
+		case PRINT_APPSOURCE:  
+			switch(type) {  
+			case JOB:  
+				if (job->app_name && job->app_name[0]) {  
+					tmp_char = (char *)app_source_to_str(  
+						job->app_source);  
+				} else {  
+					tmp_char = "";  
+				}  
+				break;  
+			default:
+				tmp_char = "";  
+				break;  
+			}  
+			field->print_routine(field,  
+					     tmp_char,  
+					     (curr_inx == field_count));  
+			break;  
+#endif
 		default:
 			break;
 		}

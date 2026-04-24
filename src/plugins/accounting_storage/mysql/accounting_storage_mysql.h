@@ -98,6 +98,9 @@ extern char *last_ran_table;
 #ifdef __METASTACK_NEW_AUTO_SUPPLEMENT_AVAIL_NODES
 extern char *node_borrow_table;
 #endif
+#ifdef __METASTACK_OPT_APP
+extern char *job_app_table;  
+#endif
 extern char *qos_table;
 extern char *resv_table;
 extern char *res_table;
@@ -164,6 +167,28 @@ extern int remove_common(mysql_conn_t *mysql_conn,
 			 List ret_list,
 			 bool *jobs_running,
 			 bool *default_account);
+
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+extern int activate_common(mysql_conn_t *mysql_conn,
+			 uint16_t type,
+			 time_t now,
+			 char *user_name,
+			 char *table,
+			 char *cond_char,
+			 char *vals,
+			 char *cluster_name);
+extern int deactivate_common(mysql_conn_t *mysql_conn,
+			 uint16_t type,
+			 time_t now,
+			 char *user_name,
+			 char *table,
+			 char *name_char,
+			 char *assoc_char,
+			 char *cluster_name,
+			 List ret_list,
+			 bool *jobs_running,
+			 bool *default_account);
+#endif
 
 extern void mod_tres_str(char **out, char *mod, char *cur,
 			 char *cur_par, char *name, char **vals,

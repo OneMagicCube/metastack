@@ -52,7 +52,16 @@ extern List as_mysql_modify_accts(mysql_conn_t *mysql_conn, uint32_t uid,
 			       slurmdb_account_rec_t *acct);
 
 extern List as_mysql_remove_accts(mysql_conn_t *mysql_conn, uint32_t uid,
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+			       bool is_deactivate,
+#endif
 			       slurmdb_account_cond_t *acct_cond);
+
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+extern List as_mysql_activate_accts(mysql_conn_t *mysql_conn, uint32_t uid,
+			       slurmdb_account_cond_t *acct_cond,
+			       slurmdb_account_rec_t *acct);
+#endif
 
 extern List as_mysql_get_accts(mysql_conn_t *mysql_conn, uid_t uid,
 			    slurmdb_account_cond_t *acct_cond);

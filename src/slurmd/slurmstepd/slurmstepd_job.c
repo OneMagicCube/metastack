@@ -80,7 +80,66 @@ static stepd_step_task_info_t *_task_info_create(int taskid, int gtaskid,
 						 char *efname);
 static void _task_info_destroy(stepd_step_task_info_t *t, uint16_t multi_prog);
 static void _task_info_array_destroy(stepd_step_rec_t *step);
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+static void _get_step_alloc_gres(acct_gather_rank_t *step_rank, slurm_cred_t *cred);
+static bool _is_target_gres(const char *name)
+{
+    return (name &&
+           (!xstrcmp(name, "gpu") ||
+            !xstrcmp(name, "npu") ||
+            !xstrcmp(name, "dcu")));
+}
+/*
+	The total amount of GRES resources occupied by the statistical tasks is as follows. 
+	Currently, the supported GRES items for statistics are: dcu, gpu, and npu.
+*/
+static void _get_step_alloc_gres(acct_gather_rank_t *step_rank, slurm_cred_t *cred) {
+	if (step_rank == NULL || cred == NULL || cred->arg == NULL)
+		return;
 
+	list_t *gres_list = NULL;
+	list_itr_t *gres_iter = NULL;
+	gres_state_t *gres_state_ptr = NULL;
+
+	switch (step_rank->step) {
+	case DATA_STEP:
+		if (!(gres_list = cred->arg->step_gres_list))
+			return;
+		gres_iter = list_iterator_create(gres_list);
+		while ((gres_state_ptr = list_next(gres_iter))) {
+			gres_step_state_t *gres_ss = (gres_step_state_t *)gres_state_ptr->gres_data;
+			if (gres_ss && _is_target_gres(gres_state_ptr->gres_name))
+				step_rank->alloc_gres += gres_ss->total_gres;
+		}
+		list_iterator_destroy(gres_iter);
+		break;
+	case EXTERN_STEP:
+		if (!(gres_list = cred->arg->job_gres_list))
+			return;
+		gres_iter = list_iterator_create(gres_list);
+		while ((gres_state_ptr = list_next(gres_iter))) {
+			gres_job_state_t *gres_js = (gres_job_state_t *)gres_state_ptr->gres_data;
+			if (gres_js && _is_target_gres(gres_state_ptr->gres_name))
+				step_rank->alloc_gres += gres_js->total_gres;
+		}
+		list_iterator_destroy(gres_iter);
+		break;
+	case BATCH_STEP:
+		if (!(gres_list = cred->arg->job_gres_list))
+			return;
+		gres_iter = list_iterator_create(gres_list);
+		while ((gres_state_ptr = list_next(gres_iter))) {
+			gres_job_state_t *gres_js = (gres_job_state_t *)gres_state_ptr->gres_data;
+			if (gres_js && _is_target_gres(gres_state_ptr->gres_name))
+				step_rank->alloc_gres += gres_js->gres_cnt_node_alloc[0];
+		}
+		list_iterator_destroy(gres_iter);
+		break;
+	default:
+		break;
+	}
+}
+#endif
 /*
  * return the default output filename for a batch job
  */
@@ -459,16 +518,23 @@ extern stepd_step_rec_t *stepd_step_rec_create(launch_tasks_request_msg_t *msg,
 	   and only really looks at the profile in the step.
 	*/
 	acct_gather_profile_g_node_step_start(step);
-
 #ifdef __METASTACK_NEW_LOAD_ABNORMAL
 	/* here memcpy not need to be released */
 	memcpy(&step_rank.step_id, &msg->step_id, sizeof(step_rank.step_id));
 
-	if(msg->step_id.step_id != SLURM_EXTERN_CONT) {
+	if(msg->step_id.step_id != SLURM_EXTERN_CONT) 
 		step_rank.step = DATA_STEP;
-		step_rank.node_alloc_cpu =  msg->node_cpus;
-	} else if(msg->step_id.step_id == SLURM_EXTERN_CONT)
+	else if(msg->step_id.step_id == SLURM_EXTERN_CONT)
 		step_rank.step = EXTERN_STEP;
+#ifdef __METASTACK_NEW_PROFILE_TIME_SYNC
+	if(msg &&  msg->cred && msg->cred->arg) {
+		step_rank.job_start =  msg->cred->arg->job_start_time;
+		debug(" The job start time is as follows %ld",step_rank.job_start);
+	} else {
+		step_rank.job_start = 0;
+		error(" Failed to obtain the job start time. The collection time between job steps may be out of sync.");
+	}
+#endif
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
 	uint32_t stepd_id = msg->step_id.step_id;
 	bool head_node = false;
@@ -479,6 +545,10 @@ extern stepd_step_rec_t *stepd_step_rec_create(launch_tasks_request_msg_t *msg,
 	step_rank.watch_dog_script = NULL;
 	step_rank.job_stdout = NULL;
 	step_rank.job_stderr = NULL;
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+	step_rank.cwd 		        = NULL;
+	step_rank.script 		    = NULL;
+#endif
 	if (acct_gather_check_acct_watch_dog_task(stepd_id, &head_node, msg)) {
 		step_rank.enable_watchdog  = true;
 		step_rank.watch_dog        = xstrdup(msg->watch_dog);
@@ -499,7 +569,16 @@ extern stepd_step_rec_t *stepd_step_rec_create(launch_tasks_request_msg_t *msg,
 #endif
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
 	step_rank.apptype = xstrdup(msg->apptype);
-#endif		
+#endif
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+	step_rank.alloc_cpus = msg->cpu_count;
+	_get_step_alloc_gres(&step_rank, msg->cred);
+#endif
+#ifdef __METASTACK_OPT_APP
+	step_rank.app_name = xstrdup(msg->app_name);  
+	step_rank.app_version = xstrdup(msg->app_version);  
+	step_rank.app_source = msg->app_source;  
+#endif
 	acct_gather_profile_startpoll(msg->acctg_freq,
 				      slurm_conf.job_acct_gather_freq, &step_rank);	
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
@@ -509,6 +588,11 @@ extern stepd_step_rec_t *stepd_step_rec_create(launch_tasks_request_msg_t *msg,
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
 	xfree(step_rank.apptype);
 #endif
+#ifdef __METASTACK_OPT_APP
+	xfree(step_rank.app_name);  
+	xfree(step_rank.app_version);  
+#endif
+
 #endif
 	step->timelimit   = (time_t) -1;
 	step->flags       = msg->flags;
@@ -615,9 +699,18 @@ batch_stepd_step_rec_create(batch_job_launch_msg_t *msg)
 	step_rank.step = BATCH_STEP;
 
 	step_rank.step_id = step->step_id;
-	step_rank.node_alloc_cpu = step->cpus;
+	// step_rank.node_alloc_cpu = step->cpus;
 	step->cwd     = xstrdup(msg->work_dir);
     step->env = slurm_char_array_copy(msg->envc, msg->environment);
+#ifdef __METASTACK_NEW_PROFILE_TIME_SYNC
+	if(msg &&  msg->cred && msg->cred->arg) {
+		step_rank.job_start =  msg->cred->arg->job_start_time;
+		debug(" The job start time is as follows %ld",step_rank.job_start);
+	} else {
+		step_rank.job_start = 0;
+		error(" Failed to obtain the job start time. The collection time between job steps may be out of sync.");
+	}
+#endif
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
 	uint32_t stepd_id 			= step->step_id.step_id;
 	step_rank.enable_watchdog 	= false;
@@ -629,12 +722,20 @@ batch_stepd_step_rec_create(batch_job_launch_msg_t *msg)
 	step_rank.watch_dog_script	= NULL;
 	step_rank.job_stdout        = NULL;
 	step_rank.job_stderr        = NULL;
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+	step_rank.cwd 		        = NULL;
+	step_rank.script 		    = NULL;
+#endif
 	if (acct_gather_check_acct_watch_dog_batch(stepd_id, msg) ) {
 		step_rank.enable_watchdog  = true;
 		step_rank.watch_dog        = xstrdup(msg->watch_dog);
 		step_rank.watch_dog_script = xstrdup(msg->watch_dog_script);
 		step_rank.job_stdout       = _batchfilename(step, msg->std_out);
 		step_rank.job_stderr       = _batchfilename(step, msg->std_err);		
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+		step_rank.cwd 		       = xstrdup(msg->work_dir);
+		step_rank.script		   = xstrdup(msg->script);
+#endif
 		step_rank.period           = msg->period;
 		step_rank.init_time        = msg->init_time;
 		step_rank.style_step       = msg->style_step;
@@ -645,7 +746,16 @@ batch_stepd_step_rec_create(batch_job_launch_msg_t *msg)
 #endif
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
 	step_rank.apptype = xstrdup(msg->apptype);
-#endif		
+#endif
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+	step_rank.alloc_cpus = step->cpus;
+	_get_step_alloc_gres(&step_rank, msg->cred);
+#endif
+#ifdef __METASTACK_OPT_APP  
+	step_rank.app_name = xstrdup(msg->app_name);  
+	step_rank.app_version = xstrdup(msg->app_version);  
+	step_rank.app_source = msg->app_source;  
+#endif
 	acct_gather_profile_startpoll(msg->acctg_freq,
 				      slurm_conf.job_acct_gather_freq, &step_rank);
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
@@ -653,9 +763,17 @@ batch_stepd_step_rec_create(batch_job_launch_msg_t *msg)
 	xfree(step_rank.watch_dog_script);
 	xfree(step_rank.job_stdout);
 	xfree(step_rank.job_stderr);
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+	xfree(step_rank.cwd);
+	xfree(step_rank.script);
+#endif
 #endif
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
 	xfree(step_rank.apptype);
+#endif
+#ifdef __METASTACK_OPT_APP  
+	xfree(step_rank.app_name);  
+	xfree(step_rank.app_version);  
 #endif
 #endif
 	step->open_mode  = msg->open_mode;
@@ -693,6 +811,7 @@ batch_stepd_step_rec_create(batch_job_launch_msg_t *msg)
 	format_core_allocs(msg->cred, conf->node_name, conf->cpus,
 			   &step->job_alloc_cores, &step->step_alloc_cores,
 			   &step->job_mem, &step->step_mem);
+
 	if (step->step_mem && slurm_conf.job_acct_oom_kill)
 		jobacct_gather_set_mem_limit(&step->step_id, step->step_mem);
 	else if (step->job_mem && slurm_conf.job_acct_oom_kill)

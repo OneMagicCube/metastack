@@ -1241,6 +1241,25 @@ static int DUMP_FUNC(JOB_USER)(const parser_t *const parser, void *obj,
 	return SLURM_SUCCESS;
 }
 
+#ifdef __METASTACK_OPT_APP
+PARSE_DISABLED(JOB_APP_SOURCE)
+
+static int DUMP_FUNC(JOB_APP_SOURCE)(const parser_t *const parser, void *obj,
+				     data_t *dst, args_t *args)
+{
+	slurmdb_job_rec_t *job = obj;
+
+	xassert(job);
+	if (job->app_name && job->app_name[0])
+		data_set_string(dst,
+				app_source_to_str((app_source_t)job->app_source));
+	else
+		data_set_string(dst, "");
+
+	return SLURM_SUCCESS;
+}
+#endif
+
 PARSE_DISABLED(ROLLUP_STATS)
 
 static int DUMP_FUNC(ROLLUP_STATS)(const parser_t *const parser, void *obj,
@@ -4483,6 +4502,25 @@ static int DUMP_FUNC(JOB_INFO_STDERR)(const parser_t *const parser, void *obj,
 	return SLURM_SUCCESS;
 }
 
+#ifdef __METASTACK_OPT_APP
+PARSE_DISABLED(JOB_INFO_APP_SOURCE)
+
+static int DUMP_FUNC(JOB_INFO_APP_SOURCE)(const parser_t *const parser,
+					  void *obj, data_t *dst, args_t *args)
+{
+	slurm_job_info_t *job = obj;
+
+	xassert(job);
+	if (job->app_name && job->app_name[0])
+		data_set_string(dst,
+				app_source_to_str((app_source_t)job->app_source));
+	else
+		data_set_string(dst, "");
+
+	return SLURM_SUCCESS;
+}
+#endif
+
 static int PARSE_FUNC(JOB_EXCLUSIVE)(const parser_t *const parser, void *obj,
 				     data_t *src, args_t *args,
 				     data_t *parent_path)
@@ -4889,6 +4927,12 @@ static const parser_t PARSER_ARRAY(JOB)[] = {
 	add_parse(WCKEY_TAG, wckey, "wckey", NULL),
 	add_skip(wckeyid),
 	add_parse(STRING, work_dir, "working_directory", NULL),
+#ifdef __METASTACK_OPT_APP
+	add_parse(STRING, app_name, "application_name", NULL),
+	add_parse(STRING, app_version, "application_version", NULL),
+	add_complex_parser(slurmdb_job_rec_t, JOB_APP_SOURCE, false,
+			   "application_source", NULL),
+#endif
 };
 #undef add_parse
 #undef add_skip
@@ -5667,6 +5711,11 @@ static const parser_t PARSER_ARRAY(JOB_INFO)[] = {
 	add_parse(UINT32, wait4switch, "maximum_switch_wait_time", NULL),
 	add_parse(STRING, wckey, "wckey", NULL),
 	add_parse(STRING, work_dir, "current_working_directory", NULL),
+#ifdef __METASTACK_OPT_APP
+	add_parse(STRING, app_name, "application_name", NULL),
+	add_parse(STRING, app_version, "application_version", NULL),
+	add_cparse(JOB_INFO_APP_SOURCE, "application_source", NULL),
+#endif
 };
 #undef add_parse
 #undef add_parse_overload
@@ -6517,6 +6566,9 @@ static const parser_t parsers[] = {
 
 	/* Complex type parsers */
 	addpcp(JOB_ASSOC_ID, ASSOC_SHORT_PTR, slurmdb_job_rec_t, NEED_ASSOC, NULL),
+#ifdef __METASTACK_OPT_APP
+	addpcp(JOB_APP_SOURCE, STRING, slurmdb_job_rec_t, NEED_NONE, NULL),
+#endif
 	addpca(QOS_PREEMPT_LIST, STRING, slurmdb_qos_rec_t, NEED_QOS, NULL),
 	addpcp(STEP_NODES, HOSTLIST, slurmdb_step_rec_t, NEED_TRES, NULL),
 	addpca(STEP_TRES_REQ_MAX, TRES, slurmdb_step_rec_t, NEED_TRES, NULL),
@@ -6554,7 +6606,13 @@ static const parser_t parsers[] = {
 	addpc(JOB_INFO_STDIN, slurm_job_info_t, NEED_NONE, STRING, NULL),
 	addpc(JOB_INFO_STDOUT, slurm_job_info_t, NEED_NONE, STRING, NULL),
 	addpc(JOB_INFO_STDERR, slurm_job_info_t, NEED_NONE, STRING, NULL),
+#ifdef __METASTACK_OPT_APP
+	addpc(JOB_INFO_APP_SOURCE, slurm_job_info_t, NEED_NONE, STRING, NULL),
+#endif
 	addpc(JOB_USER, slurmdb_job_rec_t, NEED_NONE, STRING, NULL),
+#ifdef __METASTACK_OPT_APP
+	addpc(JOB_APP_SOURCE, slurmdb_job_rec_t, NEED_NONE, STRING, NULL),
+#endif
 
 	/* Removed parsers */
 	addr(EXT_SENSORS_DATA, void *, OBJECT),

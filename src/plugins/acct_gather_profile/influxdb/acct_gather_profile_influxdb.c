@@ -147,7 +147,10 @@ typedef struct {
 static const event_config_t event_configs[] = {
 	{LOAD_LOW, "cpu"},
 	{PROC_AB, "process"},
-	{JNODE_STAT, "node"}
+	{JNODE_STAT, "node"},
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+	{GRES_LOAD_LOW, "gres"}
+#endif
 };
 
 #define EVENT_COUNT (sizeof(event_configs) / sizeof(event_configs[0]))
@@ -1259,9 +1262,7 @@ extern int acct_gather_profile_p_add_sample_data_stepd(int dataset_id, void* dat
 		FIELD_STEPMEM,	
 		FIELD_STEPVMEM,		
 		FIELD_STEPPAGES,
-#ifdef __METASTACK_OPT_INFLUXDB_PERFORMANCE
 		FIELD_TIMER,
-#endif
 		/*EVENT*/
 		FIELD_FLAG,
 		FIELD_CPUTHRESHOLD,
@@ -1282,6 +1283,14 @@ extern int acct_gather_profile_p_add_sample_data_stepd(int dataset_id, void* dat
 		FIELD_HAVERECOGN,
 		FIELD_CPUTIME,
 #endif					
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+		FIELD_STEPDCU,
+		FIELD_STEPDCUMEM,
+		FIELD_GRESTHRESHOLD,
+#endif
+#ifdef __METASTACK_NEW_PROFILE_TIME_SYNC
+		FIELD_SENDTIMESTAPM,
+#endif
 		FIELD_CNT
 	};
 
@@ -1300,15 +1309,28 @@ extern int acct_gather_profile_p_add_sample_data_stepd(int dataset_id, void* dat
 #ifdef __METASTACK_OPT_INFLUXDB_PERFORMANCE
 					"stepcpuave=%.2f,stepmem=%.2f,stepvmem=%.2f,interval_time=%"PRIu64","
 #endif
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+					"stepdcuutil=%.2f,stepdcumem=%.2f,"
+#endif
 					"steppages=%"PRIu64" %"PRIu64"\n",
 					g_job->user_name, g_job->step_id.job_id, g_job->step_id.step_id,
 					d[FIELD_STEPCPU].d, d[FIELD_STEPCPUAVE].d, d[FIELD_STEPMEM].d,
-					d[FIELD_STEPVMEM].d, d[FIELD_TIMER].u, d[FIELD_STEPPAGES].u, (uint64_t)sample_time);
+					d[FIELD_STEPVMEM].d, d[FIELD_TIMER].u,
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+					((union data_t*)data)[FIELD_STEPDCU].d,
+					((union data_t*)data)[FIELD_STEPDCUMEM].d,
+#endif					
+					d[FIELD_STEPPAGES].u,
+#ifdef __METASTACK_NEW_PROFILE_TIME_SYNC
+				((union data_t*)data)[FIELD_SENDTIMESTAPM].u ? ((union data_t*)data)[FIELD_SENDTIMESTAPM].u : (uint64_t)sample_time);
+#endif
+
 	}
 
     /* Logical block: Processing Event data */
 #ifdef __METASTACK_OPT_INFLUXDB_PERFORMANCE
 	if (d[FIELD_FLAG].u != 0 
+
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
 		&& (send_flag & JOBACCT_GATHER_PROFILE_ABNORMAL)
 #endif
@@ -1317,11 +1339,26 @@ extern int acct_gather_profile_p_add_sample_data_stepd(int dataset_id, void* dat
 			if (d[FIELD_FLAG].u & event_configs[i].flag) {
 				xstrfmtcat(str_event, "Event,username=%s,jobid=%d,step=%d,type=%s "
 							"cputhreshold=%.2f,stepcpu=%.2f,stepmem=%.2f,stepvmem=%.2f,"
-							"steppages=%"PRIu64",start=%"PRIu64",end=%"PRIu64" %"PRIu64"\n",
+							"steppages=%"PRIu64",start=%"PRIu64",end=%"PRIu64""
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+							",stepdcuutil=%.2f,stepdcumem=%.2f,gresthreshold=%.2f"
+#endif
+							
+							" %"PRIu64"\n",
+
 							g_job->user_name, g_job->step_id.job_id, g_job->step_id.step_id,
 							event_configs[i].name, d[FIELD_CPUTHRESHOLD].d, d[FIELD_STEPCPU].d,
 							d[FIELD_STEPMEM].d, d[FIELD_STEPVMEM].d, d[FIELD_STEPPAGES].u,
-							d[FIELD_EVENTTYPE1START].u, d[FIELD_EVENTTYPE1END].u, (uint64_t)sample_time);
+							d[FIELD_EVENTTYPE1START].u, d[FIELD_EVENTTYPE1END].u, 
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+								((union data_t*)data)[FIELD_STEPDCU].d,
+								((union data_t*)data)[FIELD_STEPDCUMEM].d,
+								((union data_t*)data)[FIELD_GRESTHRESHOLD].d,
+#endif
+#ifdef __METASTACK_NEW_PROFILE_TIME_SYNC
+								((union data_t*)data)[FIELD_SENDTIMESTAPM].u ? ((union data_t*)data)[FIELD_SENDTIMESTAPM].u : (uint64_t)sample_time);
+#endif
+
 			}
 		}
 	}

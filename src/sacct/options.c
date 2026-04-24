@@ -49,6 +49,10 @@
 #include "sacct.h"
 #include <time.h>
 
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+#include "src/common/assoc_mgr.h"
+#endif
+
 /* getopt_long options, integers but not characters */
 #define OPT_LONG_DELIMITER 0x100
 #define OPT_LONG_LOCAL     0x101
@@ -66,6 +70,11 @@
 #define OPT_LONG_HELPSTATE 0x113
 #define OPT_LONG_HELPREASON 0x114
 #define OPT_LONG_EXPAND_PATTERNS 0x115
+#ifdef __METASTACK_OPT_APP  
+#define OPT_LONG_APPNAME   0x116  
+#define OPT_LONG_APPVERSION 0x117  
+#define OPT_LONG_APPSOURCE 0x118  
+#endif
 
 #define JOB_HASH_SIZE 1000
 
@@ -445,6 +454,14 @@ sacct [<OPTION>]                                                            \n \
      -V, --version: Print version.                                          \n\
      -W, --wckeys:                                                          \n\
                    Only send data about these wckeys.  Default is all.      \n\
+     --appname:                                                               \n\
+                   Filter by application name(s), comma separated.           \n\
+     --appversion:                                                            \n\
+                   Filter by application version(s), comma separated.        \n\
+                   Must be used with --appname.                              \n\
+     --appsource:                                                             \n\
+                   Filter by application source(s), comma separated.           \n\
+                   Valid values: user, auto, portal, marketplace.             \n\
      --whole-hetjob[=yes|no]:                                               \n\
 		   If set to 'yes' (or no argument), then information about \n\
 		   all the heterogeneous components will be retrieved. If   \n\
@@ -738,6 +755,11 @@ extern void parse_command_line(int argc, char **argv)
                 {"associations",   required_argument, 0,    'x'},
                 {"json", optional_argument, 0, OPT_LONG_JSON},
                 {"yaml", optional_argument, 0, OPT_LONG_YAML},
+#ifdef __METASTACK_OPT_APP    
+                {"appname",        required_argument, 0,    OPT_LONG_APPNAME},    
+                {"appversion",     required_argument, 0,    OPT_LONG_APPVERSION},    
+                {"appsource",      required_argument, 0,    OPT_LONG_APPSOURCE},  
+#endif
                 {0,                0,		      0,    0}};
 
 	params.opt_uid = getuid();
@@ -1056,12 +1078,50 @@ extern void parse_command_line(int argc, char **argv)
 		case OPT_LONG_HELPREASON:
 			params.opt_help = 5;
 			break;
+#ifdef __METASTACK_OPT_APP  
+		case OPT_LONG_APPNAME:  
+			if (!job_cond->appname_list)  
+				job_cond->appname_list = list_create(xfree_ptr);  
+			slurm_addto_char_list(job_cond->appname_list, optarg);  
+			job_cond->flags |= JOBCOND_FLAG_APP;  
+			break;  
+		case OPT_LONG_APPVERSION:  
+			if (!job_cond->appversion_list)  
+				job_cond->appversion_list = list_create(xfree_ptr);  
+			slurm_addto_char_list(job_cond->appversion_list, optarg);  
+			job_cond->flags |= JOBCOND_FLAG_APP;  
+			break;  
+		case OPT_LONG_APPSOURCE:  
+		{  
+			if (!job_cond->appsource_list)  
+				job_cond->appsource_list = list_create(xfree_ptr);  
+			char *tmp = xstrdup(optarg);  
+			char *save_ptr = NULL;  
+			char *tok = strtok_r(tmp, ",", &save_ptr);  
+			while (tok) {  
+				uint8_t val = app_source_from_str(tok);  
+				if (val == NO_VAL8)  
+					fatal("Invalid --appsource value: '%s'", tok);  
+				char *num_str = xstrdup_printf("%u", val);  
+				list_append(job_cond->appsource_list, num_str);  
+				tok = strtok_r(NULL, ",", &save_ptr);  
+			}  
+			xfree(tmp);  
+			job_cond->flags |= JOBCOND_FLAG_APP;  
+			break;  
+		}  
+#endif
 		case ':':
 		case '?':	/* getopt() has explained it */
 			exit(1);
 		}
 	}
-
+#ifdef __METASTACK_OPT_APP    
+	if (job_cond->appversion_list && list_count(job_cond->appversion_list)
+	    && (!job_cond->appname_list || !list_count(job_cond->appname_list))) {
+		fatal("--appversion must be used with --appname");    
+	}
+#endif
 	if (!job_cond->step_list || !list_count(job_cond->step_list)) {
 		char *reason = NULL;
 		if (job_cond->flags & JOBCOND_FLAG_SCRIPT)
@@ -1261,7 +1321,12 @@ extern void parse_command_line(int argc, char **argv)
 			all_users = true;
 
 	/* set all_users for user root if not requesting any */
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+	if (!job_cond->userid_list && (!params.opt_uid || 
+		assoc_mgr_get_admin_level(acct_db_conn, params.opt_uid) >= SLURMDB_ADMIN_READ_ONLY))
+#else
 	if (!job_cond->userid_list && !params.opt_uid)
+#endif
 		all_users = true;
 
 	if (all_users) {
@@ -1397,6 +1462,10 @@ extern void parse_command_line(int argc, char **argv)
 			dot = DEFAULT_COMP_FIELDS;
 		else if ( ( env_val = getenv("SACCT_FORMAT") ) )
 			dot = xstrdup(env_val);
+#ifdef __METASTACK_OPT_APP  
+		else if (job_cond->flags & JOBCOND_FLAG_APP)  
+			dot = DEFAULT_APP_FIELDS;  
+#endif 
 		else
 			dot = DEFAULT_FIELDS;
 
@@ -1451,6 +1520,13 @@ extern void parse_command_line(int argc, char **argv)
 	foundfield:
 		if (newlen_set)
 			fields[i].len = newlen;
+#ifdef __METASTACK_OPT_APP  
+		/* Auto-set APPTYPE flag when app format fields are requested */  
+		if (fields[i].type == PRINT_APPNAME ||  
+		    fields[i].type == PRINT_APPVERSION ||  
+		    fields[i].type == PRINT_APPSOURCE)  
+			job_cond->flags |= JOBCOND_FLAG_APP;
+#endif  
 		list_append(print_fields_list, &fields[i]);
 		start = end + 1;
 	}

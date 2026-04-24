@@ -180,6 +180,10 @@ static void _partial_free_dbd_job_start(void *object)
 		xfree(req->tres_alloc_str);
 		xfree(req->tres_req_str);
 		xfree(req->work_dir);
+#ifdef __METASTACK_OPT_APP
+		xfree(req->app_name);
+		xfree(req->app_version);
+#endif
 	}
 }
 
@@ -321,7 +325,11 @@ static int _setup_job_start_msg(dbd_job_start_msg_t *req,
 	req->uid           = job_ptr->user_id;
 	req->qos_id        = job_ptr->qos_id;
 	req->gres_used     = xstrdup(job_ptr->gres_used);
-
+#ifdef __METASTACK_OPT_APP  
+	req->app_name    = xstrdup(job_ptr->app_name);  
+	req->app_version = xstrdup(job_ptr->app_version);  
+	req->app_source  = job_ptr->app_source;  
+#endif
 	return SLURM_SUCCESS;
 }
 
@@ -1079,6 +1087,9 @@ extern int acct_storage_p_add_reservation(void *db_conn,
 }
 
 extern List acct_storage_p_modify_users(void *db_conn, uint32_t uid,
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+					bool is_activate,
+#endif
 					slurmdb_user_cond_t *user_cond,
 					slurmdb_user_rec_t *user)
 {
@@ -1092,13 +1103,21 @@ extern List acct_storage_p_modify_users(void *db_conn, uint32_t uid,
 	get_msg.cond = user_cond;
 	get_msg.rec = user;
 
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	req.msg_type = is_activate ? DBD_ACTIVATE_USERS : DBD_MODIFY_USERS;
+#else
 	req.msg_type = DBD_MODIFY_USERS;
+#endif
 	req.conn = db_conn;
 	req.data = &get_msg;
 	rc = dbd_conn_send_recv(SLURM_PROTOCOL_VERSION, &req, &resp);
 
 	if (rc != SLURM_SUCCESS)
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+		error("%s failure: %m", is_activate ? "DBD_ACTIVATE_USERS" : "DBD_MODIFY_USERS");
+#else
 		error("DBD_MODIFY_USERS failure: %m");
+#endif
 	else if (resp.msg_type == PERSIST_RC) {
 		persist_rc_msg_t *msg = resp.data;
 		if (msg->rc == SLURM_SUCCESS) {
@@ -1123,6 +1142,9 @@ extern List acct_storage_p_modify_users(void *db_conn, uint32_t uid,
 }
 
 extern List acct_storage_p_modify_accts(void *db_conn, uint32_t uid,
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+					bool is_activate,
+#endif
 					slurmdb_account_cond_t *acct_cond,
 					slurmdb_account_rec_t *acct)
 {
@@ -1136,13 +1158,21 @@ extern List acct_storage_p_modify_accts(void *db_conn, uint32_t uid,
 	get_msg.cond = acct_cond;
 	get_msg.rec = acct;
 
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	req.msg_type = is_activate ? DBD_ACTIVATE_ACCOUNTS : DBD_MODIFY_ACCOUNTS;
+#else
 	req.msg_type = DBD_MODIFY_ACCOUNTS;
+#endif
 	req.conn = db_conn;
 	req.data = &get_msg;
 	rc = dbd_conn_send_recv(SLURM_PROTOCOL_VERSION, &req, &resp);
 
 	if (rc != SLURM_SUCCESS)
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+		error("%s failure: %m", is_activate ? "DBD_ACTIVATE_ACCOUNTS" : "DBD_MODIFY_ACCOUNTS");
+#else
 		error("DBD_MODIFY_ACCOUNTS failure: %m");
+#endif
 	else if (resp.msg_type == PERSIST_RC) {
 		persist_rc_msg_t *msg = resp.data;
 		if (msg->rc == SLURM_SUCCESS) {
@@ -1214,6 +1244,9 @@ extern List acct_storage_p_modify_clusters(void *db_conn, uint32_t uid,
 
 extern List acct_storage_p_modify_assocs(
 	void *db_conn, uint32_t uid,
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	bool is_activate,
+#endif
 	slurmdb_assoc_cond_t *assoc_cond,
 	slurmdb_assoc_rec_t *assoc)
 {
@@ -1229,13 +1262,21 @@ extern List acct_storage_p_modify_assocs(
 	get_msg.cond = assoc_cond;
 	get_msg.rec = assoc;
 
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	req.msg_type = is_activate ? DBD_ACTIVATE_ASSOCS : DBD_MODIFY_ASSOCS;
+#else
 	req.msg_type = DBD_MODIFY_ASSOCS;
+#endif
 	req.conn = db_conn;
 	req.data = &get_msg;
 	rc = dbd_conn_send_recv(SLURM_PROTOCOL_VERSION, &req, &resp);
 
 	if (rc != SLURM_SUCCESS)
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+		error("%s failure: %m", is_activate ? "DBD_ACTIVATE_ASSOCS" : "DBD_MODIFY_ASSOCS");
+#else
 		error("DBD_MODIFY_ASSOCS failure: %m");
+#endif
 	else if (resp.msg_type == PERSIST_RC) {
 		persist_rc_msg_t *msg = resp.data;
 		if (msg->rc == SLURM_SUCCESS) {
@@ -1535,6 +1576,9 @@ extern int acct_storage_p_modify_reservation(void *db_conn,
 }
 
 extern List acct_storage_p_remove_users(void *db_conn, uint32_t uid,
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+					bool is_deactivate,
+#endif
 					slurmdb_user_cond_t *user_cond)
 {
 	persist_msg_t req = {0};
@@ -1547,13 +1591,21 @@ extern List acct_storage_p_remove_users(void *db_conn, uint32_t uid,
 	memset(&get_msg, 0, sizeof(dbd_cond_msg_t));
 	get_msg.cond = user_cond;
 
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	req.msg_type = is_deactivate ? DBD_DEACTIVATE_USERS : DBD_REMOVE_USERS;
+#else
 	req.msg_type = DBD_REMOVE_USERS;
+#endif
 	req.conn = db_conn;
 	req.data = &get_msg;
 	rc = dbd_conn_send_recv(SLURM_PROTOCOL_VERSION, &req, &resp);
 
 	if (rc != SLURM_SUCCESS)
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+		error("%s failure: %m", is_deactivate ? "DBD_DEACTIVATE_USERS" : "DBD_REMOVE_USERS");
+#else
 		error("DBD_REMOVE_USERS failure: %m");
+#endif
 	else if (resp.msg_type == PERSIST_RC) {
 		persist_rc_msg_t *msg = resp.data;
 		if (msg->rc == SLURM_SUCCESS) {
@@ -1625,6 +1677,9 @@ extern List acct_storage_p_remove_coord(void *db_conn, uint32_t uid,
 }
 
 extern List acct_storage_p_remove_accts(void *db_conn, uint32_t uid,
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+					bool is_deactivate,
+#endif
 					slurmdb_account_cond_t *acct_cond)
 {
 	persist_msg_t req = {0};
@@ -1637,13 +1692,21 @@ extern List acct_storage_p_remove_accts(void *db_conn, uint32_t uid,
 	memset(&get_msg, 0, sizeof(dbd_cond_msg_t));
 	get_msg.cond = acct_cond;
 
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	req.msg_type = is_deactivate ? DBD_DEACTIVATE_ACCOUNTS : DBD_REMOVE_ACCOUNTS;
+#else
 	req.msg_type = DBD_REMOVE_ACCOUNTS;
+#endif
 	req.conn = db_conn;
 	req.data = &get_msg;
 	rc = dbd_conn_send_recv(SLURM_PROTOCOL_VERSION, &req, &resp);
 
 	if (rc != SLURM_SUCCESS)
-		error("DBD_REMOVE_ACCTS failure: %m");
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+		error("%s failure: %m", is_deactivate ? "DBD_DEACTIVATE_ACCOUNTS" : "DBD_REMOVE_ACCOUNTS");
+#else
+		error("DBD_REMOVE_ACCOUNTS failure: %m");
+#endif
 	else if (resp.msg_type == PERSIST_RC) {
 		persist_rc_msg_t *msg = resp.data;
 		if (msg->rc == SLURM_SUCCESS) {
@@ -1716,6 +1779,9 @@ extern List acct_storage_p_remove_clusters(void *db_conn, uint32_t uid,
 
 extern List acct_storage_p_remove_assocs(
 	void *db_conn, uint32_t uid,
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	bool is_deactivate,
+#endif
 	slurmdb_assoc_cond_t *assoc_cond)
 {
 	persist_msg_t req = {0};
@@ -1729,13 +1795,21 @@ extern List acct_storage_p_remove_assocs(
 	memset(&get_msg, 0, sizeof(dbd_cond_msg_t));
 	get_msg.cond = assoc_cond;
 
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	req.msg_type = is_deactivate ? DBD_DEACTIVATE_ASSOCS : DBD_REMOVE_ASSOCS;
+#else
 	req.msg_type = DBD_REMOVE_ASSOCS;
+#endif
 	req.conn = db_conn;
 	req.data = &get_msg;
 	rc = dbd_conn_send_recv(SLURM_PROTOCOL_VERSION, &req, &resp);
 
 	if (rc != SLURM_SUCCESS)
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+		error("%s failure: %m", is_deactivate ? "DBD_DEACTIVATE_ASSOCS" : "DBD_REMOVE_ASSOCS");
+#else
 		error("DBD_REMOVE_ASSOCS failure: %m");
+#endif
 	else if (resp.msg_type == PERSIST_RC) {
 		persist_rc_msg_t *msg = resp.data;
 		if (msg->rc == SLURM_SUCCESS) {

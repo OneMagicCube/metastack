@@ -918,6 +918,47 @@ no_rollup_change:
 
 	xfree(query);
 
+#ifdef __METASTACK_OPT_APP  
+	/* Insert/update apptype record into job_app_table */  
+	if (rc == SLURM_SUCCESS && job_ptr->db_index  
+	    && job_ptr->app_name && job_ptr->app_name[0]) {  
+		char *esc_app_name = slurm_add_slash_to_quotes(job_ptr->app_name);  
+		char *esc_app_version = slurm_add_slash_to_quotes(job_ptr->app_version);  
+  
+		query = xstrdup_printf(  
+			"insert into `%s_%s` "  
+			"(job_db_inx, app_name, app_version, app_source, mod_time) "  
+			"values (%"PRIu64", '%s', '%s', %u, "  
+			"extract(epoch from now())::bigint) "  
+			"on duplicate key update "  
+			"app_name='%s', app_version='%s', "  
+			"app_source=%u, mod_time=extract(epoch from now())::bigint",  
+			kingbase_conn->cluster_name, job_app_table,  
+			job_ptr->db_index,  
+			esc_app_name ? esc_app_name : "",  
+			esc_app_version ? esc_app_version : "",  
+			job_ptr->app_source,  
+			esc_app_name ? esc_app_name : "",  
+			esc_app_version ? esc_app_version : "",  
+			job_ptr->app_source);  
+  
+		xfree(esc_app_name);  
+		xfree(esc_app_version);  
+  
+		DB_DEBUG(DB_JOB, kingbase_conn->conn,  
+			 "app query\n%s", query);  
+  
+		fetch_flag_t *fetch_flag = set_fetch_flag(false, false, false);  
+		fetch_result_t *data_rt = xmalloc(sizeof(fetch_result_t));  
+		int app_rc = kingbase_for_fetch(kingbase_conn, query, fetch_flag, data_rt);    
+		if (app_rc != SLURM_SUCCESS)    
+			error("Failed to insert app info for job db_index %"PRIu64,    
+			      job_ptr->db_index);  
+		free_res_data(data_rt, fetch_flag);  
+		xfree(query);  
+	}  
+#endif
+
 	if (rc != SLURM_SUCCESS)
 		return rc;
 

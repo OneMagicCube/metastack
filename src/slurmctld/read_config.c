@@ -107,6 +107,13 @@
 #ifdef __METASTACK_NEW_RPC_RATE_LIMIT
 #include "src/slurmctld/rate_limit.h"
 #endif
+
+#ifdef __METASTACK_OPT_APP
+#include "src/common/xhash.h"
+#include "src/common/fd.h"  
+#include "src/slurmctld/state_save.h"  
+#endif
+
 #define FEATURE_MAGIC	0x34dfd8b5
 
 /* Global variables */
@@ -192,6 +199,15 @@ bitstr_t **para_epilog_idle_node_bitmap = NULL; /* A collection of bitmaps for i
 
 #ifdef __METASTACK_BUG_PROCESS_DISTRIBUTION
 bool disable_change_proc_dist = false;
+#endif
+
+#ifdef __METASTACK_OPT_APP    
+List app_list = NULL;
+time_t last_app_update = (time_t) 0;
+char *default_app_name = NULL;
+app_record_t *default_app_loc = NULL;
+xhash_t *app_hash_table = NULL;
+xhash_t *app_combined_hash = NULL;  /* secondary hash: "appname-version" → app_combined_entry_t */
 #endif
 
 #ifdef __METASTACK_BUG_OVERLAP_NODE_DIST
@@ -336,6 +352,15 @@ static void _init_watch_dog_record(watch_dog_record_t *watch_dog_ptr);
 void init_watch_dog_conf(void);
 static void _list_delete_watch_dog(void *watch_dog_entry);
 #endif
+
+#ifdef __METASTACK_OPT_APP  
+static void _init_app_record(app_record_t *app_ptr);  
+static void _list_delete_app(void *app_entry);  
+static int _build_single_appline_info(app_record_t *app);  
+static int _build_all_app_info(void);  
+int list_find_app(void *x, void *key);  
+#endif
+
 /*
  * Setup the global response_cluster_rec
  */
@@ -1050,6 +1075,1196 @@ void init_watch_dog_conf(void)
 }
 #endif
 
+#ifdef __METASTACK_OPT_APP  
+/*    
+ * xhash helper: index app_record by app_name in app_hash_table (primary).    
+ */    
+static void _app_record_hash_identity(void *item, const char **key,    
+				      uint32_t *key_len)    
+{    
+	app_record_t *app_ptr = (app_record_t *)item;    
+	*key = app_ptr->app_name;    
+	*key_len = strlen(app_ptr->app_name);    
+}  
+  
+/*    
+ * app_combined_entry_t - Lightweight wrapper for the secondary hash.    
+ * Maps "appname-version" to the owning app_record_t.    
+ * The combined_name string is owned by this entry.    
+ */    
+typedef struct {    
+	char         *combined_name;  /* "appname-version", owned */    
+	app_record_t *app_ptr;        /* back-pointer, non-owning */    
+} app_combined_entry_t;  
+  
+static void _app_combined_hash_identity(void *item, const char **key,    
+					uint32_t *key_len)    
+{    
+	app_combined_entry_t *e = (app_combined_entry_t *)item;    
+	*key = e->combined_name;    
+	*key_len = strlen(e->combined_name);    
+}  
+  
+static void _app_combined_entry_free(void *item)    
+{    
+	app_combined_entry_t *e = (app_combined_entry_t *)item;    
+	if (!e)
+		return;
+	xfree(e->combined_name);    
+	xfree(e);    
+}
+  
+/*    
+ * _rebuild_combined_hash_for_app - Build secondary hash entries for one app.    
+ * If versions is NULL (no version restriction), creates a single entry    
+ * with key = app_name. Otherwise creates one entry per version.    
+ */    
+static void _rebuild_combined_hash_for_app(app_record_t *app_ptr)  
+{  
+	if (!app_ptr || !app_ptr->app_name)  
+		return;  
+  
+	if (!app_ptr->versions || !app_ptr->versions[0]) {  
+		/* No version restriction: key = app_name itself */  
+		app_combined_entry_t *existing;  
+		existing = (app_combined_entry_t *)xhash_get_str(  
+				app_combined_hash, app_ptr->app_name);  
+		if (existing) {  
+			error("%s: combined hash key collision: "  
+			      "app \"%s\" (no version) collides with "  
+			      "app \"%s\", key=\"%s\". Skipping.",  
+			      __func__, app_ptr->app_name,  
+			      existing->app_ptr->app_name,  
+			      app_ptr->app_name);  
+			return;  
+		}  
+		app_combined_entry_t *e = xmalloc(sizeof(*e));  
+		e->combined_name = xstrdup(app_ptr->app_name);  
+		e->app_ptr = app_ptr;  
+		xhash_add(app_combined_hash, e);  
+		return;  
+	}  
+  
+	/* Iterate comma-separated versions */  
+	char *copy = xstrdup(app_ptr->versions);  
+	char *save_ptr = NULL;  
+	char *tok = strtok_r(copy, ",", &save_ptr);  
+	while (tok) {  
+		while (*tok == ' ' || *tok == '\t')  
+			tok++;  
+		char *end = tok + strlen(tok) - 1;  
+		while (end > tok && (*end == ' ' || *end == '\t'))  
+			*end-- = '\0';  
+		if (*tok) {  
+			char *combined_key = NULL;  
+			app_combined_entry_t *existing;  
+  
+			xstrfmtcat(combined_key, "%s-%s",  
+				   app_ptr->app_name, tok);  
+  
+			existing = (app_combined_entry_t *)xhash_get_str(  
+					app_combined_hash, combined_key);  
+			if (existing) {  
+				error("%s: combined hash key collision: "  
+				      "app \"%s\" version \"%s\" collides "  
+				      "with app \"%s\", key=\"%s\". "  
+				      "Skipping.",  
+				      __func__, app_ptr->app_name, tok,  
+				      existing->app_ptr->app_name,  
+				      combined_key);  
+				xfree(combined_key);  
+			} else {  
+				app_combined_entry_t *e =  
+					xmalloc(sizeof(*e));  
+				e->combined_name = combined_key;  
+				e->app_ptr = app_ptr;  
+				xhash_add(app_combined_hash, e);  
+			}  
+		}  
+		tok = strtok_r(NULL, ",", &save_ptr);  
+	}  
+	xfree(copy);  
+}
+
+/*    
+ * _remove_version_from_list - Remove a single version from a    
+ *   comma-separated versions string.    
+ * IN/OUT versions_ptr - pointer to versions string (may be reallocated)    
+ * IN ver - version to remove    
+ */    
+static void _remove_version_from_list(char **versions_ptr, const char *ver)      
+{      
+	char *versions, *new_versions = NULL;      
+	char *copy, *save_ptr = NULL, *tok;      
+  
+	if (!versions_ptr || !*versions_ptr || !ver)      
+		return;      
+  
+	versions = *versions_ptr;      
+	copy = xstrdup(versions);      
+	tok = strtok_r(copy, ",", &save_ptr);      
+	while (tok) {      
+		while (*tok == ' ' || *tok == '\t')      
+			tok++;      
+		char *end = tok + strlen(tok) - 1;  
+		while (end > tok && (*end == ' ' || *end == '\t'))  
+			*end-- = '\0';  
+		if (xstrcmp(tok, ver) != 0) {      
+			if (new_versions)      
+				xstrfmtcat(new_versions, ",%s", tok);      
+			else      
+				new_versions = xstrdup(tok);      
+		}      
+		tok = strtok_r(NULL, ",", &save_ptr);      
+	}      
+	xfree(copy);      
+	xfree(*versions_ptr);      
+	*versions_ptr = new_versions;      
+}
+
+/*    
+ * _version_in_list - Check if a version string is in a comma-separated list.    
+ * IN versions - comma-separated version list (e.g. "5.7.1,5.7.2,6.0")    
+ * IN ver      - version to find    
+ * RET true if found    
+ */    
+static bool _version_in_list(const char *versions, const char *ver)    
+{    
+	if (!versions || !ver)    
+		return false;    
+	char *copy = xstrdup(versions);    
+	char *save_ptr = NULL;    
+	char *tok = strtok_r(copy, ",", &save_ptr);    
+	while (tok) {    
+		while (*tok == ' ' || *tok == '\t')    
+			tok++;    
+		char *end = tok + strlen(tok) - 1;    
+		while (end > tok && (*end == ' ' || *end == '\t'))    
+			*end-- = '\0';    
+		if (!xstrcmp(tok, ver)) {    
+			xfree(copy);    
+			return true;    
+		}    
+		tok = strtok_r(NULL, ",", &save_ptr);    
+	}    
+	xfree(copy);    
+	return false;    
+}  
+
+/*  
+ * _app_versions_add - Add comma-separated versions to app's version list.  
+ *   Skips duplicates. ver_copy tokens are "+"-prefixed.  
+ */  
+static void _app_versions_add(app_record_t *app_ptr, char *ver_copy,  
+                               const char *app_name)  
+{  
+	char *save_ptr = NULL;  
+	char *tok = strtok_r(ver_copy, ",", &save_ptr);  
+	while (tok) {  
+		if (*tok == '+')  
+			tok++;  
+		while (*tok == ' ' || *tok == '\t')  
+			tok++;  
+		if (*tok != '\0') {  
+			if (!_version_in_list(app_ptr->versions, tok)) {  
+				if (app_ptr->versions &&  
+				    app_ptr->versions[0])  
+					xstrfmtcat(app_ptr->versions,  
+						   ",%s", tok);  
+				else {  
+					xfree(app_ptr->versions);  
+					app_ptr->versions = xstrdup(tok);  
+				}  
+				info("App version added: %s-%s",  
+				     app_name, tok);  
+			} else {  
+				info("%s: version '%s' already exists "  
+				     "for AppName=%s, skipping",  
+				     __func__, tok, app_name);  
+			}  
+		}  
+		tok = strtok_r(NULL, ",", &save_ptr);  
+	}  
+}  
+  
+/*  
+ * _app_versions_remove - Remove comma-separated versions from app's  
+ *   version list. ver_copy tokens are "-"-prefixed.  
+ */  
+static void _app_versions_remove(app_record_t *app_ptr, char *ver_copy,  
+                                  const char *app_name)  
+{  
+	char *save_ptr = NULL;  
+	char *tok = strtok_r(ver_copy, ",", &save_ptr);  
+	while (tok) {  
+		if (*tok == '-')  
+			tok++;  
+		while (*tok == ' ' || *tok == '\t')  
+			tok++;  
+		if (*tok != '\0') {  
+			if (_version_in_list(app_ptr->versions, tok)) {  
+				_remove_version_from_list(  
+					&app_ptr->versions, tok);  
+				info("App version removed: %s-%s",  
+				     app_name, tok);  
+			} else {  
+				info("%s: version '%s' not found "  
+				     "for AppName=%s, skipping",  
+				     __func__, tok, app_name);  
+			}  
+		}  
+		tok = strtok_r(NULL, ",", &save_ptr);  
+	}  
+}  
+  
+/*  
+ * _app_versions_replace - Replace app's entire version list.  
+ */  
+static void _app_versions_replace(app_record_t *app_ptr,  
+                                   const char *new_versions)  
+{  
+	xfree(app_ptr->versions);  
+	app_ptr->versions = xstrdup(new_versions);  
+}
+
+/*    
+ * _remove_combined_hash_for_app - Remove all secondary hash entries for one app.    
+ */    
+static void _remove_combined_hash_for_app(app_record_t *app_ptr)    
+{    
+	if (!app_ptr || !app_ptr->app_name)    
+		return;    
+  
+	if (!app_ptr->versions || !app_ptr->versions[0]) {    
+		xhash_delete_str(app_combined_hash, app_ptr->app_name);    
+		return;    
+	}    
+  
+	char *copy = xstrdup(app_ptr->versions);    
+	char *save_ptr = NULL;    
+	char *tok = strtok_r(copy, ",", &save_ptr);    
+	while (tok) {    
+		while (*tok == ' ' || *tok == '\t')    
+			tok++;    
+		char *end = tok + strlen(tok) - 1;    
+		while (end > tok && (*end == ' ' || *end == '\t'))    
+			*end-- = '\0';    
+		if (*tok) {    
+			char *buf = NULL;    
+			xstrfmtcat(buf, "%s-%s", app_ptr->app_name, tok);    
+			xhash_delete_str(app_combined_hash, buf);    
+			xfree(buf);    
+		}    
+		tok = strtok_r(NULL, ",", &save_ptr);    
+	}    
+	xfree(copy);    
+}  
+  
+static void _list_delete_app(void *app_entry)    
+{    
+	app_record_t *app_ptr = (app_record_t *)app_entry;    
+	xfree(app_ptr->app_name);    
+	xfree(app_ptr->versions);    
+	xfree(app_ptr->description);    
+	xfree(app_ptr->watchdog);    
+	xfree(app_ptr);    
+}    
+  
+/*    
+ * init_app_conf - Reset app subsystem to empty state.    
+ *    
+ * Called during initial config load and before rebuilding from state file.    
+ * Order matters: free combined hash first (owns entry wrappers), then    
+ * free main hash (non-owning references), then flush list (which frees    
+ * the actual app_record_t memory via _list_delete_app).    
+ */  
+void init_app_conf(void)    
+{    
+	last_app_update = time(NULL);    
+	xfree(default_app_name);    
+	default_app_loc = NULL;    
+  
+	/* Clear combined hash first (owns entry wrappers) */    
+	xhash_free(app_combined_hash);    
+	app_combined_hash = xhash_init(_app_combined_hash_identity,    
+				       _app_combined_entry_free);    
+  
+	/* Clear main hash (non-owning references) */    
+	xhash_free(app_hash_table);    
+	app_hash_table = xhash_init(_app_record_hash_identity, NULL);    
+  
+	if (app_list)    
+		list_flush(app_list);    
+	else    
+		app_list = list_create(_list_delete_app);    
+}  
+    
+void app_fini(void)    
+{    
+	xhash_free(app_combined_hash);    
+	xhash_free(app_hash_table);    
+	FREE_NULL_LIST(app_list);    
+	xfree(default_app_name);    
+	default_app_loc = NULL;    
+}  
+    
+static void _init_app_record(app_record_t *app_ptr)    
+{    
+	app_ptr->app_name = NULL;    
+	app_ptr->versions = NULL;    
+	app_ptr->description = NULL;    
+	app_ptr->watchdog = NULL;    
+	app_ptr->default_flag = false;    
+}  
+    
+/*    
+ * list_find_app - find an entry in the app list by app_name.    
+ * IN key - pointer to app_name string    
+ * RET 1 if matches, 0 otherwise    
+ */    
+int list_find_app(void *x, void *key)    
+{    
+	app_record_t *app_ptr = (app_record_t *)x;    
+	char *find_name = (char *)key;    
+	return (!xstrcmp(app_ptr->app_name, find_name));    
+}    
+  
+/*    
+ * create_app_record - Create a new app record and add to list + hash tables.    
+ * IN name     - application name (unique primary key)    
+ * IN versions - comma-separated version list, or NULL for no restriction    
+ * RET pointer to new app record    
+ */    
+app_record_t *create_app_record(const char *name, const char *versions)    
+{    
+	app_record_t *app_ptr = xmalloc(sizeof(*app_ptr));    
+  
+	last_app_update = time(NULL);    
+  
+	_init_app_record(app_ptr);    
+	app_ptr->app_name = xstrdup(name);    
+	if (versions && versions[0])    
+		app_ptr->versions = xstrdup(versions);    
+  
+	(void)list_append(app_list, app_ptr);    
+	xhash_add(app_hash_table, app_ptr);    
+  
+	/* Build secondary hash entries for --app= validation */    
+	_rebuild_combined_hash_for_app(app_ptr);    
+  
+	return app_ptr;    
+}  
+  
+/*    
+ * find_app_record - find an app record by app_name (primary hash, O(1)).    
+ * IN app_name - application name    
+ * RET pointer to app record or NULL if not found    
+ */    
+app_record_t *find_app_record(const char *app_name)    
+{    
+	if (!app_name || !app_hash_table)    
+		return NULL;    
+	return (app_record_t *)xhash_get_str(app_hash_table, app_name);    
+}  
+  
+/*    
+ * find_app_record_by_combined - find an app record by combined name    
+ *   (e.g. "vasp-5.7.1") using secondary hash for O(1) lookup.    
+ *   Also supports bare app_name (e.g. "vasp") when versions is NULL.    
+ * IN combined_name - e.g. "vasp-5.7.1" or "vasp"    
+ * RET pointer to app record or NULL if not found    
+ */    
+app_record_t *find_app_record_by_combined(const char *combined_name)    
+{    
+	app_combined_entry_t *e;    
+  
+	if (!combined_name || !app_combined_hash)    
+		return NULL;    
+  
+	e = (app_combined_entry_t *)xhash_get_str(app_combined_hash,    
+						  combined_name);    
+	return e ? e->app_ptr : NULL;    
+}
+  
+/*    
+ * _build_single_appline_info - Process one AppName config line.    
+ *    
+ * If an app with the same app_name already exists, merge: append new    
+ * versions to the existing versions list, and overwrite description/    
+ * watchdog/default with the latest values.    
+ * If not found, create a new record.    
+ */    
+static int _build_single_appline_info(app_record_t *app)      
+{      
+	app_record_t *app_ptr = NULL;      
+  
+	/* Use primary hash for O(1) duplicate detection by app_name */      
+	app_ptr = (app_record_t *)xhash_get_str(app_hash_table,    
+						app->app_name);    
+  
+	if (app_ptr) {      
+		/* Same AppName already exists — merge versions, overwrite props */    
+		info("%s: AppName=%s specified more than once, merging",    
+		     __func__, app->app_name);    
+  
+		/* Merge versions: append new versions to existing list */    
+		if (app->versions && app->versions[0]) {    
+			/* Remove old combined hash entries before changing versions */    
+			_remove_combined_hash_for_app(app_ptr);    
+  
+			if (app_ptr->versions && app_ptr->versions[0]) {  
+				/* Append only versions not already present */  
+				char *copy = xstrdup(app->versions);  
+				char *save_ptr = NULL;  
+				char *tok = strtok_r(copy, ",", &save_ptr);  
+				while (tok) {  
+					while (*tok == ' ' || *tok == '\t')  
+						tok++;  
+					char *end = tok + strlen(tok) - 1;  
+					while (end > tok && (*end == ' ' || *end == '\t'))  
+						*end-- = '\0';  
+					if (*tok && !_version_in_list(  
+							app_ptr->versions, tok)) {  
+						xstrfmtcat(app_ptr->versions,  
+								",%s", tok);  
+					}  
+					tok = strtok_r(NULL, ",", &save_ptr);  
+				}  
+				xfree(copy);  
+			} else {  
+				xfree(app_ptr->versions);  
+				app_ptr->versions = xstrdup(app->versions);  
+			} 
+  
+			/* Rebuild combined hash entries with updated versions */    
+			_rebuild_combined_hash_for_app(app_ptr);    
+		}    
+  
+		/* Overwrite description if provided */    
+		if (app->description) {    
+			xfree(app_ptr->description);    
+			app_ptr->description = xstrdup(app->description);    
+		}    
+  
+		/* Overwrite watchdog if provided */    
+		if (app->watchdog) {    
+#ifdef __METASTACK_NEW_CUSTOM_EXCEPTION      
+			if (list_find_first(watch_dog_list,    
+					    &list_find_watch_dog,    
+					    app->watchdog)) {      
+				xfree(app_ptr->watchdog);    
+				app_ptr->watchdog = xstrdup(app->watchdog);      
+			} else {      
+				error("AppName=%s references undefined "    
+				      "Watchdog '%s', ignoring watchdog setting",    
+				      app->app_name, app->watchdog);      
+			}      
+#else      
+			xfree(app_ptr->watchdog);    
+			app_ptr->watchdog = xstrdup(app->watchdog);    
+#endif      
+		}    
+  
+		/* Handle default flag — clear old default if changing */    
+		if (app->default_flag) {    
+			if (default_app_name &&    
+			    default_app_loc != app_ptr) {    
+				info("%s: changing default app from %s to %s",    
+				     __func__, default_app_name,    
+				     app->app_name);    
+				default_app_loc->default_flag = false;    
+			}    
+			app_ptr->default_flag = true;    
+			xfree(default_app_name);    
+			default_app_name = xstrdup(app->app_name);    
+			default_app_loc = app_ptr;    
+		}    
+  
+		return 0;    
+	}    
+  
+	/* New AppName — create record */    
+	app_ptr = create_app_record(app->app_name, app->versions);      
+  
+	if (app->description)      
+		app_ptr->description = xstrdup(app->description);      
+  
+	if (app->watchdog) {      
+#ifdef __METASTACK_NEW_CUSTOM_EXCEPTION      
+		if (list_find_first(watch_dog_list, &list_find_watch_dog,      
+				    app->watchdog)) {      
+			app_ptr->watchdog = xstrdup(app->watchdog);      
+		} else {      
+			error("AppName=%s references undefined "    
+			      "Watchdog '%s', ignoring watchdog setting",    
+			      app->app_name, app->watchdog);      
+		}      
+#else      
+		app_ptr->watchdog = xstrdup(app->watchdog);    
+#endif      
+	}      
+  
+	app_ptr->default_flag = app->default_flag;      
+  
+	if (app->default_flag) {    
+		if (default_app_name &&    
+		    xstrcmp(default_app_loc->app_name, app->app_name)) {    
+			info("%s: changing default app from %s to %s",    
+			     __func__,    
+			     default_app_loc->app_name,    
+			     app->app_name);    
+		}    
+		xfree(default_app_name);    
+		default_app_name = xstrdup(app->app_name);    
+		default_app_loc = app_ptr;    
+	}      
+  
+	return 0;      
+}  
+  
+/*    
+ * _build_all_app_info - Build app records from slurm.conf AppName lines.    
+ * Each config line becomes one app_record_t with AppName as unique key.    
+ * Version is stored as-is (comma-separated list).    
+ */    
+static int _build_all_app_info(void)      
+{      
+	app_record_t **app_array = NULL;      
+	int count = 0;      
+	int i;      
+  
+	count = slurm_conf_app_array(&app_array);      
+	if (count == 0) {      
+		debug("No AppName information available");      
+		return SLURM_ERROR;      
+	}      
+  
+	for (i = 0; i < count; i++) {      
+		app_record_t *app = app_array[i];      
+		_build_single_appline_info(app);      
+	}      
+  
+	return SLURM_SUCCESS;      
+}
+
+#define APP_STATE_VERSION "METASTACK_APP_STATE_001"  
+  
+typedef struct {    
+	buf_t *buffer;    
+	uint32_t apps_packed;    
+	uint16_t protocol_version;    
+	uid_t uid;    
+} _foreach_pack_app_info_t;  
+
+void pack_app(app_record_t *app_ptr, buf_t *buffer,  
+              uint16_t protocol_version)  
+{  
+#ifdef __META_PROTOCOL  
+	if (protocol_version >= META_3_2_PROTOCOL_VERSION) {  
+		packstr(app_ptr->app_name, buffer);  
+		packstr(app_ptr->versions, buffer);  
+		packstr(app_ptr->description, buffer);  
+		packstr(app_ptr->watchdog, buffer);  
+		packbool(app_ptr->default_flag, buffer);  
+	}  
+#endif  
+}
+  
+static int _pack_app(void *object, void *arg)    
+{    
+	app_record_t *app_ptr = object;    
+	_foreach_pack_app_info_t *pack_info = arg;    
+	int offset_before = get_buf_offset(pack_info->buffer);    
+	pack_app(app_ptr, pack_info->buffer, pack_info->protocol_version);    
+	if (get_buf_offset(pack_info->buffer) != offset_before)    
+		pack_info->apps_packed++;    
+	return SLURM_SUCCESS;    
+}
+
+/*  
+ * dump_all_app_state - save the state of all app records to file  
+ *   for later recovery upon restart.  
+ * RET 0 or error code  
+ */  
+extern int dump_all_app_state(void)  
+{  
+	int error_code = 0, log_fd;  
+	char *old_file, *new_file, *reg_file;  
+	slurmctld_lock_t app_read_lock = {  
+		READ_LOCK, NO_LOCK, NO_LOCK, NO_LOCK, NO_LOCK };  
+	buf_t *buffer = init_buf(BUF_SIZE);  
+	DEF_TIMERS;  
+  
+	START_TIMER;  
+  
+	/* write header */  
+	packstr(APP_STATE_VERSION, buffer);  
+	pack16(SLURM_PROTOCOL_VERSION, buffer);  
+	pack_time(time(NULL), buffer);  
+  
+	/* write app records to buffer */  
+	lock_slurmctld(app_read_lock);  
+	if (app_list) {  
+		list_itr_t *iter = list_iterator_create(app_list);  
+		app_record_t *app_ptr;  
+		while ((app_ptr = list_next(iter)))  
+			pack_app(app_ptr, buffer, SLURM_PROTOCOL_VERSION);  
+		list_iterator_destroy(iter);  
+	}  
+	unlock_slurmctld(app_read_lock);  
+  
+	/* write the buffer to file */  
+	old_file = xstrdup(slurm_conf.state_save_location);  
+	xstrcat(old_file, "/app_state.old");  
+	reg_file = xstrdup(slurm_conf.state_save_location);  
+	xstrcat(reg_file, "/app_state");  
+	new_file = xstrdup(slurm_conf.state_save_location);  
+	xstrcat(new_file, "/app_state.new");  
+  
+	lock_state_files();  
+	log_fd = creat(new_file, 0600);  
+	if (log_fd < 0) {  
+		error("Can't save state, error creating file %s, %m",  
+		      new_file);  
+		error_code = errno;  
+	} else {  
+		int pos = 0, nwrite = get_buf_offset(buffer), amount, rc;  
+		char *data = (char *)get_buf_data(buffer);  
+  
+		while (nwrite > 0) {  
+			amount = write(log_fd, &data[pos], nwrite);  
+			if ((amount < 0) && (errno != EINTR)) {  
+				error("Error writing file %s, %m", new_file);  
+				error_code = errno;  
+				break;  
+			}  
+			nwrite -= amount;  
+			pos    += amount;  
+		}  
+		rc = fsync_and_close(log_fd, "app");  
+		if (rc && !error_code)  
+			error_code = rc;  
+	}  
+	if (error_code)  
+		(void)unlink(new_file);  
+	else {	/* file shuffle */  
+		(void)unlink(old_file);  
+		if (link(reg_file, old_file))  
+			debug4("unable to create link for %s -> %s: %m",  
+			       reg_file, old_file);  
+		(void)unlink(reg_file);  
+		if (link(new_file, reg_file))  
+			debug4("unable to create link for %s -> %s: %m",  
+			       new_file, reg_file);  
+		(void)unlink(new_file);  
+	}  
+	xfree(old_file);  
+	xfree(reg_file);  
+	xfree(new_file);  
+	unlock_state_files();  
+  
+	FREE_NULL_BUFFER(buffer);  
+	END_TIMER2(__func__);  
+	return error_code;  
+}
+
+/* Open the app state save file, or backup if necessary. */  
+static buf_t *_open_app_state_file(char **state_file)  
+{  
+	buf_t *buf;  
+  
+	*state_file = xstrdup(slurm_conf.state_save_location);  
+	xstrcat(*state_file, "/app_state");  
+	if (!(buf = create_mmap_buf(*state_file)))  
+		error("Could not open app state file %s: %m",  
+		      *state_file);  
+	else  
+		return buf;  
+  
+	error("NOTE: Trying backup app state save file. "  
+	      "App config changes may be lost");  
+	xstrcat(*state_file, ".old");  
+	return create_mmap_buf(*state_file);  
+}
+
+/*    
+ * load_all_app_state - Merge app state file data into config-loaded app_list.    
+ *    
+ * Uses merge strategy (consistent with load_all_part_state):    
+ *   - For each record in state file, find matching record in app_list.    
+ *   - If found: overlay state file fields onto config-loaded record.    
+ *   - If not found: create new record (dynamically created app).    
+ *   - Apps in slurm.conf but not in state file are preserved as-is.    
+ *    
+ * On reconfigure (recover==0): only loads state if RECONFIG_KEEP_APP_INFO    
+ * flag is set; otherwise discards dynamic changes and uses config only.    
+ *    
+ * Error handling: unpack failures go to unpack_error which frees tmp_app    
+ * members and buffer. With ignore_state_errors=false, incompatible versions    
+ * cause fatal(); otherwise logs error and continues with partial data.    
+ */
+extern int load_all_app_state(uint16_t reconfig_flags) 
+{  
+	char *state_file, *ver_str = NULL;  
+	time_t now;  
+	int error_code = 0;  
+	buf_t *buffer;  
+	uint16_t protocol_version = NO_VAL16;  
+	app_record_t tmp_app;  
+	int app_count = 0;  
+  
+	/* On reconfigure (recover == 0), only load state file if  
+	* RECONFIG_KEEP_APP_INFO is set — otherwise discard  
+	* dynamic changes and use config file only. */  
+	if (!(reconfig_flags & RECONFIG_KEEP_APP_INFO)) {  
+		debug("Restoring app state from state file disabled");  
+		schedule_app_save();
+		return SLURM_SUCCESS;  
+	}  
+	
+	/* recover > 1 (full recovery): load state file.    
+	 * recover == 0 with RECONFIG_KEEP_APP_INFO: also load state file. */
+  
+	/* read the file */  
+	lock_state_files();  
+	if (!(buffer = _open_app_state_file(&state_file))) {  
+		info("No app state file (%s) to recover",  
+		     state_file);  
+		xfree(state_file);  
+		unlock_state_files();  
+		return ENOENT;  
+	}  
+	xfree(state_file);  
+	unlock_state_files();  
+  
+	safe_unpackstr(&ver_str, buffer);  
+	debug3("Version string in app_state header is %s", ver_str);  
+	if (ver_str && !xstrcmp(ver_str, APP_STATE_VERSION))  
+		safe_unpack16(&protocol_version, buffer);  
+  
+	if (protocol_version == NO_VAL16) {  
+		if (!ignore_state_errors)  
+			fatal("Can not recover app state, data version "  
+			      "incompatible, start with '-i' to ignore this.");  
+		error("*****************************************************");  
+		error("Can not recover app state, data version incompatible");  
+		error("*****************************************************");  
+		xfree(ver_str);  
+		FREE_NULL_BUFFER(buffer);  
+		schedule_app_save();	/* Schedule save with new format */  
+		return EFAULT;  
+	}  
+	xfree(ver_str);  
+	safe_unpack_time(&now, buffer);  
+  
+	/*    
+	 * Merge state file data into config-loaded app_list.    
+	 * For each state file record:    
+	 *   - If app exists in app_list (from slurm.conf): overlay state data.    
+	 *   - If app does not exist: create new record (dynamic app).    
+	 * Apps in slurm.conf but not in state file are preserved as-is.    
+	 * This is consistent with load_all_part_state() merge strategy.    
+	 */    
+    
+	while (remaining_buf(buffer) > 0) {    
+		memset(&tmp_app, 0, sizeof(tmp_app));    
+
+#ifdef __META_PROTOCOL    
+		if (protocol_version >= META_3_2_PROTOCOL_VERSION) {    
+			safe_unpackstr(&tmp_app.app_name, buffer);    
+			if (tmp_app.app_name == NULL)    
+				tmp_app.app_name = xmalloc(1);    
+			safe_unpackstr(&tmp_app.versions, buffer);    
+			safe_unpackstr(&tmp_app.description, buffer);    
+			safe_unpackstr(&tmp_app.watchdog, buffer);    
+			safe_unpackbool(&tmp_app.default_flag, buffer);    
+		} else {    
+			goto unpack_error;    
+		}    
+#else    
+		goto unpack_error;    
+#endif    
+      
+		/* Find existing record or create new one */      
+		app_record_t *app_ptr = find_app_record(tmp_app.app_name);      
+      
+		if (!app_ptr) {      
+			/* Not in config — dynamically created app */      
+			info("%s: app %s missing from configuration "      
+			     "file, creating from state",      
+			     __func__, tmp_app.app_name);      
+			app_ptr = create_app_record(      
+				tmp_app.app_name, tmp_app.versions);      
+		}      
+      
+		if (app_ptr) {      
+			/* Overlay state file data onto record */      
+			if (tmp_app.versions) {    
+				/* Remove old combined hash entries */    
+				_remove_combined_hash_for_app(app_ptr);    
+				xfree(app_ptr->versions);    
+				app_ptr->versions = xstrdup(tmp_app.versions);    
+				/* Rebuild combined hash entries */    
+				_rebuild_combined_hash_for_app(app_ptr);    
+			}    
+			xfree(app_ptr->description);      
+			if (tmp_app.description)      
+				app_ptr->description =      
+					xstrdup(tmp_app.description);      
+			xfree(app_ptr->watchdog);      
+			if (tmp_app.watchdog)      
+				app_ptr->watchdog =      
+					xstrdup(tmp_app.watchdog);      
+			app_ptr->default_flag = tmp_app.default_flag;      
+      
+			if (tmp_app.default_flag) {      
+				xfree(default_app_name);      
+				default_app_name = xstrdup(app_ptr->app_name);      
+				default_app_loc = app_ptr;      
+			}      
+			app_count++;      
+		}      
+      
+		/* Free temporary strings */      
+		xfree(tmp_app.app_name);      
+		xfree(tmp_app.versions);      
+		xfree(tmp_app.description);      
+		xfree(tmp_app.watchdog);      
+	}  
+    
+	info("Recovered state of %d app records", app_count);    
+	FREE_NULL_BUFFER(buffer);    
+	last_app_update = time(NULL);    
+	return error_code;    
+    
+unpack_error:    
+	if (!ignore_state_errors)  
+		fatal("Incomplete app data checkpoint file, start with "  
+		      "'-i' to ignore this.");  
+	error("Incomplete app data checkpoint file");  
+	xfree(tmp_app.app_name);  
+	xfree(tmp_app.versions);  
+	xfree(tmp_app.description);  
+	xfree(tmp_app.watchdog);  
+	info("Recovered state of %d app records", app_count);
+	FREE_NULL_BUFFER(buffer);  
+	return EFAULT;  
+}
+
+/*  
+ * pack_all_app — Serialize all app records for RESPONSE_BUILD_APP_INFO.  
+ *  
+ * Called by slurmctld when handling "scontrol show app" requests.  
+ * Format: [record_count (uint32)] [timestamp] [app_record]*  
+ * Each app_record is packed by pack_app().  
+ *  
+ * IN uid              - requesting user (reserved for future ACL use)  
+ * IN protocol_version - RPC protocol version for pack format selection  
+ * RET buf_t containing the serialized app info message  
+ */
+extern buf_t *pack_all_app(uid_t uid, uint16_t protocol_version)  
+{  
+	time_t now = time(NULL);  
+	int tmp_offset = 0;  
+	_foreach_pack_app_info_t pack_app_info = {  
+		.buffer = init_buf(BUF_SIZE),  
+		.apps_packed = 0,  
+		.protocol_version = protocol_version,  
+		.uid = uid,  
+	};  
+  
+	pack32(0, pack_app_info.buffer);  
+	pack_time(now, pack_app_info.buffer);  
+  
+	if (app_list)  
+		list_for_each_ro(app_list, _pack_app, &pack_app_info);  
+  
+	tmp_offset = get_buf_offset(pack_app_info.buffer);  
+	set_buf_offset(pack_app_info.buffer, 0);  
+	pack32(pack_app_info.apps_packed, pack_app_info.buffer);  
+	set_buf_offset(pack_app_info.buffer, tmp_offset);  
+  
+	return pack_app_info.buffer;  
+}
+
+/*    
+ * update_app - Create or update an app record (scontrol RPC handler).    
+ *    
+ * IN app_desc   - App description from RPC message.    
+ * IN create_flag - true=create new, false=update existing.    
+ * RET SLURM_SUCCESS or ESLURM_* error code.    
+ *    
+ * On create: validates uniqueness by app_name, creates record.    
+ * On update: modifies versions/description/watchdog/default of existing record.    
+ * Version supports +/- prefix for add/remove operations.    
+ * Both paths: update last_app_update timestamp and schedule state file save.    
+ *    
+ * Default app management: at most one app can be default. Setting a new    
+ * default clears the old one. default_app_name (string) and default_app_loc    
+ * (pointer) are always kept in sync.    
+ */  
+extern int update_app(app_desc_msg_t *app_desc, bool create_flag)        
+{        
+	app_record_t *app_ptr = NULL;        
+      
+	if (!app_desc->app_name || !app_desc->app_name[0]) {        
+		info("%s: missing AppName", __func__);        
+		return ESLURM_INVALID_APP_NAME;        
+	}        
+      
+	if (create_flag) {      
+		/* --- CREATE path: app_name must be unique --- */      
+    
+#ifdef __METASTACK_NEW_CUSTOM_EXCEPTION      
+		if (app_desc->watchdog && app_desc->watchdog[0]) {      
+			if (!list_find_first(watch_dog_list,      
+			                     &list_find_watch_dog,      
+			                     app_desc->watchdog)) {      
+				info("%s: AppName=%s references "      
+				     "undefined Watchdog '%s'",      
+				     __func__, app_desc->app_name,      
+				     app_desc->watchdog);      
+				return ESLURM_INVALID_APP_WATCHDOG;      
+			}      
+		}      
+#endif      
+      
+		app_ptr = find_app_record(app_desc->app_name);      
+		if (app_ptr) {      
+			info("%s: App '%s' already exists",      
+			     __func__, app_desc->app_name);      
+			return ESLURM_APP_ALREADY_EXISTS;      
+		}      
+		app_ptr = create_app_record(app_desc->app_name,      
+		                            app_desc->versions);      
+		if (!app_ptr)      
+			return SLURM_ERROR;      
+      
+		if (app_desc->description)      
+			app_ptr->description = xstrdup(app_desc->description);      
+		if (app_desc->watchdog)      
+			app_ptr->watchdog = xstrdup(app_desc->watchdog);      
+		if (app_desc->default_spec == APP_DESC_DEFAULT_YES) {      
+			if (default_app_loc && default_app_loc != app_ptr)      
+				default_app_loc->default_flag = false;      
+			app_ptr->default_flag = true;      
+			xfree(default_app_name);      
+			default_app_name = xstrdup(app_ptr->app_name);      
+			default_app_loc = app_ptr;      
+		}      
+		last_app_update = time(NULL);      
+		schedule_app_save();      
+		info("App created: %s", app_ptr->app_name);      
+    
+	} else if (app_desc->versions && app_desc->versions[0]) {      
+		/* --- UPDATE path with Version specified --- */      
+		/*      
+		 * Version string may contain +/- prefixed tokens from      
+		 * scontrol_process_plus_minus(), e.g.:      
+		 *   "+6.0.0,+6.1.0"  → add versions      
+		 *   "-4.7.1,-3.7.1"  → remove versions      
+		 *   "5.7.1,5.7.2"    → replace entire versions list      
+		 */      
+		char *ver_copy = xstrdup(app_desc->versions);      
+		bool has_plus = (ver_copy[0] == '+' || strstr(ver_copy, ",+") != NULL);  
+		bool has_minus = (ver_copy[0] == '-' || strstr(ver_copy, ",-") != NULL);    
+    
+		if (has_plus && has_minus) {      
+			info("%s: cannot mix + and - in Version for AppName=%s",      
+			     __func__, app_desc->app_name);      
+			xfree(ver_copy);      
+			return ESLURM_INVALID_APP_NAME;      
+		}      
+    
+		app_ptr = find_app_record(app_desc->app_name);      
+		if (!app_ptr) {      
+			info("%s: App '%s' not found",      
+			     __func__, app_desc->app_name);      
+			xfree(ver_copy);      
+			return ESLURM_APP_NOT_FOUND;      
+		}      
+    
+		/* Validate watchdog BEFORE modifying versions (atomicity) */      
+#ifdef __METASTACK_NEW_CUSTOM_EXCEPTION      
+		if (app_desc->watchdog && app_desc->watchdog[0]) {      
+			if (!list_find_first(watch_dog_list,      
+			                     &list_find_watch_dog,      
+			                     app_desc->watchdog)) {      
+				info("%s: AppName=%s references undefined "      
+				     "Watchdog '%s'",      
+				     __func__, app_desc->app_name,      
+				     app_desc->watchdog);      
+				xfree(ver_copy);      
+				return ESLURM_INVALID_APP_WATCHDOG;      
+			}      
+		}      
+#endif      
+    
+		/* Remove old combined hash entries before modifying versions */      
+		_remove_combined_hash_for_app(app_ptr);      
+  
+		if (has_plus)  
+			_app_versions_add(app_ptr, ver_copy, app_desc->app_name);  
+		else if (has_minus)  
+			_app_versions_remove(app_ptr, ver_copy, app_desc->app_name);  
+		else  
+			_app_versions_replace(app_ptr, app_desc->versions);  
+    
+		/* Rebuild combined hash entries with updated versions */      
+		_rebuild_combined_hash_for_app(app_ptr);      
+    
+		xfree(ver_copy);      
+    
+		/* Also update other properties if provided */      
+		if (app_desc->description) {      
+			xfree(app_ptr->description);      
+			app_ptr->description =      
+				xstrdup(app_desc->description);      
+		}      
+    
+		if (app_desc->watchdog) {      
+			xfree(app_ptr->watchdog);      
+			app_ptr->watchdog =      
+				xstrdup(app_desc->watchdog);      
+		}      
+    
+		if (app_desc->default_spec !=      
+		    APP_DESC_DEFAULT_IGNORE) {      
+			bool new_default =      
+				(app_desc->default_spec ==      
+				 APP_DESC_DEFAULT_YES);      
+			if (new_default && !app_ptr->default_flag) {      
+				if (default_app_loc &&      
+				    default_app_loc != app_ptr)      
+					default_app_loc->default_flag =      
+						false;      
+				app_ptr->default_flag = true;      
+				xfree(default_app_name);      
+				default_app_name =      
+					xstrdup(app_ptr->app_name);      
+				default_app_loc = app_ptr;      
+			} else if (!new_default &&      
+				   app_ptr->default_flag) {      
+				app_ptr->default_flag = false;      
+				if (default_app_loc == app_ptr) {      
+					xfree(default_app_name);      
+					default_app_loc = NULL;      
+				}      
+			}      
+		}      
+    
+		last_app_update = time(NULL);      
+		schedule_app_save();      
+		info("App updated: %s", app_ptr->app_name);      
+    
+	} else {      
+		/* --- No Version specified: update properties only --- */      
+		app_ptr = find_app_record(app_desc->app_name);      
+		if (!app_ptr) {      
+			info("%s: App '%s' not found",      
+			     __func__, app_desc->app_name);      
+			return ESLURM_APP_NOT_FOUND;      
+		}      
+    
+#ifdef __METASTACK_NEW_CUSTOM_EXCEPTION      
+		if (app_desc->watchdog && app_desc->watchdog[0]) {      
+			if (!list_find_first(watch_dog_list,      
+			                     &list_find_watch_dog,      
+			                     app_desc->watchdog)) {      
+				info("%s: undefined Watchdog '%s'",      
+				     __func__, app_desc->watchdog);      
+				return ESLURM_INVALID_APP_WATCHDOG;      
+			}      
+		}      
+#endif      
+    
+		if (app_desc->description) {      
+			xfree(app_ptr->description);      
+			app_ptr->description =      
+				xstrdup(app_desc->description);      
+		}      
+		if (app_desc->watchdog) {      
+			xfree(app_ptr->watchdog);      
+			app_ptr->watchdog =      
+				xstrdup(app_desc->watchdog);      
+		}      
+		if (app_desc->default_spec !=      
+		    APP_DESC_DEFAULT_IGNORE) {      
+			bool new_default =      
+				(app_desc->default_spec ==      
+				 APP_DESC_DEFAULT_YES);      
+			if (new_default && !app_ptr->default_flag) {      
+				if (default_app_loc &&      
+				    default_app_loc != app_ptr)      
+					default_app_loc->default_flag =      
+						false;      
+				app_ptr->default_flag = true;      
+				xfree(default_app_name);      
+				default_app_name =      
+					xstrdup(app_ptr->app_name);      
+				default_app_loc = app_ptr;      
+			} else if (!new_default &&      
+				   app_ptr->default_flag) {      
+				app_ptr->default_flag = false;      
+				if (default_app_loc == app_ptr) {      
+					xfree(default_app_name);      
+					default_app_loc = NULL;      
+				}      
+			}      
+		}      
+    
+		last_app_update = time(NULL);      
+		schedule_app_save();      
+		info("App updated: %s", app_ptr->app_name);      
+	}      
+      
+	return SLURM_SUCCESS;        
+}
+
+
+/*    
+ * delete_app - Remove an app record by app_name.    
+ *    
+ * Deletion order: remove combined hash entries first, then remove from    
+ * primary hash table (O(1), non-owning), then remove from list (which    
+ * triggers _list_delete_app to free memory).    
+ */  
+extern int delete_app(delete_app_msg_t *app_msg)    
+{    
+	app_record_t *app_ptr;    
+    
+	if (!app_msg->name || !app_msg->name[0]) {    
+		info("%s: missing app name", __func__);    
+		return ESLURM_APP_NOT_FOUND;    
+	}    
+    
+	app_ptr = find_app_record(app_msg->name);    
+	if (!app_ptr) {    
+		info("%s: App '%s' not found", __func__, app_msg->name);    
+		return ESLURM_APP_NOT_FOUND;    
+	}    
+    
+	if (app_ptr->default_flag && default_app_loc == app_ptr) {    
+		xfree(default_app_name);    
+		default_app_loc = NULL;    
+	}    
+    
+	/* Remove secondary hash entries first */    
+	_remove_combined_hash_for_app(app_ptr);    
+  
+	/* Remove from primary hash table (O(1)) */    
+	xhash_pop_str(app_hash_table, app_ptr->app_name);    
+  
+	/* Then delete from list (triggers _list_delete_app to free memory) */    
+	list_delete_first(app_list, &list_find_app, app_ptr->app_name);    
+	last_app_update = time(NULL);  
+	schedule_app_save();  
+    
+	info("App deleted: %s", app_msg->name);    
+	return SLURM_SUCCESS;    
+}  
+#endif /* __METASTACK_OPT_APP */
+
 /*
  * _init_all_slurm_conf - initialize or re-initialize the slurm
  *	configuration values.
@@ -1068,6 +2283,9 @@ static void _init_all_slurm_conf(void)
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
 	init_watch_dog_conf();
 #endif
+#ifdef __METASTACK_OPT_APP  
+	init_app_conf();  
+#endif 
 	init_job_conf();
 }
 
@@ -2218,6 +3436,19 @@ extern int read_slurm_conf(int recover)
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
 	_build_all_watchdog_info();
 #endif
+
+#ifdef __METASTACK_OPT_APP  
+	if (recover > 1)  
+        reconfig_flags |= RECONFIG_KEEP_APP_INFO; 
+	_build_all_app_info();  
+  
+	/* Then optionally merge state file data into config-loaded app_list.    
+	 * On full recovery (recover > 1): merge state file data.    
+	 * On normal startup (recover == 1) or reconfigure (recover == 0):    
+	 *   use config file only, dynamic changes are discarded. */
+	(void)load_all_app_state(reconfig_flags);
+#endif
+
 	restore_front_end_state(recover);
 
 	/*

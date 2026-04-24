@@ -47,7 +47,12 @@ extern "C" {
 typedef enum {
 	SLURMDB_ADMIN_NOTSET,
 	SLURMDB_ADMIN_NONE,
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+	SLURMDB_ADMIN_READ_ONLY = 4,
+	SLURMDB_ADMIN_OPERATOR = 7,	
+#else
 	SLURMDB_ADMIN_OPERATOR,
+#endif
 	SLURMDB_ADMIN_SUPER_USER
 } slurmdb_admin_level_t;
 
@@ -93,6 +98,11 @@ typedef enum {
 	SLURMDB_RESOURCE_LICENSE
 } slurmdb_resource_type_t;
 
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+/* "deactivated" rows use this deleted column value  */
+#define SLURMDB_USER_DEACTIVATED 5
+#endif
+
 typedef enum {
 	SLURMDB_UPDATE_NOTSET,
 	SLURMDB_ADD_USER,
@@ -118,6 +128,16 @@ typedef enum {
 	SLURMDB_UPDATE_QOS_USAGE,
 	SLURMDB_ADD_TRES,
 	SLURMDB_UPDATE_FEDS,
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	SLURMDB_ACTIVATE_USER,
+	SLURMDB_ACTIVATE_ASSOC,
+	SLURMDB_ACTIVATE_COORD,
+	SLURMDB_ACTIVATE_WCKEY,
+	SLURMDB_DEACTIVATE_USER,
+	SLURMDB_DEACTIVATE_ASSOC,
+	SLURMDB_DEACTIVATE_COORD,
+	SLURMDB_DEACTIVATE_WCKEY,
+#endif
 } slurmdb_update_type_t;
 
 /* Define QOS flags */
@@ -211,6 +231,9 @@ enum cluster_fed_states {
 						    */
 #define JOBCOND_FLAG_SCRIPT           SLURM_BIT(8) /* Get batch script only */
 #define JOBCOND_FLAG_ENV              SLURM_BIT(9) /* Get job's env only */
+#ifdef __METASTACK_OPT_APP  
+#define JOBCOND_FLAG_APP          SLURM_BIT(10)
+#endif
 
 /* Archive / Purge time flags */
 #define SLURMDB_PURGE_BASE    0x0000ffff   /* Apply to get the number
@@ -271,6 +294,13 @@ typedef enum {
 #define DB_CONN_FLAG_CLUSTER_DEL SLURM_BIT(0)
 #define DB_CONN_FLAG_ROLLBACK SLURM_BIT(1)
 #define DB_CONN_FLAG_FEDUPDATE SLURM_BIT(2)
+
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+/* Query flags for assoc_cond->with_deleted and user_cond->with_deleted */
+#define SLURMDB_QUERY_WITH_DELETED 1        /* query deleted, deactivated and active associations */
+#define SLURMDB_QUERY_WITH_DEACTIVATED 2    /* query deactivated and active associations */
+#define SLURMDB_QUERY_ONLY_DEACTIVATED 3    /* query deactivated associations */
+#endif
 
 /********************************************/
 
@@ -357,6 +387,13 @@ typedef struct {
 	char *used_nodes;       /* a ranged node string where jobs ran */
 	List userid_list;	/* list of char * */
 	List wckey_list;	/* list of char * */
+#ifdef __METASTACK_OPT_APP  
+	List appname_list;      /* list of char *, --appname filter values */  
+	List appversion_list;   /* list of char *, --appversion filter values */  
+	List appsource_list;    /* list of char * (numeric strings "0","1",...),  
+	                         * --appsource filter values, converted from  
+	                         * string names to numeric for SQL WHERE clause */  
+#endif
 } slurmdb_job_cond_t;
 
 /* slurmdb_stats_t needs to be defined before slurmdb_job_rec_t and
@@ -399,6 +436,19 @@ typedef struct {
 	uint64_t *node_start;
 	uint64_t *node_end;
 #endif
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+	//double dcu_step_ave;
+	double dcu_step_max;
+	double dcu_step_min;
+	double dcu_step_real;
+
+	uint64_t dcu_mem_step_max;
+	uint64_t dcu_mem_step_min;
+	uint64_t dcu_mem_step;
+	uint64_t gres_count;
+	uint64_t *gres_start;
+	uint64_t *gres_end;
+#endif
 	uint64_t consumed_energy; /* contains energy consumption in joules */
 	char *tres_usage_in_ave; /* average amount of usage in data */
 	char *tres_usage_in_max; /* contains max amount of usage in data */
@@ -429,6 +479,11 @@ typedef enum {
 
 	/* Anything above this (0-15) will not be stored in the database. */
 	SLURMDB_ACCT_FLAG_BASE = 0x0000ffff,
+
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	SLURMDB_ACCT_FLAG_DEACTIVATED = SLURM_BIT(8),  /* This account is deactivated or active. */
+	SLURMDB_ACCT_FLAG_ONLY_DEACTIVATED = SLURM_BIT(9), /* This account is deactivated. */
+#endif
 
 	SLURMDB_ACCT_FLAG_USER_COORD = SLURM_BIT(16),
 
@@ -1015,6 +1070,12 @@ typedef struct {
 #ifdef __METASTACK_OPT_RESC_NODEDETAIL
 	char	*resource_node_detail;
 #endif
+#ifdef __METASTACK_OPT_APP  
+	char    *app_name;      /* application name from job_app_table */  
+	char    *app_version;   /* application version from job_app_table */  
+	uint8_t  app_source;    /* 0=user, 1=auto, 2=portal, 3=marketplace,  
+	                         * 0xff=unset (no app info for this job) */  
+#endif
 } slurmdb_job_rec_t;
 
 typedef struct {
@@ -1587,6 +1648,28 @@ extern List slurmdb_accounts_modify(void *db_conn,
 extern List slurmdb_accounts_remove(void *db_conn,
 				    slurmdb_account_cond_t *acct_cond);
 
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+/*
+ * deactivate accounts from accounting system
+ * IN:  slurmdb_account_cond_t *acct_cond
+ * RET: List containing (char *'s) else NULL on error
+ * note List needs to be freed with slurm_list_destroy() when called
+ */
+extern List slurmdb_accounts_deactivate(void *db_conn,
+				    slurmdb_account_cond_t *acct_cond);
+
+/*
+ * activate existing accounts in the accounting system
+ * IN:  slurmdb_acct_cond_t *acct_cond
+ * IN:  slurmdb_account_rec_t *acct
+ * RET: List containing (char *'s) else NULL on error
+ * note List needs to be freed with slurm_list_destroy() when called
+ */
+extern List slurmdb_accounts_activate(void *db_conn,
+				    slurmdb_account_cond_t *acct_cond,
+				    slurmdb_account_rec_t *acct);
+
+#endif
 
 /************** archive functions **************/
 
@@ -1639,6 +1722,29 @@ extern List slurmdb_associations_modify(void *db_conn,
  */
 extern List slurmdb_associations_remove(void *db_conn,
 					slurmdb_assoc_cond_t *assoc_cond);
+
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+/*
+ * deactivate associations from accounting system
+ * IN:  slurmdb_assoc_cond_t *assoc_cond
+ * RET: List containing (char *'s) else NULL on error
+ * note List needs to be freed with slurm_list_destroy() when called
+ */
+extern List slurmdb_associations_deactivate(void *db_conn,
+					slurmdb_assoc_cond_t *assoc_cond);
+
+/*
+ * activate existing associations in the accounting system
+ * IN:  slurmdb_assoc_cond_t *assoc_cond
+ * IN:  slurmdb_assoc_rec_t *assoc
+ * RET: List containing (char *'s) else NULL on error
+ * note List needs to be freed with slurm_list_destroy() when called
+ */
+extern List slurmdb_associations_activate(void *db_conn,
+					slurmdb_assoc_cond_t *assoc_cond,
+					slurmdb_assoc_rec_t *assoc);
+
+#endif
 
 /************** cluster functions **************/
 
@@ -2282,6 +2388,28 @@ extern List slurmdb_users_modify(void *db_conn,
 extern List slurmdb_users_remove(void *db_conn,
 				 slurmdb_user_cond_t *user_cond);
 
+
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+/*
+ * activate existing users in the accounting system
+ * IN:  slurmdb_user_cond_t *user_cond
+ * IN:  slurmdb_user_rec_t *user
+ * RET: List containing (char *'s) else NULL on error
+ * note List needs to be freed with slurm_list_destroy() when called
+ */
+extern List slurmdb_users_activate(void *db_conn,
+				 slurmdb_user_cond_t *user_cond,
+				 slurmdb_user_rec_t *user);
+
+/*
+ * deactivate users from accounting system
+ * IN:  slurmdb_user_cond_t *user_cond
+ * RET: List containing (char *'s) else NULL on error
+ * note List needs to be freed with slurm_list_destroy() when called
+ */
+extern List slurmdb_users_deactivate(void *db_conn,
+				 slurmdb_user_cond_t *user_cond);
+#endif
 
 /************** user report functions **************/
 

@@ -159,7 +159,7 @@ static void _addto_job_list(char *names)
 }
 
 #ifdef __METASTACK_OPT_SSTAT_CPUUTIL
-int cpu_util_readable = 1;
+int tran_util_readable = 1;
 #endif
 
 int decode_state_char(char *state)
@@ -299,7 +299,7 @@ void parse_command_line(int argc, char **argv)
 			params.units = UNIT_GIGA;
 			break;
 		case 'r':
-			cpu_util_readable = 0;
+			tran_util_readable = 0;
 			break;
 #endif
 		case ':':

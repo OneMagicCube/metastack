@@ -996,14 +996,15 @@ extern void gpu_p_step_hardware_init(bitstr_t *usable_gpus, char *tres_freq)
 		return;		/* No TRES frequency spec */
 
 #ifdef __METASTACK_NEW_GRES_DCU
-	log_flag(GRES, "__METASTACK_NEW_GRES_DCU, tres_freq: %s", tres_freq);
-	if (!strstr(tres_freq, "dcu:"))
-		return;
+    log_flag(GRES, "__METASTACK_NEW_GRES_DCU, tres_freq: %s", tres_freq);
+    tmp = strstr(tres_freq, "dcu:");
+    if (!tmp)
+        tmp = strstr(tres_freq, "gpu:");
+#else
+    tmp = strstr(tres_freq, "gpu:");
 #endif
-
-	tmp = strstr(tres_freq, "gpu:");
 	if (!tmp)
-		return;		/* No GPU frequency spec */
+		return;	/* No GPU frequency spec */
 
 	freq = xstrdup(tmp + 4);
 	tmp = strchr(freq, ';');

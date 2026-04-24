@@ -827,7 +827,11 @@ extern int as_mysql_get_usage(mysql_conn_t *mysql_conn, uid_t uid,
 
 	if (slurm_conf.private_data & PRIVATE_DATA_USAGE) {
 		if (!(is_admin = is_user_min_admin_level(
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+			      mysql_conn, uid, SLURMDB_ADMIN_READ_ONLY))) {
+#else
 			      mysql_conn, uid, SLURMDB_ADMIN_OPERATOR))) {
+#endif
 			list_itr_t *itr = NULL;
 			slurmdb_coord_rec_t *coord = NULL;
 			slurmdb_user_rec_t user;

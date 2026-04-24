@@ -163,6 +163,9 @@ char *wckey_day_table = "wckey_usage_day_table";
 char *wckey_hour_table = "wckey_usage_hour_table";
 char *wckey_month_table = "wckey_usage_month_table";
 char *wckey_table = "wckey_table";
+#ifdef __METASTACK_OPT_APP
+char *job_app_table = "job_app_table";  
+#endif
 
 char *event_view = "event_view";
 char *event_ext_view = "event_ext_view";
@@ -1547,6 +1550,41 @@ extern int create_cluster_tables(mysql_conn_t *mysql_conn, char *cluster_name)
 		{ NULL, NULL}
 	};
 
+/*  
+ * job_app_table - Per-job application metadata, one row per job.  
+ *  
+ * Table: <cluster_name>_job_app_table  
+ * Primary key: job_db_inx (1:1 with job_table)  
+ * Index: idx_app_name for sacct --appname queries  
+ *  
+ * Fields:  
+ *   app_name    - Application name (e.g. "vasp"), from --app or auto-recognition  
+ *   app_version - Version string (e.g. "5.7.1"), empty if auto-recognized  
+ *   app_runtime - Reserved for future use (runtime metrics)  
+ *   app_source  - How app was determined (0=user, 1=auto, 2=portal, 3=marketplace)  
+ *   extra       - Reserved for future extensibility  
+ *  
+ * Populated in as_mysql_job_start via INSERT ... ON DUPLICATE KEY UPDATE.  
+ * Queried by sacct via LEFT JOIN when JOBCOND_FLAG_APP is set.  
+ * Archived/purged alongside job_table records.  
+ *  
+ * Fault isolation: write failures use independent app_rc, logged but  
+ * not propagated to the main job_start rc.  
+ */
+#ifdef __METASTACK_OPT_APP
+	storage_field_t job_app_table_fields[] = {  
+		{ "job_db_inx", "bigint unsigned not null" },  
+		{ "app_name", "varchar(128) not null default ''" },  
+		{ "app_version", "varchar(64) not null default ''" },  
+		{ "app_runtime", "tinytext not null default ''" },  
+		{ "app_source", "tinyint default 0 not null" },
+		{ "mod_time", "bigint unsigned default 0 not null" },  
+		{ "extra", "text not null default ''" },  
+		{ "deleted", "tinyint default 0 not null" },  
+		{ NULL, NULL}  
+	};  
+#endif
+
 	char table_name[200];
 
 	if (create_cluster_assoc_table(mysql_conn, cluster_name)
@@ -1675,6 +1713,17 @@ extern int create_cluster_tables(mysql_conn_t *mysql_conn, char *cluster_name)
 	    == SLURM_ERROR)
 		return SLURM_ERROR;
 
+#ifdef __METASTACK_OPT_APP
+	snprintf(table_name, sizeof(table_name), "\"%s_%s\"",  
+		 cluster_name, job_app_table);  
+	if (mysql_db_create_table(mysql_conn, table_name,  
+				  job_app_table_fields,  
+				  ", primary key (job_db_inx), "  
+				  "key idx_app_name (app_name))")
+	    == SLURM_ERROR)  
+		return SLURM_ERROR;  
+#endif
+
 	snprintf(table_name, sizeof(table_name), "\"%s_%s\"",
 		 cluster_name, last_ran_table);
 	if (mysql_db_create_table(mysql_conn, table_name,
@@ -1800,6 +1849,9 @@ extern int remove_cluster_tables(mysql_conn_t *mysql_conn, char *cluster_name)
 #ifdef __METASTACK_NEW_AUTO_SUPPLEMENT_AVAIL_NODES
 		   "\"%s_%s\", "
 #endif
+#ifdef __METASTACK_OPT_APP
+		   "\"%s_%s\", "  
+#endif
 		   "\"%s_%s\", \"%s_%s\", \"%s_%s\", \"%s_%s\";",
 		   cluster_name, assoc_table,
 		   cluster_name, assoc_day_table,
@@ -1819,6 +1871,9 @@ extern int remove_cluster_tables(mysql_conn_t *mysql_conn, char *cluster_name)
 		   cluster_name, resv_table,
 		   cluster_name, step_table,
 		   cluster_name, suspend_table,
+#ifdef __METASTACK_OPT_APP
+		   cluster_name, job_app_table,  
+#endif
 		   cluster_name, wckey_table,
 		   cluster_name, wckey_day_table,
 		   cluster_name, wckey_hour_table,
@@ -2432,15 +2487,25 @@ extern int remove_common(mysql_conn_t *mysql_conn,
 		if (cluster_centric) {
 			xstrfmtcat(query,
 				   "update \"%s_%s\" set mod_time=%ld, "
-				   "deleted=1 where deleted=0 && (%s);",
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+				   "deleted=1 where (deleted=0 || deleted=%d) and (%s);",
+				   cluster_name, table, now, SLURMDB_USER_DEACTIVATED, name_char);
+#else
+				   "deleted=1 where deleted=0 and (%s);",
 				   cluster_name, table, now, name_char);
+#endif
 		} else if (table == federation_table) {
 			xstrfmtcat(query,
 				   "update %s set "
 				   "mod_time=%ld, deleted=1, "
 				   "flags=DEFAULT "
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+				   "where (deleted=0 || deleted=%d) and (%s);",
+				   federation_table, now, SLURMDB_USER_DEACTIVATED, 
+#else
 				   "where deleted=0 && (%s);",
 				   federation_table, now,
+#endif
 				   name_char);
 		} else if (table == qos_table) {
 			xstrfmtcat(query,
@@ -2474,13 +2539,23 @@ extern int remove_common(mysql_conn_t *mysql_conn,
 				   "usage_factor=DEFAULT, "
 				   "usage_thres=DEFAULT, "
 				   "limit_factor=DEFAULT "
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+				   "where (deleted=0 || deleted=%d) && (%s);",
+				   qos_table, now, SLURMDB_USER_DEACTIVATED, name_char);
+#else
 				   "where deleted=0 && (%s);",
 				   qos_table, now, name_char);
+#endif
 		} else {
 			xstrfmtcat(query,
 				   "update %s set mod_time=%ld, deleted=1 "
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+				   "where (deleted=0 || deleted=%d) && (%s);",
+				   table, now, SLURMDB_USER_DEACTIVATED, name_char);
+#else
 				   "where deleted=0 && (%s);",
 				   table, now, name_char);
+#endif
 		}
 	}
 
@@ -2541,8 +2616,13 @@ extern int remove_common(mysql_conn_t *mysql_conn,
 		 * already done this, so don't
 		 */
 		query = xstrdup_printf(
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+			"select distinct t2.id_assoc from \"%s_%s\" as t2 where %s && (t2.deleted=0 || t2.deleted=%d);",
+			cluster_name, assoc_table, assoc_char, SLURMDB_USER_DEACTIVATED);
+#else
 			"select distinct t2.id_assoc from \"%s_%s\" as t2 where %s && t2.deleted=0;",
 			cluster_name, assoc_table, assoc_char);
+#endif
 
 		DB_DEBUG(DB_ASSOC, mysql_conn->conn, "query\n%s", query);
 		if (!(result = mysql_db_query_ret(
@@ -3422,17 +3502,37 @@ extern int acct_storage_p_add_reservation(mysql_conn_t *mysql_conn,
 }
 
 extern List acct_storage_p_modify_users(mysql_conn_t *mysql_conn, uint32_t uid,
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+					bool is_activate,
+#endif
 					slurmdb_user_cond_t *user_cond,
 					slurmdb_user_rec_t *user)
 {
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	if (is_activate)
+		return as_mysql_activate_users(mysql_conn, uid, user_cond, user);
+	else
+		return as_mysql_modify_users(mysql_conn, uid, user_cond, user);
+#else
 	return as_mysql_modify_users(mysql_conn, uid, user_cond, user);
+#endif
 }
 
 extern List acct_storage_p_modify_accts(mysql_conn_t *mysql_conn, uint32_t uid,
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+					bool is_activate,
+#endif
 					slurmdb_account_cond_t *acct_cond,
 					slurmdb_account_rec_t *acct)
 {
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	if (is_activate)
+		return as_mysql_activate_accts(mysql_conn, uid, acct_cond, acct);
+	else
+		return as_mysql_modify_accts(mysql_conn, uid, acct_cond, acct);
+#else
 	return as_mysql_modify_accts(mysql_conn, uid, acct_cond, acct);
+#endif
 }
 
 extern List acct_storage_p_modify_clusters(mysql_conn_t *mysql_conn,
@@ -3445,10 +3545,20 @@ extern List acct_storage_p_modify_clusters(mysql_conn_t *mysql_conn,
 
 extern List acct_storage_p_modify_assocs(
 	mysql_conn_t *mysql_conn, uint32_t uid,
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	bool is_activate,
+#endif
 	slurmdb_assoc_cond_t *assoc_cond,
 	slurmdb_assoc_rec_t *assoc)
 {
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	if (is_activate)
+		return as_mysql_activate_assocs(mysql_conn, uid, assoc_cond, assoc);
+	else
+		return as_mysql_modify_assocs(mysql_conn, uid, assoc_cond, assoc);
+#else
 	return as_mysql_modify_assocs(mysql_conn, uid, assoc_cond, assoc);
+#endif
 }
 
 extern List acct_storage_p_modify_federations(
@@ -3496,22 +3606,40 @@ extern int acct_storage_p_modify_reservation(mysql_conn_t *mysql_conn,
 }
 
 extern List acct_storage_p_remove_users(mysql_conn_t *mysql_conn, uint32_t uid,
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+					bool is_deactivate,
+#endif
 					slurmdb_user_cond_t *user_cond)
 {
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	return as_mysql_remove_users(mysql_conn, uid, is_deactivate, user_cond);
+#else
 	return as_mysql_remove_users(mysql_conn, uid, user_cond);
+#endif
 }
 
 extern List acct_storage_p_remove_coord(mysql_conn_t *mysql_conn, uint32_t uid,
 					List acct_list,
 					slurmdb_user_cond_t *user_cond)
 {
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	return as_mysql_remove_coord(mysql_conn, uid, false, acct_list, user_cond);
+#else
 	return as_mysql_remove_coord(mysql_conn, uid, acct_list, user_cond);
+#endif
 }
 
 extern List acct_storage_p_remove_accts(mysql_conn_t *mysql_conn, uint32_t uid,
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+					bool is_deactivate,
+#endif
 					slurmdb_account_cond_t *acct_cond)
 {
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	return as_mysql_remove_accts(mysql_conn, uid, is_deactivate, acct_cond);
+#else
 	return as_mysql_remove_accts(mysql_conn, uid, acct_cond);
+#endif
 }
 
 extern List acct_storage_p_remove_clusters(mysql_conn_t *mysql_conn,
@@ -3523,10 +3651,275 @@ extern List acct_storage_p_remove_clusters(mysql_conn_t *mysql_conn,
 
 extern List acct_storage_p_remove_assocs(
 	mysql_conn_t *mysql_conn, uint32_t uid,
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	bool is_deactivate,
+#endif
 	slurmdb_assoc_cond_t *assoc_cond)
 {
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	return as_mysql_remove_assocs(mysql_conn, uid, is_deactivate, assoc_cond);
+#else
 	return as_mysql_remove_assocs(mysql_conn, uid, assoc_cond);
+#endif
 }
+
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+
+/* Activate deactivated entries and modify info per input parameters.
+ */
+extern int activate_common(mysql_conn_t *mysql_conn,
+			 uint16_t type,
+			 time_t now,
+			 char *user_name,
+			 char *table,
+			 char *cond_char,
+			 char *vals,
+			 char *cluster_name)
+{
+	char *query = NULL;
+	int rc = SLURM_SUCCESS;
+	char *tmp_cond_char = slurm_add_slash_to_quotes(cond_char);
+	char *tmp_vals = NULL;
+	bool cluster_centric = true;
+
+	/* figure out which tables we need to append the cluster name to */
+	if ((table == acct_table) || (table == acct_coord_table)
+	    || (table == user_table))
+		cluster_centric = false;
+
+	if (vals && vals[1])
+		tmp_vals = slurm_add_slash_to_quotes(vals+2);
+
+	if (cluster_centric) {
+		xassert(cluster_name);
+		xstrfmtcat(query,
+			   "update \"%s_%s\" set mod_time=%ld%s "
+			   "where deleted=%d && %s;",
+			   cluster_name, table, now, vals, SLURMDB_USER_DEACTIVATED, cond_char);
+		xstrfmtcat(query,
+			   "insert into %s "
+			   "(timestamp, action, name, cluster, actor, info) "
+			   "values (%ld, %d, '%s', '%s', '%s', '%s');",
+			   txn_table,
+			   now, type, tmp_cond_char, cluster_name,
+			   user_name, tmp_vals);
+	} else {
+		xstrfmtcat(query,
+			   "update %s set mod_time=%ld%s "
+			   "where deleted=%d && %s;",
+			   table, now, vals, SLURMDB_USER_DEACTIVATED, cond_char);
+		xstrfmtcat(query,
+			   "insert into %s "
+			   "(timestamp, action, name, actor, info) "
+			   "values (%ld, %d, '%s', '%s', '%s');",
+			   txn_table,
+			   now, type, tmp_cond_char, user_name, tmp_vals);
+	}
+	xfree(tmp_cond_char);
+	xfree(tmp_vals);
+	DB_DEBUG(DB_ASSOC, mysql_conn->conn, "query\n%s", query);
+	rc = mysql_db_query(mysql_conn, query);
+	xfree(query);
+
+	if (rc != SLURM_SUCCESS) {
+		reset_mysql_conn(mysql_conn);
+		return SLURM_ERROR;
+	}
+
+	return SLURM_SUCCESS;
+}
+
+
+/* Every option in assoc_char should have a 't1.' infront of it. */
+extern int deactivate_common(mysql_conn_t *mysql_conn,
+			 uint16_t type,
+			 time_t now,
+			 char *user_name,
+			 char *table,
+			 char *name_char,
+			 char *assoc_char,
+			 char *cluster_name,
+			 List ret_list,
+			 bool *jobs_running,
+			 bool *default_account)
+{
+	int rc = SLURM_SUCCESS;
+	char *query = NULL;
+	char *loc_assoc_char = NULL;
+	MYSQL_RES *result = NULL;
+	MYSQL_ROW row;
+	char *tmp_name_char = NULL;
+	bool cluster_centric = true;
+
+	/* figure out which tables we need to append the cluster name to */
+	if ((table == cluster_table) || (table == acct_coord_table)
+	    || (table == acct_table) || (table == qos_table)
+	    || (table == txn_table) || (table == user_table)
+	    || (table == res_table) || (table == clus_res_table)
+	    || (table == federation_table))
+		cluster_centric = false;
+
+	if (((table == assoc_table) || (table == acct_table))) {
+		if (_check_is_def_acct_before_remove(mysql_conn,
+						     cluster_name,
+						     assoc_char,
+						     ret_list,
+						     default_account))
+			return SLURM_SUCCESS;
+	}
+
+	if ((table == acct_coord_table) || (table == res_table)
+	    || (table == clus_res_table) || (table == federation_table)
+		|| (table == qos_table) || (table == wckey_table)) {
+		/* This doesn't apply for these tables since we are
+		 * only looking for association type tables.
+		 */
+	} else if (table != assoc_table) {
+		/* first check to see if we are running jobs now */
+		if (_check_jobs_before_remove(
+			    mysql_conn, cluster_name, assoc_char,
+			    ret_list, jobs_running) || (*jobs_running))
+			return SLURM_SUCCESS;
+	} else {
+		/* first check to see if we are running jobs now */
+		if (_check_jobs_before_remove_assoc(
+			    mysql_conn, cluster_name, name_char,
+			    ret_list, jobs_running) || (*jobs_running))
+			return SLURM_SUCCESS;
+	}
+
+	if (table != assoc_table) {
+		if (cluster_centric) {
+			xstrfmtcat(query,
+				   "update \"%s_%s\" set mod_time=%ld, "
+				   "deleted=%d where deleted=0 && (%s);",
+				   cluster_name, table, now, SLURMDB_USER_DEACTIVATED, name_char);
+		} else {
+			xstrfmtcat(query,
+				   "update %s set mod_time=%ld, deleted=%d "
+				   "where deleted=0 && (%s);",
+				   table, now, SLURMDB_USER_DEACTIVATED, name_char);
+		}
+	}
+
+	/* If we are deactivating assocs use the assoc_char since the
+	   name_char has lft between statements that can change over
+	   time.  The assoc_char has the actual ids of the assocs
+	   which never change.
+	*/
+	if (type == DBD_DEACTIVATE_ASSOCS && assoc_char)
+		tmp_name_char = slurm_add_slash_to_quotes(assoc_char);
+	else
+		tmp_name_char = slurm_add_slash_to_quotes(name_char);
+
+	if (cluster_centric)
+		xstrfmtcat(query,
+			   "insert into %s (timestamp, action, name, "
+			   "actor, cluster) values "
+			   "(%ld, %d, '%s', '%s', '%s');",
+			   txn_table,
+			   now, type, tmp_name_char, user_name, cluster_name);
+	else
+		xstrfmtcat(query,
+			   "insert into %s (timestamp, action, name, actor) "
+			   "values (%ld, %d, '%s', '%s');",
+			   txn_table,
+			   now, type, tmp_name_char, user_name);
+
+	xfree(tmp_name_char);
+
+	DB_DEBUG(DB_ASSOC, mysql_conn->conn, "query\n%s", query);
+	rc = mysql_db_query(mysql_conn, query);
+	xfree(query);
+	if (rc != SLURM_SUCCESS) {
+		reset_mysql_conn(mysql_conn);
+		return SLURM_ERROR;
+	} else if ((table == acct_coord_table)
+		   || (table == wckey_table)
+		   || (table == clus_res_table)
+		   || (table == res_table)
+		   || (table == federation_table)
+		   || (table == qos_table))
+		return SLURM_SUCCESS;
+
+	/* mark deleted=SLURMDB_USER_DEACTIVATED 
+	 */
+	if (table != assoc_table) {
+		if (!assoc_char) {
+			error("no assoc_char");
+			if (mysql_conn->flags & DB_CONN_FLAG_ROLLBACK) {
+				mysql_db_rollback(mysql_conn);
+			}
+			list_flush(mysql_conn->update_list);
+			return SLURM_ERROR;
+		}
+
+		/*
+		 * If we are doing this on an assoc_table we have
+		 * already done this, so don't
+		 */
+		query = xstrdup_printf(
+			"select distinct t2.id_assoc from \"%s_%s\" as t2 where %s && t2.deleted=0;",
+			cluster_name, assoc_table, assoc_char);
+
+		DB_DEBUG(DB_ASSOC, mysql_conn->conn, "query\n%s", query);
+		if (!(result = mysql_db_query_ret(
+			      mysql_conn, query, 0))) {
+			xfree(query);
+			if (mysql_conn->flags & DB_CONN_FLAG_ROLLBACK) {
+				mysql_db_rollback(mysql_conn);
+			}
+			list_flush(mysql_conn->update_list);
+			return SLURM_ERROR;
+		}
+		xfree(query);
+
+		rc = 0;
+		xfree(loc_assoc_char);
+		while ((row = mysql_fetch_row(result))) {
+			slurmdb_assoc_rec_t *rem_assoc = NULL;
+			if (loc_assoc_char)
+				xstrcat(loc_assoc_char, " || ");
+			xstrfmtcat(loc_assoc_char, "id_assoc=%s", row[0]);
+
+			rem_assoc = xmalloc(sizeof(slurmdb_assoc_rec_t));
+			rem_assoc->id = slurm_atoul(row[0]);
+			rem_assoc->cluster = xstrdup(cluster_name);
+			if (addto_update_list(mysql_conn->update_list,
+					      SLURMDB_DEACTIVATE_ASSOC,
+					      rem_assoc) != SLURM_SUCCESS)
+				error("couldn't add to the update list");
+		}
+		mysql_free_result(result);
+	} else
+		loc_assoc_char = assoc_char;
+
+	if (!loc_assoc_char) {
+		debug2("No associations with object being deactivated.");
+		return rc;
+	}
+
+	/* Deactivate the association records.
+	 */
+	query = xstrdup_printf("update \"%s_%s\" as t1 set "
+			       "mod_time=%ld, deleted=%d "
+			       "where (%s);",
+			       cluster_name, assoc_table, now,
+			       SLURMDB_USER_DEACTIVATED, loc_assoc_char);
+
+	if (table != assoc_table)
+		xfree(loc_assoc_char);
+
+	DB_DEBUG(DB_ASSOC, mysql_conn->conn, "query\n%s", query);
+	rc = mysql_db_query(mysql_conn, query);
+	xfree(query);
+	if (rc != SLURM_SUCCESS) {
+		reset_mysql_conn(mysql_conn);
+	}
+
+	return rc;
+}
+#endif
 
 extern List acct_storage_p_remove_federations(
 					mysql_conn_t *mysql_conn, uint32_t uid,
@@ -3552,7 +3945,11 @@ extern List acct_storage_p_remove_wckeys(mysql_conn_t *mysql_conn,
 					 uint32_t uid,
 					 slurmdb_wckey_cond_t *wckey_cond)
 {
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	return as_mysql_remove_wckeys(mysql_conn, uid, false, wckey_cond);
+#else
 	return as_mysql_remove_wckeys(mysql_conn, uid, wckey_cond);
+#endif
 }
 
 extern int acct_storage_p_remove_reservation(mysql_conn_t *mysql_conn,
@@ -3624,7 +4021,11 @@ extern List acct_storage_p_get_problems(mysql_conn_t *mysql_conn, uint32_t uid,
 	if (check_connection(mysql_conn) != SLURM_SUCCESS)
 		return NULL;
 
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+	if (!is_user_min_admin_level(mysql_conn, uid, SLURMDB_ADMIN_READ_ONLY)) {
+#else
 	if (!is_user_min_admin_level(mysql_conn, uid, SLURMDB_ADMIN_OPERATOR)) {
+#endif
 		errno = ESLURM_ACCESS_DENIED;
 		return NULL;
 	}

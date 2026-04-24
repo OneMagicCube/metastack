@@ -217,6 +217,9 @@ extern int acct_storage_g_add_reservation(void *db_conn,
  * RET: List containing (char *'s) else NULL on error
  */
 extern List acct_storage_g_modify_users(void *db_conn, uint32_t uid,
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+					bool is_activate,
+#endif
 					slurmdb_user_cond_t *user_cond,
 					slurmdb_user_rec_t *user);
 
@@ -227,6 +230,9 @@ extern List acct_storage_g_modify_users(void *db_conn, uint32_t uid,
  * RET: List containing (char *'s) else NULL on error
  */
 extern List acct_storage_g_modify_accounts(void *db_conn, uint32_t uid,
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+					   bool is_activate,
+#endif
 					   slurmdb_account_cond_t *acct_cond,
 					   slurmdb_account_rec_t *acct);
 
@@ -248,6 +254,9 @@ extern List acct_storage_g_modify_clusters(void *db_conn, uint32_t uid,
  */
 extern List acct_storage_g_modify_assocs(
 	void *db_conn, uint32_t uid,
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	bool is_activate,
+#endif
 	slurmdb_assoc_cond_t *assoc_cond,
 	slurmdb_assoc_rec_t *assoc);
 
@@ -315,6 +324,9 @@ extern int acct_storage_g_modify_reservation(void *db_conn,
  * RET: List containing (char *'s) else NULL on error
  */
 extern List acct_storage_g_remove_users(void *db_conn, uint32_t uid,
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+					bool is_deactivate,
+#endif
 					slurmdb_user_cond_t *user_cond);
 
 /*
@@ -333,6 +345,9 @@ extern List acct_storage_g_remove_coord(void *db_conn, uint32_t uid,
  * RET: List containing (char *'s) else NULL on error
  */
 extern List acct_storage_g_remove_accounts(void *db_conn, uint32_t uid,
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+					   bool is_deactivate,
+#endif
 					   slurmdb_account_cond_t *acct_cond);
 
 /*
@@ -349,7 +364,11 @@ extern List acct_storage_g_remove_clusters(void *db_conn, uint32_t uid,
  * RET: List containing (char *'s) else NULL on error
  */
 extern List acct_storage_g_remove_assocs(
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	void *db_conn, uint32_t uid, bool is_deactivate, slurmdb_assoc_cond_t *assoc_cond);
+#else
 	void *db_conn, uint32_t uid, slurmdb_assoc_cond_t *assoc_cond);
+#endif
 
 /*
  * remove federations from accounting system

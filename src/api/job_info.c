@@ -1100,7 +1100,30 @@ slurm_sprint_job_info ( job_info_t * job_ptr, int one_liner )
 	}
 
 	xstrcat(out, line_end);
-
+#ifdef __METASTACK_OPT_APP    
+	/****** Line: App Info ******/    
+	if (job_ptr->app_name && job_ptr->app_name[0]) {    
+		char *app_combined = NULL;    
+		const char *source_str = "N/A";    
+  
+		if (job_ptr->app_version && job_ptr->app_version[0])    
+			xstrfmtcat(app_combined, "%s-%s",    
+				   job_ptr->app_name,    
+				   job_ptr->app_version);    
+		else    
+			app_combined = xstrdup(job_ptr->app_name);    
+    
+		source_str = app_source_to_str(job_ptr->app_source);    
+  
+		xstrfmtcat(out, "App=%s AppName=%s AppVersion=%s AppSource=%s",    
+			   app_combined,    
+			   job_ptr->app_name,    
+			   job_ptr->app_version ? job_ptr->app_version : "N/A",    
+			   source_str);    
+		xfree(app_combined);    
+		xstrcat(out, line_end);    
+	}
+#endif
 	/****** END OF JOB RECORD ******/
 	if (one_liner)
 		xstrcat(out, "\n");
@@ -1829,6 +1852,11 @@ extern int slurm_job_node_ready(uint32_t job_id)
 			rc = READY_JOB_FATAL;
 		else	/* EAGAIN */
 			rc = READY_JOB_ERROR;
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+		if (job_rc == ESLURM_ACCESS_DENIED) {
+			rc = ESLURM_ACCESS_DENIED;
+		}
+#endif
 		slurm_free_return_code_msg(resp.data);
 	} else if (resp.msg_type == RESPONSE_PROLOG_EXECUTING) {
 		rc = READY_JOB_ERROR;

@@ -119,6 +119,11 @@ char *job_req_inx[] = {
 #ifdef __METASTACK_OPT_RESC_NODEDETAIL
 	"t1.resource_node_detail",
 #endif
+#ifdef __METASTACK_OPT_APP  
+	"t5.app_name",  
+	"t5.app_version",  
+	"t5.app_source",  
+#endif
 	"t2.`user`"
 };
 
@@ -188,6 +193,11 @@ enum {
 	JOB_REQ_LINEAGE,
 #ifdef __METASTACK_OPT_RESC_NODEDETAIL
 	JOB_REQ_RESC_NODE,
+#endif
+#ifdef __METASTACK_OPT_APP  
+	JOB_REQ_APP_NAME,  
+	JOB_REQ_APP_VERSION,  
+	JOB_REQ_APP_SOURCE,  
 #endif
 	JOB_REQ_USER_NAME,
 	JOB_REQ_COUNT
@@ -580,7 +590,14 @@ static int _cluster_get_jobs(kingbase_conn_t *kingbase_conn,
 			   " left join `%s_%s` as t4 "
 			   "on t1.env_hash_inx=t4.hash_inx",
 			   cluster_name, job_env_table);
-
+#ifdef __METASTACK_OPT_APP  
+	/* Only LEFT JOIN apptype table when app info is actually needed */  
+	if (job_cond->flags & JOBCOND_FLAG_APP)  
+		xstrfmtcat(query,  
+			   " left join `%s_%s` as t5 "  
+			   "on t1.job_db_inx=t5.job_db_inx",  
+			   cluster_name, job_app_table);  
+#endif
 	if (job_cond->flags & JOBCOND_FLAG_RUNAWAY) {
 		if (extra)
 			xstrcat(extra, " and (t1.time_end=0)");
@@ -719,7 +736,21 @@ static int _cluster_get_jobs(kingbase_conn_t *kingbase_conn,
 		temp = KCIResultGetColumnValue(result,i,JOB_REQ_USER_NAME);
 		if (*temp != '\0')
 			job->user = xstrdup(temp);
-
+#ifdef __METASTACK_OPT_APP  
+		{  
+			char *tmp_app = KCIResultGetColumnValue(result, i, JOB_REQ_APP_NAME);  
+			if (tmp_app && tmp_app[0])  
+				job->app_name = xstrdup(tmp_app);  
+			tmp_app = KCIResultGetColumnValue(result, i, JOB_REQ_APP_VERSION);  
+			if (tmp_app && tmp_app[0])  
+				job->app_version = xstrdup(tmp_app);  
+			tmp_app = KCIResultGetColumnValue(result, i, JOB_REQ_APP_SOURCE);  
+			if (tmp_app && tmp_app[0])  
+				job->app_source = slurm_atoul(tmp_app);  
+			else  
+				job->app_source = APP_SOURCE_NOTSET;
+		}  
+#endif
 		temp = KCIResultGetColumnValue(result,i,JOB_REQ_UID);
 		if (*temp != '\0')
 			job->uid = slurm_atoul(temp);
@@ -1452,6 +1483,68 @@ no_resv:
 			   *extra ? "and" : "where",
 			   JOB_REVOKED);
 
+#ifdef __METASTACK_OPT_APP  
+	if (job_cond->appname_list &&  
+	    list_count(job_cond->appname_list)) {  
+		set = 0;  
+		if (*extra)  
+			xstrcat(*extra, " and (");  
+		else  
+			xstrcat(*extra, " where (");  
+		itr = list_iterator_create(job_cond->appname_list);  
+		while ((object = list_next(itr))) {  
+			char *esc_obj = slurm_add_slash_to_quotes(object);  
+			if (set)  
+				xstrcat(*extra, " or ");  
+			xstrfmtcat(*extra, "t5.app_name='%s'",  
+				   esc_obj ? esc_obj : "");  
+			xfree(esc_obj);  
+			set = 1;  
+		}  
+		list_iterator_destroy(itr);  
+		xstrcat(*extra, ")");  
+	}  
+  
+	if (job_cond->appversion_list &&  
+	    list_count(job_cond->appversion_list)) {  
+		set = 0;  
+		if (*extra)  
+			xstrcat(*extra, " and (");  
+		else  
+			xstrcat(*extra, " where (");  
+		itr = list_iterator_create(job_cond->appversion_list);  
+		while ((object = list_next(itr))) {  
+			char *esc_obj = slurm_add_slash_to_quotes(object);  
+			if (set)  
+				xstrcat(*extra, " or ");  
+			xstrfmtcat(*extra, "t5.app_version='%s'",  
+				   esc_obj ? esc_obj : "");  
+			xfree(esc_obj);  
+			set = 1;  
+		}  
+		list_iterator_destroy(itr);  
+		xstrcat(*extra, ")");  
+	}  
+  
+	if (job_cond->appsource_list &&  
+	    list_count(job_cond->appsource_list)) {  
+		set = 0;  
+		if (*extra)  
+			xstrcat(*extra, " and (");  
+		else  
+			xstrcat(*extra, " where (");  
+		itr = list_iterator_create(job_cond->appsource_list);  
+		while ((object = list_next(itr))) {  
+			if (set)  
+				xstrcat(*extra, " or ");  
+			xstrfmtcat(*extra, "t5.app_source=%lu", slurm_atoul(object)); 
+			set = 1;  
+		}  
+		list_iterator_destroy(itr);  
+		xstrcat(*extra, ")");  
+	}  
+#endif
+
 	return SLURM_SUCCESS;
 }
 
@@ -1807,7 +1900,11 @@ extern List as_kingbase_jobacct_process_get_jobs(kingbase_conn_t *kingbase_conn,
 	    (job_cond->flags & JOBCOND_FLAG_SCRIPT) ||
 	    (job_cond->flags & JOBCOND_FLAG_ENV)) {
 		if (!(is_admin = is_user_min_admin_level(
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+			      kingbase_conn, uid, SLURMDB_ADMIN_READ_ONLY))) {
+#else
 			      kingbase_conn, uid, SLURMDB_ADMIN_OPERATOR))) {
+#endif
 			/*
 			 * Only fill in the coordinator accounts here we will
 			 * check them later when we actually try to get the jobs
@@ -1852,7 +1949,14 @@ extern List as_kingbase_jobacct_process_get_jobs(kingbase_conn_t *kingbase_conn,
 		if (((i == JOB_REQ_SCRIPT) &&
 		     (!job_cond || !(job_cond->flags & JOBCOND_FLAG_SCRIPT))) ||
 		    ((i == JOB_REQ_ENV) &&
-		     (!job_cond || !(job_cond->flags & JOBCOND_FLAG_ENV))))
+		     (!job_cond || !(job_cond->flags & JOBCOND_FLAG_ENV)))
+#ifdef __METASTACK_OPT_APP 
+		    || ((i == JOB_REQ_APP_NAME ||  
+		         i == JOB_REQ_APP_VERSION ||  
+		         i == JOB_REQ_APP_SOURCE) &&  
+		        (!job_cond || !(job_cond->flags & JOBCOND_FLAG_APP)))  
+#endif
+			 )
 			xstrcat(tmp, ", ''");
 		else
 			xstrfmtcat(tmp, ", %s", job_req_inx[i]);

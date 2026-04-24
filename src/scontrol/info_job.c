@@ -1162,6 +1162,12 @@ static int _wait_nodes_ready(uint32_t job_id)
 			is_ready = SLURM_SUCCESS;
 			break;
 		}
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+		if (rc == ESLURM_ACCESS_DENIED) {
+			info("Read-only administrators only have the permission to perform query operations");
+			break;
+		}
+#endif
 	}
 	if (is_ready == SLURM_SUCCESS)
      		info("Nodes are ready for job %u", job_id);

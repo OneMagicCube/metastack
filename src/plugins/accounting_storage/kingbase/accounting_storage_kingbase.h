@@ -109,6 +109,9 @@ extern char *wckey_day_table;
 extern char *wckey_hour_table;
 extern char *wckey_month_table;
 extern char *wckey_table;
+#ifdef __METASTACK_OPT_APP  
+extern char *job_app_table;  
+#endif
 
 /* Since tables are cluster centric we have a global cluster list to
  * go off of.
@@ -164,6 +167,28 @@ extern int remove_common(kingbase_conn_t *kingbase_conn,
 			 List ret_list,
 			 bool *jobs_running,
 			 bool *default_account);
+
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+extern int activate_common(kingbase_conn_t *kingbase_conn,
+			 uint16_t type,
+			 time_t now,
+			 char *user_name,
+			 char *table,
+			 char *cond_char,
+			 char *vals,
+			 char *cluster_name);
+extern int deactivate_common(kingbase_conn_t *kingbase_conn,
+			 uint16_t type,
+			 time_t now,
+			 char *user_name,
+			 char *table,
+			 char *name_char,
+			 char *assoc_char,
+			 char *cluster_name,
+			 List ret_list,
+			 bool *jobs_running,
+			 bool *default_account);
+#endif
 
 extern void mod_tres_str(char **out, char *mod, char *cur,
 			 char *cur_par, char *name, char **vals,

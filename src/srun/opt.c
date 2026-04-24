@@ -197,6 +197,11 @@ static void _process_abnormal_dete(){
 		if ( xstrcasestr(opt.abnormal_dete, "collect_step=")) {
 			remove_field(opt.acctg_freq, "collect_step=");
 		}
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+		if ( xstrcasestr(opt.abnormal_dete, "avegpuutil=")) {
+			remove_field(opt.acctg_freq, "avegpuutil=");
+		}
+#endif
 	}
 
 	if (opt.acctg_freq) {
@@ -514,6 +519,23 @@ extern int initialize_and_process_args(int argc, char **argv, int *argc_off)
 
 		/* initialize options with argv */
 		_set_options(argc, argv);
+
+#ifdef __METASTACK_OPT_APP  
+        /* Handle --app=list: print preset app list and exit.  
+         * Must be before _opt_args() which fatals if no command given. */  
+        if (opt.app && !xstrcasecmp(opt.app, "list")) {
+            slurm_ctl_conf_info_msg_app_t *app_info = NULL;  
+			if (slurm_load_app((time_t)0, &app_info) == SLURM_SUCCESS  
+				&& app_info) {  
+				slurm_print_app_list(app_info);  
+				slurm_free_app_info_msg(app_info);  
+			} else {  
+				error("Unable to load app configuration");  
+			}  
+			exit(0);  
+        }  
+#endif
+
 		_opt_args(argc, argv, i);
 
 
@@ -821,6 +843,9 @@ env_vars_t env_vars[] = {
 #endif
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
   { "SLURM_JOB_APPTYPE", LONG_OPT_APPTYPE },
+#endif
+#ifdef __METASTACK_OPT_APP  
+  { "SLURM_APP", LONG_OPT_APP },  
 #endif
   { NULL }
 };
@@ -1702,6 +1727,10 @@ static void _usage(void)
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
 "			 [--watch-dog]\n"
 #endif
+#ifdef __METASTACK_OPT_APP  
+"            [--app=name-version|list]\n"
+"            [--app-source=source]\n"
+#endif
 "            executable [args...]\n");
 
 }
@@ -1815,6 +1844,15 @@ static void _help(void)
 "                              before killing job\n"
 "      --wckey=wckey           wckey to run job under\n"
 "  -X, --disable-status        Disable Ctrl-C status feature\n"
+#ifdef __METASTACK_OPT_APP  
+"\n"
+"Application options:\n"
+"      --app=name-version      specify app in combined format (e.g. vasp-5.7.1)\n"
+"                              sets both app name and version; app must be\n"
+"                              pre-configured via 'scontrol create app'\n"
+"      --app=list              list all available app configurations and exit\n"
+"      --app-source=source     source of app assignment (user, portal, marketplace)\n"
+#endif  
 "\n"
 "Constraint options:\n"
 "      --cluster-constraint=list specify a list of cluster-constraints\n"

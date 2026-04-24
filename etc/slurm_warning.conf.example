@@ -1,16 +1,40 @@
 ## warning msg
-2000=switch to a valid partition
-2002=access restricted, contact the administrator
-2004=request another partition/nodes or remove -w
-2005=reduce job's request cpu number
-2006=check job's request node number
-2014=request another nodes or remove -w
-2018=switch to a valid node
-2050=quota limited, check assoc or qos limit
-2051=reduce job's request time (--time or -t)
-2068=request another nodes or remove -w
-2070=request another partition or wait for the partition to become available
-2800=reduce job's request memory (--mem or --memory-per-cpu)
+2000=en_US=switch to a valid partition
+2000=zh_CN=您的作业指定的队列不存在或无权访问，请检查 -p 参数并更换为有效的队列
+
+2002=en_US=access restricted, contact the administrator
+2002=zh_CN=访问受限，您没有权限执行此操作，请联系管理员
+
+2004=en_US=request another partition/nodes or remove -w
+2004=zh_CN=您的作业指定的节点不在该队列中，请更换队列/节点，或尝试移除 -w 参数
+
+2005=en_US=reduce job's request cpu number
+2005=zh_CN=您的作业申请的 CPU 核心数超出了该队列的单节点上限，请调小核心数 (-n 或 -c 参数)
+
+2006=en_US=check job's request node number
+2006=zh_CN=您的作业申请的节点数无效或超出限制，请检查并修改 -N 参数
+
+2014=en_US=request another nodes or remove -w
+2014=zh_CN=当前节点的配置无法满足您的请求，请尝试申请其他节点或移除 -w 参数
+
+2018=en_US=switch to a valid node
+2018=zh_CN=您的作业指定的节点名称无效或不存在，请检查 -w 参数并更换为有效的节点名称
+
+2050=en_US=quota limited, check assoc or qos limit
+2050=zh_CN=您的作业配额受限（如排队作业数、提交作业数、cpu核心数、加速卡数已达上限），请检查账户或 QOS 限制
+
+2051=en_US=reduce job's request time (--time or -t)
+2051=zh_CN=您的作业申请的运行时间超出了该队列的上限，请调小作业时间 (--time 或 -t 参数)
+
+2068=en_US=request another nodes or remove -w
+2068=zh_CN=您的作业指定的节点当前状态不可用（可能宕机或被预留），请尝试申请其他节点或移除 -w 参数
+
+
+2070=en_US=request another partition or wait for the partition to become available
+2070=zh_CN=您的作业申请的队列当前不可用，请更换其他队列，或等待其恢复可用状态
+
+2800=en_US=reduce job's request memory (--mem or --memory-per-cpu)
+2800=zh_CN=您的作业申请的内存过大，超出了单节点或单核的内存上限，请调小内存参数 (--mem 或 --mem-per-cpu)
 
 
 # /* slurmctld error codes */

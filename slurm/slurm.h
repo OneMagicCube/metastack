@@ -408,6 +408,10 @@ typedef struct sbcast_cred sbcast_cred_t;		/* opaque data type */
 #define __METASTACK_OPT_FAIL_BY_PART
 #endif
 
+#ifndef __METASTACK_OPT_READ_ONLY_ADMIN
+#define __METASTACK_OPT_READ_ONLY_ADMIN
+#endif
+
 /* 
 	The process information of the job step is collected at the beginning of the job running to judge the application type
 */
@@ -615,6 +619,18 @@ typedef struct sbcast_cred sbcast_cred_t;		/* opaque data type */
 #define __METASTACK_BUG_SPREAD_JOB_CRASH_CTLD
 #endif
 
+#ifndef __METASTACK_OPT_MSG_OUTPUT_MULTI_LANG
+#define __METASTACK_OPT_MSG_OUTPUT_MULTI_LANG
+#endif
+
+#ifndef __METASTACK_OPT_APP  
+#define __METASTACK_OPT_APP
+#endif
+
+#ifndef __METASTACK_OPT_USER_DEACTIVATE
+#define __METASTACK_OPT_USER_DEACTIVATE
+#endif
+
 /*****************************************************************************\
  *	DEFINITIONS FOR POSIX VALUES
 \*****************************************************************************/
@@ -622,6 +638,13 @@ typedef struct sbcast_cred sbcast_cred_t;		/* opaque data type */
 #define HOST_NAME_MAX 64
 #endif
 
+#ifndef __METASTACK_NEW_GRES_GATHER_DCU
+#define __METASTACK_NEW_GRES_GATHER_DCU
+#endif
+
+#ifndef __METASTACK_NEW_PROFILE_TIME_SYNC
+#define __METASTACK_NEW_PROFILE_TIME_SYNC
+#endif
 /*****************************************************************************\
  *	DEFINITIONS FOR INPUT VALUES
 \*****************************************************************************/
@@ -2342,7 +2365,50 @@ typedef struct job_descriptor {	/* For submit, allocate, and update requests */
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
 	uint32_t style_step;
 #endif
+#ifdef __METASTACK_OPT_APP  
+	char *app;           /* --app combined name, e.g. "vasp-5.7.1" */  
+	char *app_name;      /* parsed app name, e.g. "vasp" */  
+	char *app_version;   /* parsed app version, e.g. "5.7.1" */  
+	uint8_t app_source;  /* app_source_t values; uint8_t for packed layout */
+#endif
 } job_desc_msg_t;
+
+#ifdef __METASTACK_OPT_APP  
+/*  
+ * app_source identifies HOW the app information was attached to a job:  
+ *   NOTSET      - Not set / unknown (zero-init safe default)  
+ *   USER        - User explicitly specified --app=X on command line  
+ *   AUTO        - cli_filter.lua auto-recognized the application type  
+ *   PORTAL      - Set by web portal integration (preserved across validation)  
+ *   MARKETPLACE - Set by marketplace integration (preserved across validation)  
+ *  
+ * NOTSET must be 0 so that zero-initialized fields are safely "not set"  
+ * rather than falsely indicating a specific source.  
+ *  
+ * PORTAL and MARKETPLACE are "external" sources: once set, they are NOT  
+ * overwritten by the slurmctld validation logic (see _job_create).  
+ */  
+typedef enum {
+	APP_SOURCE_NOTSET = 0,
+	APP_SOURCE_USER = 1,
+	APP_SOURCE_AUTO = 2,
+	APP_SOURCE_PORTAL = 3,
+	APP_SOURCE_MARKETPLACE = 4,
+} app_source_t;
+
+/* app_source string constants (parallel to app_source_t) */
+#define APP_SOURCE_STR_NOTSET      "notset"
+#define APP_SOURCE_STR_USER        "user"
+#define APP_SOURCE_STR_AUTO        "auto"
+#define APP_SOURCE_STR_PORTAL      "portal"
+#define APP_SOURCE_STR_MARKETPLACE "marketplace"
+
+extern const char *app_source_to_str(app_source_t source);
+/*
+ * Returns app_source_t value as uint8_t, or NO_VAL8 if str is NULL or unknown.
+ */
+extern uint8_t app_source_from_str(const char *str);
+#endif
 
 typedef struct job_info {
 	char *account;		/* charge to specified account */
@@ -2508,6 +2574,11 @@ typedef struct job_info {
 	char *work_dir;		/* pathname of working directory */
 #ifdef __METASTACK_NEW_PENDING_ORDER
 	uint32_t pending_order;
+#endif
+#ifdef __METASTACK_OPT_APP  
+	char *app_name;      /* application name, e.g. "vasp" */  
+	char *app_version;   /* application version, e.g. "5.7.1" */  
+	uint8_t app_source;  /* app_source_t; how app was determined */  
 #endif
 } slurm_job_info_t;
 
@@ -3207,7 +3278,34 @@ typedef struct {
 
 } watch_dog_record_t;
 #endif
-
+#ifdef __METASTACK_OPT_APP  
+/*    
+ * app_record_t - Core application record.    
+ *    
+ * Represents a registered application (e.g. "vasp") in the system.    
+ * AppName is the unique primary key. Version is an optional comma-separated    
+ * list of allowed versions (like partition's AllowAccounts).    
+ *    
+ * Managed by slurmctld; stored in app_list (ownership) and    
+ * app_hash_table (O(1) lookup by app_name, references only).    
+ * A secondary hash (app_combined_hash) maps "appname-version" strings    
+ * to app records for O(1) --app validation.    
+ *    
+ * Lifecycle: created by slurm.conf parsing or scontrol create app,    
+ * persisted to app_state file, recovered on slurmctld restart.    
+ *    
+ * Memory ownership: app_list owns the records via _list_delete_app;    
+ * app_hash_table holds non-owning references (freefunc=NULL).    
+ * app_combined_hash owns its entry wrappers (freefunc frees them).    
+ */  
+typedef struct {    
+	char    *app_name;      /* application name, unique primary key */    
+	char    *versions;      /* comma-separated version list, optional (NULL = no version restriction) */    
+	char    *description;   /* description */    
+	char    *watchdog;      /* bound watchdog name */  
+	bool     default_flag;  /* true if this app is the cluster default */    
+} app_record_t;  
+#endif
 typedef struct delete_partition_msg {
 	char *name;		/* name of partition to be delete */
 } delete_part_msg_t;
@@ -3254,6 +3352,14 @@ typedef struct resource_allocation_response_msg {
 	void *working_cluster_rec; /* Cluster to direct remaining messages to.
 				    * slurmdb_cluster_rec_t* because slurm.h
 				    * doesn't know about slurmdb.h. */
+#ifdef __METASTACK_OPT_APP  
+	/* App info propagated to srun/salloc for environment injection.  
+	 * Set by slurmctld in _fill_job_alloc_info, consumed by  
+	 * setup_env() to set SLURM_JOB_APP_NAME/VERSION/SOURCE. */  
+	char *app_name;  
+	char *app_version;  
+	uint8_t app_source;  
+#endif
 } resource_allocation_response_msg_t;
 
 typedef struct partition_info_msg {
@@ -3268,6 +3374,70 @@ typedef struct slurm_ctl_conf_info_msg_watch_dog {
 	uint32_t record_count;	/* number of records */
 	watch_dog_record_t * watch_dog_array;	/* the watch dog records */
 } slurm_ctl_conf_info_msg_watch_dog_t;
+#endif
+
+#ifdef __METASTACK_OPT_APP
+/*  
+ * slurm_ctl_conf_info_msg_app_t — Response message for REQUEST_BUILD_APP_INFO.  
+ * Contains an array of app_record_t returned by slurmctld to client commands  
+ * (scontrol show app). Freed by slurm_free_app_info_msg().  
+ */  
+typedef struct slurm_ctl_conf_info_msg_app {  
+	time_t last_update;  
+	uint32_t record_count;  
+	app_record_t *app_array;  
+} slurm_ctl_conf_info_msg_app_t;
+
+/*
+ * Tri-state for app_desc_msg_t.default_spec (RPC create/update).
+ * Semantics differ from app_record_t.default_flag (runtime bool).
+ */
+#define APP_DESC_DEFAULT_NO     ((uint8_t)0)
+#define APP_DESC_DEFAULT_YES    ((uint8_t)1)
+#define APP_DESC_DEFAULT_IGNORE ((uint8_t)0xff) /* update: leave default unchanged */
+
+/*    
+ * app_desc_msg_t - RPC message for create/update app.    
+ *    
+ * Used by both REQUEST_CREATE_APP and REQUEST_UPDATE_APP.    
+ * For update: fields set to NULL mean "don't change".    
+ * default_spec uses APP_DESC_DEFAULT_* (tri-state).  
+ */  
+typedef struct app_desc_msg {    
+	char *app_name;    
+	char *versions;     /* comma-separated version list, optional */    
+	char *description;    
+	char *watchdog;    
+	uint8_t default_spec; /* APP_DESC_DEFAULT_* */  
+} app_desc_msg_t;
+  
+/* Message for delete app */  
+typedef struct delete_app_msg {  
+	char *name; /* app_name, e.g. "vasp" */
+} delete_app_msg_t;  
+  
+/* API functions */  
+extern int slurm_load_app(time_t update_time,  
+                          slurm_ctl_conf_info_msg_app_t **app_info_ptr);  
+extern int slurm_create_app(app_desc_msg_t *app_msg);  
+extern int slurm_update_app(app_desc_msg_t *app_msg);  
+extern int slurm_delete_app(delete_app_msg_t *app_msg); 
+/*  
+ * App message memory management functions.  
+ * slurm_free_app_info_members — free internal strings of a single app_record_t  
+ * slurm_free_app_info_msg     — free the entire RESPONSE_BUILD_APP_INFO message  
+ * slurm_free_app_desc_msg     — free a REQUEST_CREATE/UPDATE_APP message  
+ * slurm_free_delete_app_msg   — free a REQUEST_DELETE_APP message  
+ * slurm_init_app_desc_msg     — default_spec=APP_DESC_DEFAULT_IGNORE  
+ */   
+extern void slurm_free_app_info_msg(slurm_ctl_conf_info_msg_app_t *msg);  
+extern void slurm_free_app_info_members(app_record_t *app);  
+extern void slurm_free_app_desc_msg(app_desc_msg_t *msg);  
+extern void slurm_free_delete_app_msg(delete_app_msg_t *msg);  
+extern void slurm_init_app_desc_msg(app_desc_msg_t *msg);  
+extern void slurm_print_app_info(FILE *out, app_record_t *app_ptr, int one_liner);  
+extern char *slurm_sprint_app_info(app_record_t *app_ptr, int one_liner);
+extern void slurm_print_app_list(slurm_ctl_conf_info_msg_app_t *app_info);
 #endif
 
 typedef struct will_run_response_msg {
@@ -3524,6 +3694,9 @@ typedef struct reservation_name_msg {
 #define RECONFIG_KEEP_PART_INFO SLURM_BIT(0) /* keep dynamic partition info on scontrol reconfig */
 #define RECONFIG_KEEP_PART_STAT SLURM_BIT(1) /* keep dynamic partition state on scontrol reconfig */
 #define RECONFIG_KEEP_POWER_SAVE_SETTINGS SLURM_BIT(2) /* keep dynamic power save settings on scontrol reconfig */
+#ifdef __METASTACK_OPT_APP  
+#define RECONFIG_KEEP_APP_INFO SLURM_BIT(3)  
+#endif
 
 #define HEALTH_CHECK_NODE_IDLE	0x0001	/* execute on idle nodes */
 #define HEALTH_CHECK_NODE_ALLOC	0x0002	/* execute on fully allocated nodes */
@@ -4714,7 +4887,13 @@ extern void slurm_print_ctl_conf(FILE *out, slurm_conf_t *slurm_ctl_conf_ptr);
  * IN node_info_ptr - pointer to node table of information
  * IN part_info_ptr - pointer to partition information
  */
-#ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
+#if defined(__METASTACK_OPT_APP)  
+extern void slurm_write_ctl_conf(slurm_conf_t *slurm_ctl_conf_ptr,  
+                                 node_info_msg_t *node_info_ptr,  
+                                 partition_info_msg_t *part_info_ptr,  
+                                 slurm_ctl_conf_info_msg_watch_dog_t *slurm_watch_dog_ptr,  
+                                 slurm_ctl_conf_info_msg_app_t *slurm_app_ptr);
+#elif defined(__METASTACK_NEW_CUSTOM_EXCEPTION)
 extern void slurm_write_ctl_conf(slurm_conf_t *slurm_ctl_conf_ptr,
                                  node_info_msg_t *node_info_ptr,
                                  partition_info_msg_t *part_info_ptr,

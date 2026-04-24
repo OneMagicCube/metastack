@@ -1050,6 +1050,77 @@ static slurm_cli_opt_t slurm_opt_apptype = {
 };
 #endif
 
+#ifdef __METASTACK_OPT_APP  
+static int arg_set_app(slurm_opt_t *opt, const char *arg)  
+{  
+	xfree(opt->app);  
+	opt->app = xstrdup(arg);  
+	return SLURM_SUCCESS;  
+}  
+COMMON_STRING_OPTION_GET(app);  
+static void arg_reset_app(slurm_opt_t *opt)  
+{  
+	xfree(opt->app);  
+}  
+COMMON_STRING_OPTION_SET_DATA(app);  
+static slurm_cli_opt_t slurm_opt_app = {  
+	.name = "app",  
+	.has_arg = required_argument,  
+	.val = LONG_OPT_APP,  
+	.set_func = arg_set_app,  
+	.set_func_data = arg_set_data_app,  
+	.get_func = arg_get_app,  
+	.reset_func = arg_reset_app,  
+};  
+static int arg_set_app_source(slurm_opt_t *opt, const char *arg)  
+{  
+	uint8_t val = app_source_from_str(arg);  
+	if (val == NO_VAL8 || val == APP_SOURCE_AUTO ||  
+	    val == APP_SOURCE_NOTSET) {  
+		error("Invalid --app-source value: '%s'. "  
+		      "Valid: user, portal, marketplace", arg);  
+		return SLURM_ERROR;  
+	}  
+	opt->app_source_val = val;  
+	opt->app_source_set = true;  
+	return SLURM_SUCCESS;  
+}
+static char *arg_get_app_source(slurm_opt_t *opt)  
+{  
+	if (!opt->app_source_set)  
+		return xstrdup("");  
+	return xstrdup(app_source_to_str(opt->app_source_val));  
+}  
+static void arg_reset_app_source(slurm_opt_t *opt)  
+{  
+	opt->app_source_val = APP_SOURCE_NOTSET;  
+	opt->app_source_set = false;  
+}
+static int arg_set_data_app_source(slurm_opt_t *opt,  
+				   const data_t *arg,  
+				   data_t *errors)  
+{  
+	char *str = NULL;  
+	int rc;  
+  
+	rc = data_get_string_converted(arg, &str);  
+	if (rc) return rc;  
+  
+	rc = arg_set_app_source(opt, str);  
+	xfree(str);  
+	return rc;  
+}
+static slurm_cli_opt_t slurm_opt_app_source = {  
+	.name = "app-source",  
+	.has_arg = required_argument,  
+	.val = LONG_OPT_APP_SOURCE,  
+	.set_func = arg_set_app_source,  
+	.set_func_data = arg_set_data_app_source,  
+	.get_func = arg_get_app_source,  
+	.reset_func = arg_reset_app_source,  
+};  
+#endif
+
 static int arg_set_compress(slurm_opt_t *opt, const char *arg)
 {
 	if (!opt->srun_opt)
@@ -6101,6 +6172,10 @@ static const slurm_cli_opt_t *common_options[] = {
 	&slurm_opt_submit_line,
 	&slurm_opt_apptype,
 #endif
+#ifdef __METASTACK_OPT_APP  
+	&slurm_opt_app,  
+	&slurm_opt_app_source,  
+#endif
 	NULL /* END */
 };
 
@@ -8052,6 +8127,11 @@ extern job_desc_msg_t *slurm_opt_create_job_desc(slurm_opt_t *opt_local,
 #ifdef __METASTACK_NEW_GRES_NPU
 	xfmt_tres(&job_desc->tres_per_socket, "gres/npu",
 				opt_local->npus_per_socket);
+#endif
+#ifdef __METASTACK_OPT_APP  
+	job_desc->app = xstrdup(opt_local->app);  
+	if (opt_local->app_source_set)  
+		job_desc->app_source = opt_local->app_source_val;  
 #endif
 
 	job_desc->tres_per_task = xstrdup(opt_local->tres_per_task);

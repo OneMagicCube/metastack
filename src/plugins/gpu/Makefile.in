@@ -94,6 +94,7 @@ target_triplet = @target@
 @BUILD_RSMI_TRUE@am__append_2 = rsmi
 @BUILD_NVML_TRUE@am__append_3 = nvml
 @BUILD_ONEAPI_TRUE@am__append_4 = oneapi
+@BUILD_DTK_TRUE@am__append_5= dtk
 subdir = src/plugins/gpu
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/auxdir/ax_check_compile_flag.m4 \
@@ -207,7 +208,7 @@ am__define_uniq_tagged_files = \
   unique=`for i in $$list; do \
     if test -f "$$i"; then echo $$i; else echo $(srcdir)/$$i; fi; \
   done | $(am__uniquify_input)`
-DIST_SUBDIRS = common generic dsmi rsmi nvml oneapi nrt
+DIST_SUBDIRS = common generic dsmi rsmi nvml oneapi nrt dtk
 ACLOCAL = @ACLOCAL@
 AMTAR = @AMTAR@
 AM_DEFAULT_VERBOSITY = @AM_DEFAULT_VERBOSITY@
@@ -237,6 +238,7 @@ DEPDIR = @DEPDIR@
 DLLTOOL = @DLLTOOL@
 DL_LIBS = @DL_LIBS@
 DSMI_CPPFLAGS = @DSMI_CPPFLAGS@
+DTK_CPPFLAGS = @DTK_CPPFLAGS@
 DSMI_LDFLAGS = @DSMI_LDFLAGS@
 DSMI_LIBS = @DSMI_LIBS@
 DSYMUTIL = @DSYMUTIL@
@@ -470,7 +472,7 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 SUBDIRS = common generic $(am__append_1) $(am__append_2) \
-	$(am__append_3) $(am__append_4) nrt
+	$(am__append_3) $(am__append_4)  $(am__append_5) nrt
 all: all-recursive
 
 .SUFFIXES:
