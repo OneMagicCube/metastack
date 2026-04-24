@@ -109,23 +109,18 @@ def _delete_app(name):
     """Delete an app via scontrol (ignore errors if not found)."""  
     atf.run_command(  
         f"scontrol delete app={name}",  
-        user=_slurm_user()  
+        user=_slurm_user(),  
+        fatal=False,  
     )  
   
   
-def _show_app(name):  
-    return atf.run_command(  
-        f"scontrol show app {name}",  
-        user=atf.properties["slurm-user"],  
+def _show_app(name):
+    return atf.run_command(
+        f"scontrol show app {name}",
+        user=_slurm_user(),
     )
-  
-  
-def _app_exists(name):  
-    """Check if an app exists via scontrol show app."""  
-    output = _show_app(name)  
-    return f"AppName={name}" in output  
-  
-  
+
+
 def _get_current_reconfig_flags():  
     output = atf.run_command_output(  
         "scontrol show config | grep -i ReconfigFlags"  
