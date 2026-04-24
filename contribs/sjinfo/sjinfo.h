@@ -319,7 +319,9 @@ extern List print_apptype_job_value_list;
 extern list_itr_t *print_apptype_job_itr;
 // /* Names for the values of the `has_arg' field of `struct option'.  */
 extern void print_fields_str(print_field_t *field, char *value, int last);
+extern void print_fields_header(list_t *print_fields_list);
+void print_available_fields(void);
+int parse_sacct_line(const char *line, int count, List print_head_list);
 extern int print_fields_parsable_print;
 #define KEYDIR "/opt/gridview/slurm"
 #endif /* !_SJINFO_H */
-

@@ -133,6 +133,28 @@ void print_sjinfo_version(void)
 	printf("%s %s\n", PACKAGE_NAME, SJINFO_VERSION_STRING);
 }
 
+void print_available_fields(void)
+{
+	printf("Available fields for --format option:\n\n");
+	printf("Step fields (default):\n");
+	printf("  JobID, StepID, StepAVECPU, StepCPU, StepMEM, StepVMEM, StepPages,\n");
+	printf("  MaxStepCPU, MinStepCPU, MaxStepMEM, MinStepMEM, MaxStepVMEM, MinStepVMEM,\n");
+	printf("  StepDCU, StepDCUMEM, MaxStepDCU, MinStepDCU, MaxStepDCUMEM, MinStepDCUMEM\n\n");
+	printf("Event fields (with -A or -O):\n");
+	printf("  JobID, StepID, StepCPU, StepMEM, StepVMEM, StepDCU, StepDCUMEM, StepPages,\n");
+	printf("  CPUthreshold, Start, End, Type\n\n");
+	printf("Overall fields (with -O):\n");
+	printf("  JobID, StepID, Last_start, Last_end, CPU_Abnormal_CNT, PROC_Abnormal_CNT, NODE_Abnormal_CNT\n\n");
+	printf("Apptype fields (with -t):\n");
+	printf("  JobID, StepID, Username, CpuTime, Apptype_CLI, Apptype_STEP\n\n");
+	printf("Apptype job fields (with -t=job):\n");
+	printf("  JobID, Apptype, Username\n\n");
+	printf("Job summary fields (with -J):\n");
+	printf("  JobID, TotalCPU, TotalMEM, TotalVMEM, TotalPages,\n");
+	printf("  MaxCPU, MinCPU, MaxMEM, MinMEM, MaxVMEM, MinVMEM,\n");
+	printf("  TotalDCU, TotalDCUMEM, MaxDCU, MinDCU, MaxDCUMEM, MinDCUMEM\n\n");
+}
+
 /* print help */
 void print_sjinfo_help(void)
 {
@@ -166,9 +188,10 @@ void print_sjinfo_help(void)
 "        Displays load information during job run time          \n"
 "     -n, --noheader:                                                       \n"
 "        Do not print table headers and section banners.                   \n"
+"     -f, --helpformat:                                                    \n"
+"        List all available fields for the --format option.                \n"
 "     -o, --format:                                                        \n"
-"        Print a list of fields that can be specified with the            \n"
-"        '--format' option                                                 \n"
+"        Specify the fields to display.                                    \n"
 "        '--format='    JobID,StepID,StepCPU,StepAVECPU,StepMEM,StepVMEM,         \n"
 "                       StepPages,MaxStepCPU,MinStepCPU,MaxStepMEM,            \n"
 "                       MinStepMEM,MaxStepVMEM,MinStepVMEM,CPUthreshold,        \n"
@@ -470,6 +493,7 @@ int parse_command_and_query(int argc, char **argv, slurm_influxdb *data, query_j
                 {"event",       required_argument,  0,      'e'},
                 {"end",         required_argument,  0,      'E'},
                 {"help",        no_argument,        0,      'h'},
+                {"helpformat",  no_argument,        0,      'f'},
                 {"jobs",        required_argument,  0,      'j'},
                 {"job-summary", no_argument,        0,      'J'},
                 {"load",        no_argument,        0,      'l'},
@@ -489,7 +513,7 @@ int parse_command_and_query(int argc, char **argv, slurm_influxdb *data, query_j
     
     optind = 0;
     while ((c = getopt_long(argc, argv,
-				       "dt:e:E:j:s:lo:rS:u:VOmgaAhqDJnB:pP",
+				       "dt:e:E:j:s:lo:rS:u:VOmgaAhqDJnB:pPf",
 				       long_options, &optionIndex)) != -1) {   
         if (c == -1) {
             sql_labels.no_jobid = true;
@@ -499,6 +523,9 @@ int parse_command_and_query(int argc, char **argv, slurm_influxdb *data, query_j
             case 'a':
                 params.level |= INFLUXDB_ALL;
                 break;
+            case 'f':
+                print_available_fields();
+                exit(0);
             case 'A':
                 params.level |= INFLUXDB_EVENT;
                 break;
