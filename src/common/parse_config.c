@@ -1387,6 +1387,7 @@ static void _handle_include(char *include_file, char *conf_file)
 }
 
 #ifdef __METASTACK_OPT_APP  
+#define APP_ONLY_PEEK_LINES 3
 /*  
  * _is_app_only_file - Quick peek at an included file to check whether  
  * it contains only AppName configuration lines (plus comments and blanks).  
@@ -1406,13 +1407,13 @@ static void _handle_include(char *include_file, char *conf_file)
  * Returns false on any I/O error, if the file is empty, or if any  
  * non-empty non-comment line does not start with "AppName".  
  */  
-#define APP_ONLY_PEEK_LINES 3  
 static bool _is_app_only_file(const char *path)  
 {  
 	FILE *f;  
 	char buf[256];  
 	char *p;  
-	int checked = 0;  
+	int checked = 0;
+	bool saw_app_line = false;
   
 	if (!path)  
 		return false;  
@@ -1420,41 +1421,74 @@ static bool _is_app_only_file(const char *path)
 	f = fopen(path, "r");  
 	if (!f)  
 		return false;  
-  
+
 	while (fgets(buf, sizeof(buf), f)) {  
+		bool line_complete = (strchr(buf, '\n') != NULL);
+
 		/* Skip leading whitespace */  
 		p = buf;  
 		while (isspace((int)*p))  
 			p++;  
-  
+
 		/* Skip blank lines and comments */  
-		if (*p == '\0' || *p == '#' || *p == '\n')  
+		if (*p == '\0' || *p == '#' || *p == '\n') {
+			if (!line_complete) {
+				int c = '\n';
+
+				/*
+				 * If fgets() filled the buffer with only whitespace,
+				 * we cannot classify the line yet. Scan the remainder
+				 * to determine whether this is truly blank/comment or
+				 * a real directive (e.g. many spaces then NodeName=).
+				 */
+				if (*p == '\0') {
+					while ((c = fgetc(f)) != EOF && c != '\n' &&
+					       isspace(c))
+						;
+
+					if (c != EOF && c != '\n' && c != '#') {
+						fclose(f);
+						return false;
+					}
+				}
+
+				while (c != EOF && c != '\n')
+					c = fgetc(f);
+			}
 			continue;  
-  
+		}
+
 		/* Check for "AppName" prefix (case-insensitive) */  
 		if (xstrncasecmp(p, "AppName", 7) != 0 ||  
 		    (p[7] != '=' && !isspace((int)p[7]))) {  
 			fclose(f);  
 			return false;  
 		}  
+
+		saw_app_line = true;
   
 		/* If the line is longer than buf, consume the rest so that  
 		 * the next fgets() starts at a fresh line. Without this,  
 		 * fgets() would return the middle of the same long line  
 		 * (e.g. "1.0.30,1.0.31,...") which would fail the AppName  
 		 * prefix check and incorrectly return false. */  
-		if (!strchr(buf, '\n')) {  
+		if (!line_complete) {  
 			int c;  
 			while ((c = fgetc(f)) != EOF && c != '\n')  
 				;  
 		}  
-  
-		if (++checked >= APP_ONLY_PEEK_LINES)  
-			break;  
+
+		if (++checked >= APP_ONLY_PEEK_LINES)
+			break;
 	}  
-  
+
+	if (ferror(f)) {
+		fclose(f);
+		return false;
+	}
+
 	fclose(f);  
-	return (checked > 0);  
+	return saw_app_line;
 }  
 #endif
 
@@ -1496,7 +1530,13 @@ static int _parse_include_directive(s_p_hashtbl_t *hashtbl, uint32_t *hash_val,
 			return -1;
 		path_name = get_extra_conf_path(file_name);
 
-		stat(path_name, &temp);
+		if (stat(path_name, &temp) < 0) {
+			error("Include file %s at %s cannot stat: %m",
+			      file_name, path_name);
+			xfree(path_name);
+			xfree(file_name);
+			return -1;
+		}
 		if ((flags & PARSE_FLAGS_CHECK_PERMISSIONS) &&
 		   ((temp.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO)) != 0600))
 			fatal("Included file %s at %s should be 600 is %o accessible for group or others",
