@@ -97,6 +97,11 @@ def setup():
     for jid in _jobs_submitted:  
         atf.run_command(f"scancel {jid}", quiet=True, fatal=False)  
   
+    # Remove jobs from global submitted-jobs list to avoid global cleanup errors  
+    for jid in _jobs_submitted:  
+        if jid in atf.properties["submitted-jobs"]:  
+            atf.properties["submitted-jobs"].remove(jid)  
+  
     # Wait a bit for jobs to be fully cleaned up  
     time.sleep(2)  
   

@@ -78,6 +78,12 @@ def setup():
     # Cleanup: cancel all held jobs, delete all apps  
     for jid in _jobs_created:  
         _cancel_job(jid)  
+
+    # Remove jobs from global submitted-jobs list to avoid global cleanup errors
+    for jid in _jobs_created:
+        if jid in atf.properties["submitted-jobs"]:
+            atf.properties["submitted-jobs"].remove(jid)
+
     for app in _apps_created:  
         _delete_app(app)  
   
