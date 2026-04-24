@@ -268,6 +268,8 @@ void print_sjinfo_help(void)
 "     -t, --apptype:                                                          \n"
 "        Displays application type information for the job. Specifying any  \n"
 "        parameter will display the application type information at the job step level \n"
+"     -u, --user:                                                           \n"
+"        Specify the user name.                                              \n"
 "     -V, --version:                                                       \n"
 "        Print sjinfo version.                                              \n"
 "     -m                                                                    \n"
