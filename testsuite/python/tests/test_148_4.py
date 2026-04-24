@@ -583,9 +583,9 @@ class TestSqueueAppFormat:
 
 
 # ---------------------------------------------------------------------------  
-# TestAppList: verify --app=list output  
+# TestAppListFormat: verify --app=list output format  
 # ---------------------------------------------------------------------------  
-class TestAppList:  
+class TestAppListFormat:  
 
     def test_sbatch_app_list(self):  
         """  
