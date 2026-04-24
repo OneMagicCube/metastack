@@ -832,6 +832,7 @@ void print_options(list_t *print_list, list_t *value_list, list_itr_t *print_itr
                     }
                     curr_inx++;
             }
+            curr_inx = 1;  // Reset curr_inx for the next row
             printf("\n");
         }
 
