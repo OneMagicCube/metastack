@@ -173,7 +173,7 @@ extern void print_query_options(query_job_record_t *query_send)
                         field->print_routine(field,
                         tmp_char,
                         (curr_inx == field_count));
-                    break;   
+                    break;
                     case PRINT_USERNAME:
                         if(sjinfo_print->username != NULL)
                             sprintf(tmp_char, "%s", sjinfo_print->username);
@@ -182,7 +182,7 @@ extern void print_query_options(query_job_record_t *query_send)
                         field->print_routine(field,
                         tmp_char,
                         (curr_inx == field_count));
-                    break;                   
+                    break;
                     case PRINT_UID:
                         if (sjinfo_print->uid != NULL)
                             sprintf(tmp_char, "%s", sjinfo_print->uid);
@@ -191,7 +191,7 @@ extern void print_query_options(query_job_record_t *query_send)
                         field->print_routine(field,
                         tmp_char,
                         (curr_inx == field_count));
-                    break;  
+                    break;
                     case PRINT_RECORD:
                         if (sjinfo_print->data != NULL)
                             sprintf(tmp_char, "%s", sjinfo_print->data);
@@ -200,7 +200,7 @@ extern void print_query_options(query_job_record_t *query_send)
                         field->print_routine(field,
                         tmp_char,
                         (curr_inx == field_count));
-                    break;     
+                    break;
                     case PRINT_STEPID:
                         if(sjinfo_print->stepid == -5)
                             sprintf(tmp_char, "batch");
@@ -213,13 +213,13 @@ extern void print_query_options(query_job_record_t *query_send)
                         field->print_routine(field,
                         tmp_char,
                         (curr_inx == field_count));
-                    break; 
+                    break;
                     case PRINT_TIME:
                         sprintf(tmp_char, "%s", buffer);
                         field->print_routine(field,
                         tmp_char,
                         (curr_inx == field_count));
-                    break;    
+                    break;
                     case PRINT_SENDNODE:
                         if (sjinfo_print->nodename != NULL)
                             sprintf(tmp_char, "%s", sjinfo_print->nodename);
@@ -228,7 +228,7 @@ extern void print_query_options(query_job_record_t *query_send)
                         field->print_routine(field,
                         tmp_char,
                         (curr_inx == field_count));
-                    break;  
+                    break;
 
                 }
                 curr_inx++;
@@ -263,11 +263,17 @@ extern void print_query(query_job_record_t *query_send, sjinfo_parameters_t *par
     }
 
 
+    print_fields_parsable_print = params->parsable;
+    fields_delimiter = params->delimiter;
+    print_fields_have_header = !params->noheader;
+
     if(list_count(query_send->print_fields_list) > 0) {
-        printf("*************************************************************************************************\n");
-        printf("******                            Display User-defined exception                           ******\n");
-        printf("*************************************************************************************************\n");
-        printf("\n");
+        if (!params->noheader) {
+            printf("*************************************************************************************************\n");
+            printf("******                            Display User-defined exception                           ******\n");
+            printf("*************************************************************************************************\n");
+            printf("\n");
+        }
         
         print_query_options(query_send);
         printf("\n");
@@ -282,9 +288,6 @@ extern void print_fields_str(print_field_t *field, char *value, int last)
 	int abs_len = abs(field->len);
 	char temp_char[abs_len+1];
 	char *print_this = NULL;
-
-
-
 	if (!value) {
 		if (print_fields_parsable_print)
 			print_this = "";
@@ -980,8 +983,10 @@ extern void job_brief(query_job_record_t *query_send, sjinfo_parameters_t *param
     list_itr_t *print_display_itr = NULL;
     interface_sjinfo_t  * sjinfo_print = NULL;
     char beijing_buf[64] = {'\0'};
-    printf("******************************************************************************************************* \n");
-    printf("*                                Display brief information of job steps                               *\n");
+    if (!params->noheader) {
+        printf("******************************************************************************************************* \n");
+        printf("*                                Display brief information of job steps                               *\n");
+    }
     print_display_itr = list_iterator_create(query_send->print_display_list);
     while ((sjinfo_print = list_next(print_display_itr))) {
         int rc =  parse_utc_time_to_local(sjinfo_print->time, beijing_buf, sizeof(beijing_buf));
@@ -992,14 +997,20 @@ extern void job_brief(query_job_record_t *query_send, sjinfo_parameters_t *param
         }
     }
     list_iterator_destroy(print_display_itr);
-    printf("******************************************************************************************************* \n");
-    printf("\n");
+    if (!params->noheader) {
+        printf("******************************************************************************************************* \n");
+        printf("\n");
+    }
     print_options(query_send->print_fields_list, query_send->print_value_list, query_send->print_fields_itr, params);
     printf("\n");
 }
 
 extern void print_field(query_job_record_t *query_send, sjinfo_parameters_t *params)
 {
+
+    print_fields_parsable_print = params->parsable;
+    fields_delimiter = params->delimiter;
+    print_fields_have_header = !params->noheader;
 
     char *opt_step_list           = xmalloc(200);
     char *opt_event_list          = xmalloc(160);
@@ -1087,52 +1098,64 @@ extern void print_field(query_job_record_t *query_send, sjinfo_parameters_t *par
 
 
     if(list_count(query_send->print_fields_list) > 0){
-        printf("***************************************************************************** \n");
-        printf("******       Display resource consumption information of job steps    *******\n");
-        printf("***************************************************************************** \n");
-        printf("\n");
+        if (!params->noheader) {
+            printf("***************************************************************************** \n");
+            printf("******       Display resource consumption information of job steps    *******\n");
+            printf("***************************************************************************** \n");
+            printf("\n");
+        }
         print_options(query_send->print_fields_list, query_send->print_value_list, query_send->print_fields_itr, params);
         printf("\n");
     }
 
 
     if(list_count(query_send->print_events_list) > 0) {
-        printf("***************************************************************************** \n");
-        printf("******       Display job step exception event information            ******** \n");
-        printf("***************************************************************************** \n");
-        printf("\n");
+        if (!params->noheader) {
+            printf("***************************************************************************** \n");
+            printf("******       Display job step exception event information            ******** \n");
+            printf("***************************************************************************** \n");
+            printf("\n");
+        }
         print_options(query_send->print_events_list, query_send->print_events_value_list, query_send->print_events_itr, params);
     }
        
     if(list_count(query_send->print_overall_list) > 0) {
-        printf("***************************************************************************** \n");
-        printf("*******     Display job step exception event overall information      ******* \n");
-        printf("***************************************************************************** \n");
-        printf("\n");
+        if (!params->noheader) {
+            printf("***************************************************************************** \n");
+            printf("*******     Display job step exception event overall information      ******* \n");
+            printf("***************************************************************************** \n");
+            printf("\n");
+        }
         print_options(query_send->print_overall_list, query_send->print_overall_value_list, query_send->print_overall_itr, params);
     }
 
     if(list_count(query_send->print_apptype_list) > 0) {
-        printf("***************************************************************************** \n");
-        printf("*******             Display job step apptype information              ******* \n");
-        printf("***************************************************************************** \n");
-        printf("\n");
+        if (!params->noheader) {
+            printf("***************************************************************************** \n");
+            printf("*******             Display job step apptype information              ******* \n");
+            printf("***************************************************************************** \n");
+            printf("\n");
+        }
         print_options(query_send->print_apptype_list, query_send->print_apptype_value_list, query_send->print_apptype_itr, params);
     }
 
     if(list_count(query_send->print_apptype_job_list) > 0) {
-        printf("***************************************************************************** \n");
-        printf("*******                Display job apptype information                ******* \n");
-        printf("***************************************************************************** \n");
-        printf("\n");
+        if (!params->noheader) {
+            printf("***************************************************************************** \n");
+            printf("*******                Display job apptype information                ******* \n");
+            printf("***************************************************************************** \n");
+            printf("\n");
+        }
         print_options(query_send->print_apptype_job_list, query_send->print_apptype_job_value_list, query_send->print_apptype_job_itr, params);
     }
 
     if(list_count(query_send->print_job_summary_list) > 0 && (params->level & INFLUXDB_JOB_SUMMARY)) {
-        printf("*****************************************************************************\n");
-        printf("******       Display Job-Level Resource Consumption Information     *********\n");
-        printf("*****************************************************************************\n");
-        printf("\n");
+        if (!params->noheader) {
+            printf("*****************************************************************************\n");
+            printf("******       Display Job-Level Resource Consumption Information     *********\n");
+            printf("*****************************************************************************\n");
+            printf("\n");
+        }
         print_options(query_send->print_job_summary_list, query_send->print_job_summary_value_list, 
                      query_send->print_job_summary_itr, params);
         printf("\n");

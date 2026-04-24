@@ -89,13 +89,16 @@ typedef struct {
 	int opt_gid;		/* running persons gid */
 	int opt_uid;		/* running persons uid */
 	int units;		/* --units*/
-	uint32_t convert_flags;	/* --noconvert */    
-	char *opt_field_list;	/* --fields= */ 
+	uint32_t convert_flags;	/* --noconvert */
+	char *opt_field_list;	/* --fields= */
     uint64_t level;
     bool desc_set;      /* output data in reverse order*/
     // bool only_run_job;  /* querying for running jobs*/
     bool show_jobstep_apptype;  /* Displays the apptype information for each job step */
-    bool display;        /*user show job */ 
+    bool display;        /*user show job */
+    bool noheader;       /* --noheader - don't print header */
+    int parsable;        /* -p/-P parsable output format */
+    char *delimiter;     /* --delimiter delimiter string */
 } sjinfo_parameters_t;
 
 typedef struct {
