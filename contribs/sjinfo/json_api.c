@@ -65,7 +65,7 @@ extern void destroy_brief_key_pair(void *object)
 	}
 }
 // 解析单行字符串到结构体
-static int parse_sacct_line(const char *line, int count, List print_head_list) {
+int parse_sacct_line(const char *line, int count, List print_head_list) {
     int result = -1;
     sacct_entry_t *sacct_field = NULL;
     sacct_field = xmalloc(sizeof(sacct_entry_t));
