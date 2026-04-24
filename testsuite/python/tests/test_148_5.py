@@ -51,7 +51,7 @@ def _delete_app(name):
 # ---------------------------------------------------------------------------  
 def _cancel_job(job_id):  
     if job_id and job_id > 0:  
-        atf.run_command(f"scancel {job_id}", quiet=True)  
+        atf.run_command(f"scancel {job_id}", quiet=True, fatal=False)  
   
   
 # ---------------------------------------------------------------------------  

@@ -25,6 +25,8 @@ def _shared_path(prefix):
 # ---------------------------------------------------------------------------  
 # Setup / Teardown  
 # ---------------------------------------------------------------------------  
+_jobs_submitted = []
+
 @pytest.fixture(scope="module", autouse=True)  
 def setup():  
     """Ensure Slurm is running (local-config mode)."""  
@@ -48,6 +50,14 @@ def create_test_apps(setup):
     )  
 
     yield  
+
+    # Cleanup: cancel any remaining jobs
+    for jid in _jobs_submitted:
+        atf.run_command(f"scancel {jid}", quiet=True, fatal=False)
+
+    # Wait a bit for jobs to be fully cleaned up
+    import time
+    time.sleep(2)
 
     # Cleanup  
     atf.run_command(  
@@ -96,42 +106,45 @@ def cleanup_app():
 # ---------------------------------------------------------------------------  
 class TestSubmitValidApp:  
 
-    def test_submit_with_versioned_app(self):  
-        """  
-        Submit a job with --app=testvasp-5.7.1 (versioned app).  
+    def test_submit_with_versioned_app(self):
+        """
+        Submit a job with --app=testvasp-5.7.1 (versioned app).
 
-        Source: _job_create() L7846-7875:  
-            find_app_record_by_combined("testvasp-5.7.1") succeeds,  
-            app_name = "testvasp", app_version = "5.7.1",  
-            app_source = APP_SOURCE_USER (1).  
-        """  
-        job_id = atf.submit_job_sbatch(  
-            '--app=testvasp-5.7.1 -t1 --wrap="sleep 5"'  
-        )  
-        assert job_id > 0, "Job with valid versioned app should be submitted"  
+        Source: _job_create() L7846-7875:
+            find_app_record_by_combined("testvasp-5.7.1") succeeds,
+            app_name = "testvasp", app_version = "5.7.1",
+            app_source = APP_SOURCE_USER (1).
+        """
+        job_id = atf.submit_job_sbatch(
+            '--app=testvasp-5.7.1 -t1 --wrap="sleep 5"'
+        )
+        assert job_id > 0, "Job with valid versioned app should be submitted"
+        _jobs_submitted.append(job_id)
 
-    def test_submit_with_unversioned_app(self):  
-        """  
-        Submit a job with --app=testgeneral (no version suffix).  
+    def test_submit_with_unversioned_app(self):
+        """
+        Submit a job with --app=testgeneral (no version suffix).
 
-        Source: _job_create() L7869-7874:  
-            strlen("testgeneral") == strlen(app_ptr->app_name),  
-            so app_version = NULL.  
-        """  
-        job_id = atf.submit_job_sbatch(  
-            '--app=testgeneral -t1 --wrap="sleep 5"'  
-        )  
-        assert job_id > 0, "Job with valid unversioned app should be submitted"  
+        Source: _job_create() L7869-7874:
+            strlen("testgeneral") == strlen(app_ptr->app_name),
+            so app_version = NULL.
+        """
+        job_id = atf.submit_job_sbatch(
+            '--app=testgeneral -t1 --wrap="sleep 5"'
+        )
+        assert job_id > 0, "Job with valid unversioned app should be submitted"
+        _jobs_submitted.append(job_id)
 
-    def test_submit_with_second_version(self):  
-        """  
-        Submit with --app=testvasp-6.0 (second version in the list).  
-        Verifies that all versions in the comma-separated list are valid.  
-        """  
-        job_id = atf.submit_job_sbatch(  
-            '--app=testvasp-6.0 -t1 --wrap="sleep 5"'  
-        )  
-        assert job_id > 0, "Job with second version should be submitted"  
+    def test_submit_with_second_version(self):
+        """
+        Submit with --app=testvasp-6.0 (second version in the list).
+        Verifies that all versions in the comma-separated list are valid.
+        """
+        job_id = atf.submit_job_sbatch(
+            '--app=testvasp-6.0 -t1 --wrap="sleep 5"'
+        )
+        assert job_id > 0, "Job with second version should be submitted"
+        _jobs_submitted.append(job_id)  
 
 
 # ---------------------------------------------------------------------------  
@@ -209,29 +222,31 @@ class TestAppSourceValidation:
                 "app" in combined.lower() or  
                 result["exit_code"] != 0)  
 
-    def test_app_source_with_app_succeeds(self):  
-        """  
-        Submit with --app=testvasp-5.7.1 --app-source=user should succeed.  
+    def test_app_source_with_app_succeeds(self):
+        """
+        Submit with --app=testvasp-5.7.1 --app-source=user should succeed.
 
-        Source: _job_create() L7878-7880:  
-            app_source is already USER, so it stays USER.  
-        """  
-        job_id = atf.submit_job_sbatch(  
-            '--app=testvasp-5.7.1 --app-source=user -t1 --wrap="sleep 5"'  
-        )  
-        assert job_id > 0  
+        Source: _job_create() L7878-7880:
+            app_source is already USER, so it stays USER.
+        """
+        job_id = atf.submit_job_sbatch(
+            '--app=testvasp-5.7.1 --app-source=user -t1 --wrap="sleep 5"'
+        )
+        assert job_id > 0
+        _jobs_submitted.append(job_id)
 
-    def test_app_source_portal_preserved(self):  
-        """  
-        Submit with --app=testvasp-5.7.1 --app-source=portal.  
+    def test_app_source_portal_preserved(self):
+        """
+        Submit with --app=testvasp-5.7.1 --app-source=portal.
 
-        Source: _job_create() L7878-7879:  
-            if app_source == APP_SOURCE_PORTAL → preserved (not overwritten to USER).  
-        """  
-        job_id = atf.submit_job_sbatch(  
-            '--app=testvasp-5.7.1 --app-source=portal -t1 --wrap="sleep 5"'  
-        )  
-        assert job_id > 0  
+        Source: _job_create() L7878-7879:
+            if app_source == APP_SOURCE_PORTAL → preserved (not overwritten to USER).
+        """
+        job_id = atf.submit_job_sbatch(
+            '--app=testvasp-5.7.1 --app-source=portal -t1 --wrap="sleep 5"'
+        )
+        assert job_id > 0
+        _jobs_submitted.append(job_id)  
 
 
 # ---------------------------------------------------------------------------  
@@ -302,86 +317,89 @@ class TestAppList:
         )  
 
 
-# ---------------------------------------------------------------------------  
 # TestJobAppFields: verify scontrol show job displays app fields  
 # ---------------------------------------------------------------------------  
 class TestJobAppFields:  
 
-    def test_scontrol_show_job_app_fields(self):  
-        """  
-        Submit with --app=testvasp-5.7.1, verify scontrol show job output  
-        contains AppName, AppVersion, AppSource fields.  
+    def test_scontrol_show_job_app_fields(self):
+        """
+        Submit with --app=testvasp-5.7.1, verify scontrol show job output
+        contains AppName, AppVersion, AppSource fields.
 
-        Source: _copy_job_desc_to_job_record() (job_mgr.c:9311-9316)  
-            copies app_name, app_version, app_source to job_record.  
-        """  
-        job_id = atf.submit_job_sbatch(  
-            '--app=testvasp-5.7.1 -t1 --hold --wrap="sleep 60"'  
-        )  
-        assert job_id > 0  
-        atf.wait_for_job_state(job_id, "PENDING", fatal=True)  
+        Source: _copy_job_desc_to_job_record() (job_mgr.c:9311-9316)
+            copies app_name, app_version, app_source to job_record.
+        """
+        job_id = atf.submit_job_sbatch(
+            '--app=testvasp-5.7.1 -t1 --hold --wrap="sleep 60"'
+        )
+        assert job_id > 0
+        _jobs_submitted.append(job_id)
+        atf.wait_for_job_state(job_id, "PENDING", fatal=True)
 
-        output = atf.run_command_output(f"scontrol show job {job_id}")  
-        # Verify app fields are present in the output  
-        assert "AppName=testvasp" in output, (  
-            f"AppName not found in scontrol show job output: {output}"  
-        )  
-        assert "AppVersion=5.7.1" in output, (  
-            f"AppVersion not found in scontrol show job output: {output}"  
-        )  
-        assert "AppSource=user" in output, (  
-            f"AppSource not found in scontrol show job output: {output}"  
-        )  
+        output = atf.run_command_output(f"scontrol show job {job_id}")
+        # Verify app fields are present in the output
+        assert "AppName=testvasp" in output, (
+            f"AppName not found in scontrol show job output: {output}"
+        )
+        assert "AppVersion=5.7.1" in output, (
+            f"AppVersion not found in scontrol show job output: {output}"
+        )
+        assert "AppSource=user" in output, (
+            f"AppSource not found in scontrol show job output: {output}"
+        )
 
-    def test_scontrol_show_job_unversioned_app(self):  
-        """  
-        Submit with --app=testgeneral (no version), verify AppVersion is  
-        empty or absent.  
+    def test_scontrol_show_job_unversioned_app(self):
+        """
+        Submit with --app=testgeneral (no version), verify AppVersion is
+        empty or absent.
 
-        Source: _job_create() L7873-7874:  
-            app_version = NULL when --app equals app_name.  
-        """  
-        job_id = atf.submit_job_sbatch(  
-            '--app=testgeneral -t1 --hold --wrap="sleep 60"'  
-        )  
-        assert job_id > 0  
-        atf.wait_for_job_state(job_id, "PENDING", fatal=True)  
+        Source: _job_create() L7873-7874:
+            app_version = NULL when --app equals app_name.
+        """
+        job_id = atf.submit_job_sbatch(
+            '--app=testgeneral -t1 --hold --wrap="sleep 60"'
+        )
+        assert job_id > 0
+        _jobs_submitted.append(job_id)
+        atf.wait_for_job_state(job_id, "PENDING", fatal=True)
 
-        output = atf.run_command_output(f"scontrol show job {job_id}")  
-        assert "AppName=testgeneral" in output  
+        output = atf.run_command_output(f"scontrol show job {job_id}")
+        assert "AppName=testgeneral" in output
 
-    def test_scontrol_show_job_no_app(self):  
-        """  
-        Submit without --app, verify app fields are empty/absent.  
-        """  
-        job_id = atf.submit_job_sbatch(  
-            '-t1 --hold --wrap="sleep 60"'  
-        )  
-        assert job_id > 0  
-        atf.wait_for_job_state(job_id, "PENDING", fatal=True)  
+    def test_scontrol_show_job_no_app(self):
+        """
+        Submit without --app, verify app fields are empty/absent.
+        """
+        job_id = atf.submit_job_sbatch(
+            '-t1 --hold --wrap="sleep 60"'
+        )
+        assert job_id > 0
+        _jobs_submitted.append(job_id)
+        atf.wait_for_job_state(job_id, "PENDING", fatal=True)
 
-        output = atf.run_command_output(f"scontrol show job {job_id}")  
-        # AppName should be empty or "(null)" or not present  
-        # We check that "AppName=testvasp" is NOT in the output  
-        assert "AppName=testvasp" not in output  
-        assert "AppName=testgeneral" not in output  
+        output = atf.run_command_output(f"scontrol show job {job_id}")
+        # AppName should be empty or "(null)" or not present
+        # We check that "AppName=testvasp" is NOT in the output
+        assert "AppName=testvasp" not in output
+        assert "AppName=testgeneral" not in output
 
-    def test_scontrol_show_job_portal_source(self):  
-        """  
-        Submit with --app-source=portal, verify AppSource=portal in output.  
+    def test_scontrol_show_job_portal_source(self):
+        """
+        Submit with --app-source=portal, verify AppSource=portal in output.
 
-        Source: _job_create() L7878-7879:  
-            portal source is preserved, not overwritten to USER.  
-        """  
-        job_id = atf.submit_job_sbatch(  
-            '--app=testvasp-5.7.1 --app-source=portal -t1 --hold --wrap="sleep 60"'  
-        )  
-        assert job_id > 0  
-        atf.wait_for_job_state(job_id, "PENDING", fatal=True)  
+        Source: _job_create() L7878-7879:
+            portal source is preserved, not overwritten to USER.
+        """
+        job_id = atf.submit_job_sbatch(
+            '--app=testvasp-5.7.1 --app-source=portal -t1 --hold --wrap="sleep 60"'
+        )
+        assert job_id > 0
+        _jobs_submitted.append(job_id)
+        atf.wait_for_job_state(job_id, "PENDING", fatal=True)
 
-        output = atf.run_command_output(f"scontrol show job {job_id}")  
-        assert "AppSource=portal" in output, (  
-            f"Expected AppSource=portal in output: {output}"  
+        output = atf.run_command_output(f"scontrol show job {job_id}")
+        assert "AppSource=portal" in output, (
+            f"Expected AppSource=portal in output: {output}"
         )  
 
 
@@ -394,17 +412,18 @@ class TestAppEnvVars:
         script = _shared_path("env_script") + ".sh"  
         outfile = _shared_path("env_out") + ".txt"  
         try:  
-            atf.make_bash_script(script, f"""  
-    echo "NAME=${{SLURM_JOB_APP_NAME:-UNSET}}" > {outfile}  
-    echo "VERSION=${{SLURM_JOB_APP_VERSION:-UNSET}}" >> {outfile}  
-    echo "SOURCE=${{SLURM_JOB_APP_SOURCE:-UNSET}}" >> {outfile}  
+            atf.make_bash_script(script, f"""
+    echo "NAME=${{SLURM_JOB_APP_NAME:-UNSET}}" > {outfile}
+    echo "VERSION=${{SLURM_JOB_APP_VERSION:-UNSET}}" >> {outfile}
+    echo "SOURCE=${{SLURM_JOB_APP_SOURCE:-UNSET}}" >> {outfile}
     """)  
             os.chmod(script, 0o755)  
     
-            job_id = atf.submit_job_sbatch(  
-                f"--app=testvasp-5.7.1 -t1 -o /dev/null {script}"  
-            )  
-            assert job_id > 0  
+            job_id = atf.submit_job_sbatch(
+                f"--app=testvasp-5.7.1 -t1 -o /dev/null {script}"
+            )
+            assert job_id > 0
+            _jobs_submitted.append(job_id)
             atf.wait_for_job_state(job_id, "DONE", fatal=True, timeout=60)  
             assert atf.wait_for_file(outfile, timeout=30)  
             output = atf.run_command_output(f"cat {outfile}")  
@@ -427,17 +446,18 @@ class TestAppEnvVars:
         script = _shared_path("env_nover_script") + ".sh"  
         outfile = _shared_path("env_nover_out") + ".txt"  
         try:  
-            atf.make_bash_script(  
-                script,  
-                "echo NAME=$SLURM_JOB_APP_NAME\n"  
-                "echo VERSION=${SLURM_JOB_APP_VERSION:-UNSET}\n"  
-                "echo SOURCE=$SLURM_JOB_APP_SOURCE\n"  
+            atf.make_bash_script(
+                script,
+                "echo NAME=$SLURM_JOB_APP_NAME\n"
+                "echo VERSION=${SLURM_JOB_APP_VERSION:-UNSET}\n"
+                "echo SOURCE=$SLURM_JOB_APP_SOURCE\n"
             )  
             os.chmod(script, 0o755)  
             job_id = atf.submit_job_sbatch(  
                 f"--app=testgeneral -t1 -o {outfile} {script}"  
             )  
             assert job_id > 0  
+            _jobs_submitted.append(job_id)
             atf.wait_for_job_state(job_id, "DONE", fatal=True, timeout=60)  
             assert atf.wait_for_file(outfile, timeout=30)  
             output = atf.run_command_output(f"cat {outfile}")  
@@ -467,7 +487,8 @@ class TestAppEnvVars:
             job_id = atf.submit_job_sbatch(  
                 f"-t1 -o {outfile} {script}"  
             )  
-            assert job_id > 0  
+            assert job_id > 0
+            _jobs_submitted.append(job_id)
             atf.wait_for_job_state(job_id, "DONE", fatal=True, timeout=60)  
             assert atf.wait_for_file(outfile, timeout=30)  
             output = atf.run_command_output(f"cat {outfile}")  
@@ -496,7 +517,8 @@ class TestSqueueAppFormat:
         job_id = atf.submit_job_sbatch(  
             '--app=testvasp-5.7.1 -t1 --hold --wrap="sleep 60"'  
         )  
-        assert job_id > 0  
+        assert job_id > 0
+        _jobs_submitted.append(job_id)
         atf.wait_for_job_state(job_id, "PENDING", fatal=True)  
 
         output = atf.run_command_output(  
@@ -516,7 +538,8 @@ class TestSqueueAppFormat:
         job_id = atf.submit_job_sbatch(  
             '--app=testvasp-5.7.1 -t1 --hold --wrap="sleep 60"'  
         )  
-        assert job_id > 0  
+        assert job_id > 0
+        _jobs_submitted.append(job_id)
         atf.wait_for_job_state(job_id, "PENDING", fatal=True)  
 
         output = atf.run_command_output(  
@@ -537,11 +560,13 @@ class TestSqueueAppFormat:
         job1 = atf.submit_job_sbatch(  
             '--app=testvasp-5.7.1 -t1 --hold --wrap="sleep 60"'  
         )  
-        assert job1 > 0  
-        job2 = atf.submit_job_sbatch(  
-            '--app=testgeneral -t1 --hold --wrap="sleep 60"'  
-        )  
-        assert job2 > 0  
+        assert job1 > 0
+        _jobs_submitted.append(job1)
+        job2 = atf.submit_job_sbatch(
+            '--app=testgeneral -t1 --hold --wrap="sleep 60"'
+        )
+        assert job2 > 0
+        _jobs_submitted.append(job2)  
         atf.wait_for_job_state(job1, "PENDING", fatal=True)  
         atf.wait_for_job_state(job2, "PENDING", fatal=True)  
 

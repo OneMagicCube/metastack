@@ -93,9 +93,12 @@ def setup():
   
     yield  
   
-    # Cleanup: cancel any remaining jobs  
+    # Cleanup: cancel any remaining jobs (ignore errors if job already gone)  
     for jid in _jobs_submitted:  
-        atf.run_command(f"scancel {jid}", quiet=True)  
+        atf.run_command(f"scancel {jid}", quiet=True, fatal=False)  
+  
+    # Wait a bit for jobs to be fully cleaned up  
+    time.sleep(2)  
   
     # Cleanup: delete test apps  
     for name in _apps_created:  
