@@ -285,6 +285,7 @@ class TestShowApp:
         assert "AppName=allapp1" in show["stdout"]  
         assert "AppName=allapp2" in show["stdout"]  
   
+    @pytest.mark.destructive
     def test_show_no_apps_configured(self):  
         """  
         Verify that when no apps exist, the output says so.  
