@@ -1755,6 +1755,9 @@ extern void slurm_free_prolog_launch_msg(prolog_launch_msg_t * msg)
 		xfree(msg->watch_dog);
 		xfree(msg->watch_dog_script);
 #endif
+#ifdef   __METASTACK_NEW_GRES_GATHER_DCU
+		xfree(msg->acctg_freq);
+#endif
 		FREE_NULL_LIST(msg->job_node_array);
 		FREE_NULL_BUFFER(msg->job_ptr_buf);
 		FREE_NULL_BUFFER(msg->job_node_array_buf);

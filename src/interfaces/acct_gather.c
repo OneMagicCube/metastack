@@ -318,6 +318,30 @@ extern int acct_gather_parse_cpu_load(char *freq, char* freq_def)
 	return cpu_load;
 }
 
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+extern int acct_gather_parse_gpu_load(char *freq, char* freq_def)
+{
+	int gpu_load = -1;
+	char *sub_str = NULL;
+    bool flag = false;
+	if(freq) {
+		if ((sub_str = xstrcasestr(freq, "avegpuutil="))) {
+				gpu_load = _get_int(sub_str + 11);
+			flag = true;
+			debug2("parsed avegpuutil=%d from freq (%s)", gpu_load, sub_str);
+		}
+
+	}
+	if(!flag && freq_def) {
+		if ((sub_str = xstrcasestr(freq_def, "avegpuutil="))) {
+			gpu_load = _get_int(sub_str + 11);
+			debug2("parsed avegpuutil=%d from freq_def (%s) and flag is %d", gpu_load, sub_str, flag);
+		}
+	}
+	return gpu_load;
+}
+#endif
+
 /* 0 disable all step, 1 enable digital stepd , 2 enable batch step 3、 enable digital step and batch step*/
 extern int acct_gather_parse_monitor(char *freq, char* freq_def) 
 {
@@ -345,7 +369,17 @@ extern int acct_gather_parse_abnormal_dete(int type, char *freq)
 	if(!freq)
 		return freq_int;
 	switch (type) {
-		
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+		case PROFILE_ABNORMAL_DETE_GPU:
+			if((sub_str = xstrcasestr(freq, "avegpuutil="))){
+				freq_int = _get_int(sub_str + 11);
+				if(freq_int > 100 || freq_int < 0){
+					freq_int = -1;
+					error("Invalid --job-monitor specification: %s , The value of avegpuutil must be between 0 and 100" , freq);
+				}
+			}
+			break;
+#endif		
 		case PROFILE_ABNORMAL_DETE_MINUTE:
 			if((sub_str = xstrcasestr(freq, "time_window="))){
 				freq_int = _get_int(sub_str + 12);
@@ -360,7 +394,7 @@ extern int acct_gather_parse_abnormal_dete(int type, char *freq)
 				freq_int = _get_int(sub_str + 11);
 				if(freq_int > 100 || freq_int < 0){
 					freq_int = -1;
-					error("Invalid --job-monitor specification: %s , The value of cpuminload must be between 0 and 100" , freq);
+					error("Invalid --job-monitor specification: %s , The value of avecpuutil must be between 0 and 100" , freq);
 				}
 			}
 			break;
@@ -368,13 +402,16 @@ extern int acct_gather_parse_abnormal_dete(int type, char *freq)
 			if((sub_str = xstrcasestr(freq, "collect_step="))){
 				freq_int = _get_int(sub_str + 13);
 				if(freq_int != -1) {
-					if(!(freq_int == 0 || freq_int == 1 || freq_int==2 || freq_int==3)) {
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+					if(!(freq_int == 0 || freq_int == 1 || freq_int==2 || freq_int==3 || freq_int==4)) {
 						freq_int = -1;
 						error("Invalid --job-monitor specification: %s , Invalid parameter; 0 disable all stepd, "
 								"1 enable digital stepd, "
 								"2、enable batch stepd "
-								"3、enable digital stepd and batch stepd;" , freq);
+								"3、enable digital stepd and batch stepd;"
+								"4、enable all stepd;" , freq);
 					}
+#endif
 				}
 			}
 			break;

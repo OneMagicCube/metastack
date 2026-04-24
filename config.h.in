@@ -160,6 +160,9 @@
 /* Define to 1 if NVML library found */
 #undef HAVE_NVML
 
+/* Define to 1 if DTK library found */
+#undef HAVE_DTK
+
 /* Define to 1 if ofed library found */
 #undef HAVE_OFED
 
@@ -207,6 +210,9 @@
 
 /* Define to 1 if RSMI library found */
 #undef HAVE_RSMI
+
+/* Define to 1 if DTK library found */
+#undef HAVE_DTK
 
 /* Define to 1 if s2n library found. */
 #undef HAVE_S2N

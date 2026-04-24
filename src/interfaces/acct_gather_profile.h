@@ -63,13 +63,15 @@
 
 #define ENABLE_DIG   1
 #define ENABLE_BATCH 2
-#define ENABLE_ALL   3
-
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+#define ENABLE_DIG_BATCH 3
+#define ENABLE_ALL   4
+#endif
 
 typedef struct {
 	slurm_step_id_t step_id; /* Current step id (or NO_VAL)               */
 	int step;				 /* which stepd                               */
-	uint16_t node_alloc_cpu;
+	// uint16_t node_alloc_cpu;
 	bool switch_step;
 	int timer;
 	int cpu_min_load;
@@ -93,8 +95,18 @@ typedef struct {
 	char      *job_stderr;	
 #endif
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
-	char *apptype;			/* apptype returned from the cli_filer plugin */
-	uint32_t profile;		/* acct_gather.conf configuration file ProfileInfluxDBDefault configuration entry corresponding to the incoming data type */
+	char      *apptype;			/* apptype returned from the cli_filer plugin */
+	uint32_t  profile;		/* acct_gather.conf configuration file ProfileInfluxDBDefault configuration entry corresponding to the incoming data type */
+#endif
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+	int       gpu_min_load;
+	char      *cwd;	         /* path to current working directory, only used by bacth   */ 
+	char      *script;       /* job name script, only used by bacth */
+	uint64_t  alloc_cpus; /* all cores distributed on the job step, represented using uint32_t type */
+	uint64_t  alloc_gres;
+#endif
+#ifdef __METASTACK_NEW_PROFILE_TIME_SYNC
+	time_t job_start; /* job_start */
 #endif
 #ifdef __METASTACK_OPT_APP
 	char *app_name;  
@@ -111,6 +123,9 @@ typedef struct {
 #endif
 
 typedef enum {
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+	PROFILE_ABNORMAL_DETE_GPU,
+#endif
 	PROFILE_ABNORMAL_DETE_MINUTE,
 	PROFILE_ABNORMAL_DETE_CPUMINLOAD,
 	PROFILE_ABNORMAL_DETE_STEPD,

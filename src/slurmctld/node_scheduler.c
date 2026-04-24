@@ -3995,6 +3995,9 @@ extern void launch_prolog(job_record_t *job_ptr)
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
 	prolog_msg_ptr->apptype = xstrdup(job_ptr->details->apptype);
 #endif
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+	prolog_msg_ptr->acctg_freq = xstrdup(job_ptr->details->acctg_freq);
+#endif
 	if (job_ptr->bit_flags & STEPMGR_ENABLED) {
 		node_record_t *bit_node;
 
@@ -4081,6 +4084,9 @@ extern void launch_prolog(job_record_t *job_ptr)
 #else
 	agent_arg_ptr->hostlist = hostlist_create(job_ptr->nodes);
 	agent_arg_ptr->node_count = job_ptr->node_cnt;
+#endif
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+	prolog_msg_ptr->cpu_count = job_ptr->cpu_cnt;
 #endif
 #ifdef __METASTACK_OPT_HIGH_THROUGHPUT_AGENT_THREAD_POOL
 	if (agent_arg_ptr->node_count == 1) {

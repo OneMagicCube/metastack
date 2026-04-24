@@ -1271,6 +1271,10 @@ static uint32_t _handle_autodetect_flags(char *str)
 	else if (xstrcasestr(str, "dsmi"))
 		flags |= GRES_AUTODETECT_GPU_DSMI;
 #endif
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+	else if (xstrcasestr(str, "dtk"))
+		flags |= GRES_AUTODETECT_GPU_DTK;
+#endif
 	else if (xstrcasestr(str, "oneapi"))
 		flags |= GRES_AUTODETECT_GPU_ONEAPI;
 	else if (xstrcasestr(str, "nrt"))
@@ -11318,8 +11322,10 @@ rwfail:
 	return;
 }
 
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
 /* Receive GRES information from slurmd on the specified file descriptor */
-extern int gres_g_recv_stepd(int fd, slurm_msg_t *msg)
+extern int gres_g_recv_stepd(int fd, slurm_msg_t *msg, uint32_t *auto_flag)
+#endif
 {
 	int len, rc = SLURM_ERROR;
 	buf_t *buffer = NULL;
@@ -11364,7 +11370,10 @@ extern int gres_g_recv_stepd(int fd, slurm_msg_t *msg)
 		safe_read(fd, buffer->head, len);
 
 		rc = _unpack_gres_conf(buffer);
-
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+		if(auto_flag)
+			*auto_flag = autodetect_flags;
+#endif
 		if (rc == SLURM_ERROR)
 			goto rwfail;
 

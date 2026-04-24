@@ -1854,7 +1854,11 @@ extern List as_mysql_jobacct_process_get_jobs(mysql_conn_t *mysql_conn,
 	    (job_cond->flags & JOBCOND_FLAG_SCRIPT) ||
 	    (job_cond->flags & JOBCOND_FLAG_ENV)) {
 		if (!(is_admin = is_user_min_admin_level(
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+			      mysql_conn, uid, SLURMDB_ADMIN_READ_ONLY))) {
+#else
 			      mysql_conn, uid, SLURMDB_ADMIN_OPERATOR))) {
+#endif
 			/*
 			 * Only fill in the coordinator accounts here we will
 			 * check them later when we actually try to get the jobs

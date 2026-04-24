@@ -2684,7 +2684,11 @@ extern buf_t *pack_all_part(uint16_t show_flags, uid_t uid,
 {
 	int tmp_offset;
 	time_t now = time(NULL);
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+	bool privileged = validate_read_only_admin(uid);
+#else
 	bool privileged = validate_operator(uid);
+#endif
 #ifdef __METASTACK_OPT_PART_VISIBLE
 	_foreach_pack_part_info_t pack_info = {
 		.buffer = init_buf(BUF_SIZE),
@@ -5492,7 +5496,11 @@ extern buf_t *pack_all_cache_part(uint16_t show_flags, uid_t uid,
 {
 	int tmp_offset;
 	time_t now = time(NULL);
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+	bool privileged = validate_read_only_admin(uid);
+#else
 	bool privileged = validate_operator(uid);
+#endif
 #ifdef __METASTACK_OPT_PART_VISIBLE
 	_foreach_pack_part_info_t pack_info = {
 			.buffer = init_buf(BUF_SIZE),

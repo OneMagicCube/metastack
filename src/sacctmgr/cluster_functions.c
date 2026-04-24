@@ -1100,6 +1100,9 @@ extern int sacctmgr_dump_cluster (int argc, char **argv)
 
 	} else {
 		if ((my_uid != slurm_conf.slurm_user_id) && (my_uid != 0)
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+		    && (user->admin_level != SLURMDB_ADMIN_READ_ONLY)
+#endif
 		    && user->admin_level < SLURMDB_ADMIN_SUPER_USER) {
 			exit_code = 1;
 			fprintf(stderr, " Your user does not have sufficient "

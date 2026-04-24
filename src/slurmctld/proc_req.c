@@ -686,6 +686,56 @@ extern bool validate_operator_user_rec(slurmdb_user_rec_t *user)
 
 }
 
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+/*
+ * validate_read_only_admin - validate that the uid is authorized at the
+ *      root, SlurmUser, or SLURMDB_ADMIN_READ_ONLY level
+ * IN uid - user to validate
+ * RET true if permitted to run, false otherwise
+ */
+static bool _validate_read_only_admin_internal(uid_t uid, bool locked)
+{
+	slurmdb_admin_level_t level;
+
+#ifndef NDEBUG
+	if (drop_priv)
+		return false;
+#endif
+
+	if ((uid == 0) || (uid == slurm_conf.slurm_user_id))
+		return true;
+
+	if (locked)
+		level = assoc_mgr_get_admin_level_locked(acct_db_conn, uid);
+	else
+		level = assoc_mgr_get_admin_level(acct_db_conn, uid);
+
+	if (level >= SLURMDB_ADMIN_READ_ONLY)
+		return true;
+
+	return false;
+}
+
+extern bool validate_read_only_admin(uid_t uid)
+{
+	return _validate_read_only_admin_internal(uid, false);
+}
+
+extern bool validate_read_only_user_rec(slurmdb_user_rec_t *user)
+{
+#ifndef NDEBUG
+	if (drop_priv)
+		return false;
+#endif
+	if ((user->uid == 0) ||
+		(user->uid == slurm_conf.slurm_user_id) ||
+		(user->admin_level >= SLURMDB_ADMIN_READ_ONLY))
+		return true;
+	else
+		return false;
+}
+#endif
+
 static void _set_identity(slurm_msg_t *msg, void **id)
 {
 	static bool set = false, use_client_ids = false;
@@ -1834,7 +1884,11 @@ static void _slurm_rpc_dump_cache_partitions(slurm_msg_t * msg)
 
 	START_TIMER;
 	if ((slurm_conf.private_data & PRIVATE_DATA_PARTITIONS) &&
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+		!validate_read_only_admin(msg->auth_uid)) {
+#else
 		!validate_operator(msg->auth_uid)) {
+#endif
 		debug2("Security violation, PARTITION_INFO RPC from uid=%u",
 			msg->auth_uid);
 		slurm_send_rc_msg(msg, ESLURM_ACCESS_DENIED);
@@ -1887,7 +1941,11 @@ static void _slurm_rpc_dump_cache_nodes(slurm_msg_t * msg)
 
 	START_TIMER;
 	if ((slurm_conf.private_data & PRIVATE_DATA_NODES) &&
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+		(!validate_read_only_admin(msg->auth_uid))) {
+#else
 		(!validate_operator(msg->auth_uid))) {
+#endif
 		error("Security violation, REQUEST_NODE_INFO RPC from uid=%u",
 			msg->auth_uid);
 		slurm_send_rc_msg(msg, ESLURM_ACCESS_DENIED);
@@ -1943,7 +2001,11 @@ static void _slurm_rpc_dump_cache_node_single(slurm_msg_t * msg)
 
 	START_TIMER;
 	if ((slurm_conf.private_data & PRIVATE_DATA_NODES) &&
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+		(!validate_read_only_admin(msg->auth_uid))) {
+#else
 		(!validate_operator(msg->auth_uid))) {
+#endif
 		error("Security violation, REQUEST_NODE_INFO_SINGLE RPC from uid=%u",
 			msg->auth_uid);
 		slurm_send_rc_msg(msg, ESLURM_ACCESS_DENIED);
@@ -2268,7 +2330,11 @@ static void _slurm_rpc_dump_nodes(slurm_msg_t *msg)
 
 	START_TIMER;
 	if ((slurm_conf.private_data & PRIVATE_DATA_NODES) &&
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+		(!validate_read_only_admin(msg->auth_uid))) {
+#else
 	    (!validate_operator(msg->auth_uid))) {
+#endif
 		error("Security violation, REQUEST_NODE_INFO RPC from uid=%u",
 		      msg->auth_uid);
 		slurm_send_rc_msg(msg, ESLURM_ACCESS_DENIED);
@@ -2313,7 +2379,11 @@ static void _slurm_rpc_dump_node_single(slurm_msg_t *msg)
 
 	START_TIMER;
 	if ((slurm_conf.private_data & PRIVATE_DATA_NODES) &&
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+	    (!validate_read_only_admin(msg->auth_uid))) {
+#else
 	    (!validate_operator(msg->auth_uid))) {
+#endif
 		error("Security violation, REQUEST_NODE_INFO_SINGLE RPC from uid=%u",
 		      msg->auth_uid);
 		slurm_send_rc_msg(msg, ESLURM_ACCESS_DENIED);
@@ -2540,7 +2610,11 @@ static void _slurm_rpc_dump_partitions(slurm_msg_t *msg)
 
 	START_TIMER;
 	if ((slurm_conf.private_data & PRIVATE_DATA_PARTITIONS) &&
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+		!validate_read_only_admin(msg->auth_uid)) {
+#else
 	    !validate_operator(msg->auth_uid)) {
+#endif
 		debug2("Security violation, PARTITION_INFO RPC from uid=%u",
 		       msg->auth_uid);
 		slurm_send_rc_msg(msg, ESLURM_ACCESS_DENIED);
@@ -3252,7 +3326,11 @@ static void _slurm_rpc_job_step_get_info(slurm_msg_t *msg)
 		assoc_mgr_fill_in_user(acct_db_conn, &args.user_rec,
 					accounting_enforce, NULL, true);
 
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+		bool privileged = validate_read_only_user_rec(&args.user_rec);
+#else
 		bool privileged = validate_operator_user_rec(&args.user_rec);
+#endif
 		bool skip_visible_parts = (request->show_flags & SHOW_ALL) || privileged;
 		args.privileged = privileged;
 		/**
@@ -3268,7 +3346,11 @@ static void _slurm_rpc_job_step_get_info(slurm_msg_t *msg)
 		}
 		args.pack_job_step_list_func = _pack_ctld_job_steps,
 #else
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+		bool privileged = validate_read_only_admin(msg->auth_uid);
+#else
 		bool privileged = validate_operator(msg->auth_uid);
+#endif
 		bool skip_visible_parts =
 			(request->show_flags & SHOW_ALL) || privileged;
 		pack_step_args_t args = {0};
@@ -3792,6 +3874,7 @@ static void _slurm_rpc_job_alloc_info(slurm_msg_t *msg)
 	user_rec.uid = msg->auth_uid;
 
 	assoc_mgr_lock(&assoc_locks);
+	assoc_mgr_fill_in_user(acct_db_conn, &user_rec, accounting_enforce, NULL, true);
 	user_rec.assoc_list = fill_assoc_list(msg->auth_uid, true);
 	error_code = job_alloc_info_user(&user_rec, job_info_msg->job_id,
 				    &job_ptr);
@@ -3875,6 +3958,7 @@ static void _slurm_rpc_het_job_alloc_info(slurm_msg_t *msg)
 	user_rec.uid = msg->auth_uid;
 
 	assoc_mgr_lock(&assoc_locks);
+	assoc_mgr_fill_in_user(acct_db_conn, &user_rec, accounting_enforce, NULL, true);
 	user_rec.assoc_list = fill_assoc_list(msg->auth_uid, true);
 	error_code = job_alloc_info_user(&user_rec, job_info_msg->job_id,
 				    &job_ptr);
@@ -3990,6 +4074,7 @@ static void _slurm_rpc_job_sbcast_cred(slurm_msg_t *msg)
 	user_rec.uid = msg->auth_uid;
 
 	assoc_mgr_lock(&assoc_locks);
+	assoc_mgr_fill_in_user(acct_db_conn, &user_rec, accounting_enforce, NULL, true);
 	user_rec.assoc_list = fill_assoc_list(msg->auth_uid, true);
 #endif
 	if (job_info_msg->het_job_offset == NO_VAL) {
@@ -4336,7 +4421,11 @@ static int _foreach_job_filter_steps(void *x, void *arg)
 
 	if ((slurm_conf.private_data & PRIVATE_DATA_JOBS) &&
 	    (job_ptr->user_id != args->request_uid) &&
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+	    !validate_read_only_admin(args->request_uid)) {
+#else
 	    !validate_operator(args->request_uid)) {
+#endif
 		if (slurm_mcs_get_privatedata()) {
 			if (mcs_g_check_mcs_label(args->request_uid,
 						  job_ptr->mcs_label, false))
@@ -4506,6 +4595,7 @@ static void _slurm_rpc_step_layout(slurm_msg_t *msg)
 	user_rec.uid = msg->auth_uid;
 
 	assoc_mgr_lock(&assoc_locks);
+	assoc_mgr_fill_in_user(acct_db_conn, &user_rec, accounting_enforce, NULL, true);
 	user_rec.assoc_list = fill_assoc_list(msg->auth_uid, true);
 
 	error_code = job_alloc_info_user(&user_rec, req->job_id, &job_ptr);
@@ -5876,6 +5966,13 @@ static void _slurm_rpc_job_ready(slurm_msg_t *msg)
 	slurm_msg_t response_msg;
 	return_code_msg_t rc_msg;
 
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+	if (assoc_mgr_get_admin_level(acct_db_conn, msg->auth_uid) == SLURMDB_ADMIN_READ_ONLY){
+		slurm_send_rc_msg(msg, ESLURM_ACCESS_DENIED);
+		return;
+	}
+#endif
+
 	START_TIMER;
 	lock_slurmctld(job_read_lock);
 	error_code = job_node_ready(id_msg->job_id, &result);
@@ -6274,6 +6371,11 @@ static void _slurm_rpc_trigger_set(slurm_msg_t *msg)
 	                                       "allow_user_triggers");
 	bool disable_triggers = xstrcasestr(slurm_conf.slurmctld_params,
 					    "disable_triggers");
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+	if (assoc_mgr_get_admin_level(acct_db_conn, msg->auth_uid) == SLURMDB_ADMIN_READ_ONLY) {
+		allow_user_triggers = false; 
+	}
+#endif
 	DEF_TIMERS;
 
 	START_TIMER;
@@ -7712,7 +7814,11 @@ static void _slurm_rpc_request_crontab(slurm_msg_t *msg)
 	lock_slurmctld(job_read_lock);
 
 	if ((req_msg->uid != msg->auth_uid) &&
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+	    !validate_read_only_admin(msg->auth_uid)) {
+#else
 	    !validate_operator(msg->auth_uid)) {
+#endif
 		rc = ESLURM_USER_ID_MISSING;
 	} else {
 		char *file = NULL;
@@ -7804,6 +7910,11 @@ static void _slurm_rpc_update_crontab(slurm_msg_t *msg)
 	    !validate_slurm_user(msg->auth_uid)) {
 		resp_msg->return_code = ESLURM_USER_ID_MISSING;
 	}
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+	if (assoc_mgr_get_admin_level(acct_db_conn, msg->auth_uid) == SLURMDB_ADMIN_READ_ONLY) {
+		resp_msg->return_code = ESLURM_USER_ID_MISSING;
+	}
+#endif
 
 	if (!resp_msg->return_code) {
 		char *alloc_node = NULL;

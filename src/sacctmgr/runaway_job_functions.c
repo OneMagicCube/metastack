@@ -330,6 +330,14 @@ extern int sacctmgr_list_runaway_jobs(int argc, char **argv)
 
 	_print_runaway_jobs(format_list, runaway_jobs);
 
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+	uid_t uid = getuid();
+
+	if (assoc_mgr_get_admin_level(db_conn, uid) == SLURMDB_ADMIN_READ_ONLY) {
+		goto end_it;
+	}
+#endif
+
 	while (!rc && list_transfer_max(process_jobs, runaway_jobs,
 					RUNAWAY_JOBS_PER_PASS)) {
 		rc = slurmdb_jobs_fix_runaway(db_conn, process_jobs);

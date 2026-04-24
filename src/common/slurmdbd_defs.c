@@ -253,6 +253,28 @@ extern slurmdbd_msg_type_t str_2_slurmdbd_msg_type(char *msg_type)
 	} else if (!xstrcasecmp(msg_type, "Got Job App")) {  
 		return DBD_GOT_JOB_APP;  
 #endif
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	} else if (!xstrcasecmp(msg_type, "Activate Accounts")) {
+		return DBD_ACTIVATE_ACCOUNTS;
+	} else if (!xstrcasecmp(msg_type, "Activate Users")) {
+		return DBD_ACTIVATE_USERS;
+	} else if (!xstrcasecmp(msg_type, "Activate Associations")) {
+		return DBD_ACTIVATE_ASSOCS;
+	} else if (!xstrcasecmp(msg_type, "Activate Account Coords")) {
+		return DBD_ACTIVATE_ACCOUNT_COORDS;
+	} else if (!xstrcasecmp(msg_type, "Activate Wckeys")) {
+		return DBD_ACTIVATE_WCKEYS;
+	} else if (!xstrcasecmp(msg_type, "Deactivate Accounts")) {
+		return DBD_DEACTIVATE_ACCOUNTS;
+	} else if (!xstrcasecmp(msg_type, "Deactivate Users")) {
+		return DBD_DEACTIVATE_USERS;
+	} else if (!xstrcasecmp(msg_type, "Deactivate Associations")) {
+		return DBD_DEACTIVATE_ASSOCS;
+	} else if (!xstrcasecmp(msg_type, "Deactivate Account Coords")) {
+		return DBD_DEACTIVATE_ACCOUNT_COORDS;
+	} else if (!xstrcasecmp(msg_type, "Deactivate Wckeys")) {
+		return DBD_DEACTIVATE_WCKEYS;
+#endif
 	} else {
 		return NO_VAL;
 	}
@@ -875,6 +897,68 @@ extern char *slurmdbd_msg_type_2_str(slurmdbd_msg_type_t msg_type, int get_enum)
 		} else
 			return "Persistent TLS Connection Initialization";
 		break;
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	case DBD_ACTIVATE_ACCOUNTS:
+		if (get_enum) {
+			return "DBD_ACTIVATE_ACCOUNTS";
+		} else
+			return "Activate Accounts";
+		break;
+	case DBD_ACTIVATE_USERS:
+		if (get_enum) {
+			return "DBD_ACTIVATE_USERS";
+		} else
+			return "Activate Users";
+		break;	
+	case DBD_ACTIVATE_ASSOCS:
+		if (get_enum) {
+			return "DBD_ACTIVATE_ASSOCS";
+		} else
+			return "Activate Associations";
+		break;
+	case DBD_ACTIVATE_ACCOUNT_COORDS:
+		if (get_enum) {
+			return "DBD_ACTIVATE_ACCOUNT_COORDS";
+		} else
+			return "Activate Account Coords";
+		break;	
+	case DBD_ACTIVATE_WCKEYS:
+		if (get_enum) {
+			return "DBD_ACTIVATE_WCKEYS";
+		} else
+			return "Activate Wckeys";
+		break;
+	case DBD_DEACTIVATE_ACCOUNTS:
+		if (get_enum) {
+			return "DBD_DEACTIVATE_ACCOUNTS";
+		} else
+			return "Deactivate Accounts";
+		break;	
+	case DBD_DEACTIVATE_USERS:
+		if (get_enum) {
+			return "DBD_DEACTIVATE_USERS";
+		} else
+			return "Deactivate Users";
+		break;
+	case DBD_DEACTIVATE_ASSOCS:
+		if (get_enum) {
+			return "DBD_DEACTIVATE_ASSOCS";
+		} else
+			return "Deactivate Associations";
+		break;	
+	case DBD_DEACTIVATE_ACCOUNT_COORDS:
+		if (get_enum) {
+			return "DBD_DEACTIVATE_ACCOUNT_COORDS";
+		} else
+			return "Deactivate Account Coords";
+		break;
+	case DBD_DEACTIVATE_WCKEYS:
+		if (get_enum) {
+			return "DBD_DEACTIVATE_WCKEYS";
+		} else
+			return "Deactivate Wckeys";
+		break;
+#endif
 	default:
 		snprintf(unk_str, sizeof(unk_str), "MsgType=%d", msg_type);
 		return unk_str;
@@ -952,6 +1036,10 @@ extern void slurmdbd_free_msg(persist_msg_t *msg)
 		break;
 	case DBD_ADD_ACCOUNT_COORDS:
 	case DBD_REMOVE_ACCOUNT_COORDS:
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	case DBD_ACTIVATE_ACCOUNT_COORDS:
+	case DBD_DEACTIVATE_ACCOUNT_COORDS:
+#endif
 		slurmdbd_free_acct_coord_msg(msg->data);
 		break;
 	case DBD_ARCHIVE_LOAD:
@@ -984,6 +1072,12 @@ extern void slurmdbd_free_msg(persist_msg_t *msg)
 	case DBD_REMOVE_RES:
 	case DBD_REMOVE_WCKEYS:
 	case DBD_REMOVE_USERS:
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	case DBD_DEACTIVATE_ACCOUNTS:
+	case DBD_DEACTIVATE_ASSOCS:
+	case DBD_DEACTIVATE_USERS:
+	case DBD_DEACTIVATE_WCKEYS:
+#endif
 	case DBD_ARCHIVE_DUMP:
 #ifdef __METASTACK_NEW_AUTO_SUPPLEMENT_AVAIL_NODES
 	case DBD_GET_BORROW:
@@ -1023,6 +1117,11 @@ extern void slurmdbd_free_msg(persist_msg_t *msg)
 	case DBD_MODIFY_QOS:
 	case DBD_MODIFY_RES:
 	case DBD_MODIFY_USERS:
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	case DBD_ACTIVATE_ACCOUNTS:
+	case DBD_ACTIVATE_USERS:
+	case DBD_ACTIVATE_ASSOCS:
+#endif
 		slurmdbd_free_modify_msg(msg->data, msg->msg_type);
 		break;
 	case DBD_NODE_STATE:
@@ -1099,6 +1198,9 @@ extern void slurmdbd_free_cond_msg(dbd_cond_msg_t *msg,
 		switch (type) {
 		case DBD_GET_ACCOUNTS:
 		case DBD_REMOVE_ACCOUNTS:
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+		case DBD_DEACTIVATE_ACCOUNTS:
+#endif
 			my_destroy = slurmdb_destroy_account_cond;
 			break;
 		case DBD_GET_TRES:
@@ -1107,6 +1209,9 @@ extern void slurmdbd_free_cond_msg(dbd_cond_msg_t *msg,
 		case DBD_GET_ASSOCS:
 		case DBD_GET_PROBS:
 		case DBD_REMOVE_ASSOCS:
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+		case DBD_DEACTIVATE_ASSOCS:
+#endif
 			my_destroy = slurmdb_destroy_assoc_cond;
 			break;
 		case DBD_GET_CLUSTERS:
@@ -1130,6 +1235,9 @@ extern void slurmdbd_free_cond_msg(dbd_cond_msg_t *msg,
 			break;
 		case DBD_GET_WCKEYS:
 		case DBD_REMOVE_WCKEYS:
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+		case DBD_DEACTIVATE_WCKEYS:
+#endif
 			my_destroy = slurmdb_destroy_wckey_cond;
 			break;
 		case DBD_GET_TXN:
@@ -1137,6 +1245,9 @@ extern void slurmdbd_free_cond_msg(dbd_cond_msg_t *msg,
 			break;
 		case DBD_GET_USERS:
 		case DBD_REMOVE_USERS:
+#ifdef __METASTACK_OPT_USER_DEACTIVATE	
+		case DBD_DEACTIVATE_USERS:
+#endif
 			my_destroy = slurmdb_destroy_user_cond;
 			break;
 		case DBD_ARCHIVE_DUMP:
@@ -1279,10 +1390,16 @@ extern void slurmdbd_free_modify_msg(dbd_modify_msg_t *msg,
 			destroy_rec = slurmdb_destroy_user_rec;
 			break;
 		case DBD_MODIFY_ACCOUNTS:
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+		case DBD_ACTIVATE_ACCOUNTS:
+#endif
 			destroy_cond = slurmdb_destroy_account_cond;
 			destroy_rec = slurmdb_destroy_account_rec;
 			break;
 		case DBD_MODIFY_ASSOCS:
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+		case DBD_ACTIVATE_ASSOCS:
+#endif
 			destroy_cond = slurmdb_destroy_assoc_cond;
 			destroy_rec = slurmdb_destroy_assoc_rec;
 			break;
@@ -1307,6 +1424,9 @@ extern void slurmdbd_free_modify_msg(dbd_modify_msg_t *msg,
 			destroy_rec = slurmdb_destroy_res_rec;
 			break;
 		case DBD_MODIFY_USERS:
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+		case DBD_ACTIVATE_USERS:
+#endif
 			destroy_cond = slurmdb_destroy_user_cond;
 			destroy_rec = slurmdb_destroy_user_rec;
 			break;

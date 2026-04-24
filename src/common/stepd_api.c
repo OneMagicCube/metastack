@@ -1154,7 +1154,7 @@ stepd_aggregate(int fd, uint16_t protocol_version, step_gather_msg_t *sent)
 
 	debug("Entering stepd_aggregate for %ps, rank = %d", &sent->step_id, sent->rank);
 #ifdef __META_PROTOCOL
-	if(protocol_version >= META_3_0_PROTOCOL_VERSION){
+	if (protocol_version >= META_3_2_PROTOCOL_VERSION){
 		safe_write(fd, &req, sizeof(int));
 		safe_write(fd, &sent->cpu_ave, sizeof(double));
 		safe_write(fd, &sent->cpu_util, sizeof(double));
@@ -1163,8 +1163,26 @@ stepd_aggregate(int fd, uint16_t protocol_version, step_gather_msg_t *sent)
 		safe_write(fd, &sent->vmem_real, sizeof(uint64_t));
 		safe_write(fd, &sent->page_fault, sizeof(uint64_t));
 		safe_write(fd, &sent->rank, sizeof(uint32_t));
-		safe_write(fd, &sent->node_alloc_cpu, sizeof(uint64_t));
-
+		// safe_write(fd, &sent->node_alloc_cpu, sizeof(uint64_t));
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+		safe_write(fd, &sent->dcu_util, sizeof(double));
+		safe_write(fd, &sent->dcu_mem_step, sizeof(uint64_t));
+#endif
+#ifdef __METASTACK_NEW_PROFILE_TIME_SYNC
+		safe_write(fd, &sent->send_timestamp, sizeof(time_t));
+#endif
+		safe_read(fd, &rc, sizeof(int));
+		safe_read(fd, &errnum, sizeof(int));
+	} else if(protocol_version >= META_3_0_PROTOCOL_VERSION){
+		safe_write(fd, &req, sizeof(int));
+		safe_write(fd, &sent->cpu_ave, sizeof(double));
+		safe_write(fd, &sent->cpu_util, sizeof(double));
+		safe_write(fd, &sent->load_flag, sizeof(uint64_t));
+		safe_write(fd, &sent->mem_real, sizeof(uint64_t));
+		safe_write(fd, &sent->vmem_real, sizeof(uint64_t));
+		safe_write(fd, &sent->page_fault, sizeof(uint64_t));
+		safe_write(fd, &sent->rank, sizeof(uint32_t));
+		// safe_write(fd, &sent->node_alloc_cpu, sizeof(uint64_t));
 		safe_read(fd, &rc, sizeof(int));
 		safe_read(fd, &errnum, sizeof(int));
 	} else if(protocol_version >= SLURM_24_05_PROTOCOL_VERSION) {
@@ -1183,7 +1201,7 @@ stepd_aggregate(int fd, uint16_t protocol_version, step_gather_msg_t *sent)
 		safe_write(fd, &sent->vmem_real, sizeof(uint64_t));
 		safe_write(fd, &sent->page_fault, sizeof(uint64_t));
 		safe_write(fd, &sent->rank, sizeof(uint32_t));
-		safe_write(fd, &sent->node_alloc_cpu, sizeof(uint64_t));
+		// safe_write(fd, &sent->node_alloc_cpu, sizeof(uint64_t));
 
 		safe_read(fd, &rc, sizeof(int));
 		safe_read(fd, &errnum, sizeof(int));

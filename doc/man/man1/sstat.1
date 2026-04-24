@@ -350,8 +350,44 @@ The average CPU usage of job step, which can be converted to average cpu utiliza
 
 .TP
 \f3TotalRSS\fP
- Real-time memory usage of job step, default in KB, which can be converted to appropriate 
- units using  -g or -m.
+ Real-time memory usage of a job step, in KB by default. It can be converted to
+ appropriate units using -g or -m.
+.IP
+
+.TP
+\f3GPUUtil\fP
+ The real-time overall GPU(DCU) utilization of a job step. The following notes apply to DCU utilization.
+ This function returns the percentage of DCU compute units (CUs) occupied by the specified process across all DCUs in the system.
+ For example, in an environment with 8 DCUs, each containing 100 CUs, if a process occupies 10 CUs on card1, the returned utilization is:
+ 10 / (8 × 100)
+.IP
+
+.TP
+\f3MaxGPUUtil\fP
+ This value represents the maximum GPU(DCU) utilization of the job step.
+.IP
+
+.TP
+\f3MinGPUUtil\fP
+ This value represents the minimum GPU(DCU) utilization of the job step. 
+.IP
+
+.TP
+\f3GPUMem\fP
+ The GPU (DCU) memory usage of a job step, in MB by default. It can be
+ converted to appropriate units using -g or -m.
+.IP
+
+.TP
+\f3MaxGPUMem\fP
+ The maximum GPU (DCU) memory usage of a job step, in MB by default. It can be
+ converted to appropriate units using -g or -m.
+.IP
+
+.TP
+\f3MinGPUMem\fP
+ The minimum GPU (DCU) memory usage of a job step, in MB by default. It can be
+ converted to appropriate units using -g or -m.
 .IP
 
 .SH "PERFORMANCE"

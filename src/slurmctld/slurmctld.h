@@ -2785,6 +2785,23 @@ extern bool validate_operator_locked(uid_t uid);
  */
 extern bool validate_operator_user_rec(slurmdb_user_rec_t *user);
 
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+/*
+ * validate_read_only_admin - validate that the uid is authorized at the
+ *      root, SlurmUser, or SLURMDB_ADMIN_READ_ONLY level
+ * IN uid - user to validate
+ * RET true if permitted to run, false otherwise
+ */
+extern bool validate_read_only_admin(uid_t uid);
+/*
+ * validate_read_only_user_rec - validate that the user is authorized at the
+ * 		root, SlurmUser, or SLURMDB_ADMIN_READ_ONLY level
+ * IN user - slurmdb_user_rec_t of user to check
+ * RET true if permitted to run, false otherwise
+ */
+extern bool validate_read_only_user_rec(slurmdb_user_rec_t *user);
+#endif
+
 /* cleanup_completing()
  *
  * Clean up the JOB_COMPLETING flag and eventually

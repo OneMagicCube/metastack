@@ -109,7 +109,9 @@ static void _kill_step_on_send_signal_fail(slurm_msg_t *msg);
 
 static pthread_mutex_t cleanup_mutex = PTHREAD_MUTEX_INITIALIZER;
 static bool cleanup = false;
-
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+static uint32_t auto_gres_flag = GRES_AUTODETECT_UNSET;
+#endif
 #ifdef __METASTACK_BUG_OVERLAP_NODE_DIST
 bool enable_overlap_node_lb = false;
 #endif
@@ -1047,8 +1049,11 @@ _init_from_slurmd(int sock, char **argv, slurm_addr_t **_cli,
 		fatal("Failed to read job_container.conf from slurmd.");
 
 	/* Receive GRES information from slurmd */
-	if (gres_g_recv_stepd(sock, msg) != SLURM_SUCCESS)
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+	if (gres_g_recv_stepd(sock, msg, &auto_gres_flag) != SLURM_SUCCESS)
 		fatal("Failed to read gres.conf from slurmd.");
+	gpu_gather.auto_gpu_flag = auto_gres_flag;
+#endif
 
 	/* Receive mpi.conf from slurmd */
 	if ((step_type == LAUNCH_TASKS) &&

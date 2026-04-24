@@ -360,6 +360,9 @@ extern int slurm_step_launch(slurm_step_ctx_t *ctx,
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
 	launch.apptype = params->apptype;
 #endif
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+	launch.cpu_count = ctx->step_req->cpu_count;
+#endif
 	if (params->buffered_stdio)
 		launch.flags |= LAUNCH_BUFFERED_IO;
 	if (params->labelio)
@@ -585,6 +588,9 @@ extern int slurm_step_launch_add(slurm_step_ctx_t *ctx,
 	launch.ifname = params->remote_input_filename;
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
 	launch.apptype = params->apptype;
+#endif
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+	launch.cpu_count = ctx->step_req->cpu_count;
 #endif
 	if (params->buffered_stdio)
 		launch.flags	|= LAUNCH_BUFFERED_IO;

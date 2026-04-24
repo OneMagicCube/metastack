@@ -2747,15 +2747,25 @@ extern int remove_common(kingbase_conn_t *kingbase_conn,
 		if (cluster_centric) {
 			xstrfmtcat(query,
 				   "update `%s_%s` set mod_time=%ld, "
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+				   "deleted=1 where (deleted=0 or deleted=%d) and (%s);",
+				   cluster_name, table, now, SLURMDB_USER_DEACTIVATED, name_char);
+#else
 				   "deleted=1 where deleted=0 and (%s);",
 				   cluster_name, table, now, name_char);
+#endif
 		} else if (table == federation_table) {
 			xstrfmtcat(query,
 				   "update %s set "
 				   "mod_time=%ld, deleted=1, "
 				   "flags=DEFAULT "
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+				   "where (deleted=0 or deleted=%d) and (%s);",
+				   federation_table, now, SLURMDB_USER_DEACTIVATED, 
+#else
 				   "where deleted=0 and (%s);",
 				   federation_table, now,
+#endif
 				   name_char);
 		} else if (table == qos_table) {
 			xstrfmtcat(query,
@@ -2789,13 +2799,23 @@ extern int remove_common(kingbase_conn_t *kingbase_conn,
 				   "usage_factor=DEFAULT, "
 				   "usage_thres=DEFAULT, "
 				   "limit_factor=DEFAULT "
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+				   "where (deleted=0 or deleted=%d) and (%s);",
+				   qos_table, now, SLURMDB_USER_DEACTIVATED, name_char);
+#else
 				   "where deleted=0 and (%s);",
 				   qos_table, now, name_char);
+#endif
 		} else {
 			xstrfmtcat(query,
 				   "update %s set mod_time=%ld, deleted=1 "
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+				   "where (deleted=0 or deleted=%d) and (%s);",
+				   table, now, SLURMDB_USER_DEACTIVATED, name_char);
+#else
 				   "where deleted=0 and (%s);",
 				   table, now, name_char);
+#endif
 		}
 	}
 
@@ -2863,8 +2883,13 @@ extern int remove_common(kingbase_conn_t *kingbase_conn,
 		 * already done this, so don't
 		 */
 		query = xstrdup_printf(
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+			"select distinct t2.id_assoc from `%s_%s` as t2 where %s and (t2.deleted=0 or t2.deleted=%d);",
+			cluster_name, assoc_table, assoc_char, SLURMDB_USER_DEACTIVATED);
+#else
 			"select distinct t2.id_assoc from `%s_%s` as t2 where %s and t2.deleted=0;",
 			cluster_name, assoc_table, assoc_char);
+#endif
 
 		DB_DEBUG(DB_ASSOC, kingbase_conn->conn, "query\n%s", query);
 		//info("[query] line %d, %s: query: %s", __LINE__, __func__, query);
@@ -3832,23 +3857,43 @@ extern int acct_storage_p_add_reservation(kingbase_conn_t *kingbase_conn,
 }
 
 extern List acct_storage_p_modify_users(kingbase_conn_t *kingbase_conn, uint32_t uid,
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+					bool is_activate,
+#endif
 					slurmdb_user_cond_t *user_cond,
 					slurmdb_user_rec_t *user)
 {
 	if (kingbase_db_query(kingbase_conn, "BEGIN")!= SLURM_SUCCESS) {
 		return NULL;
 	}
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	if (is_activate)
+		return as_kingbase_activate_users(kingbase_conn, uid, user_cond, user);
+	else
+		return as_kingbase_modify_users(kingbase_conn, uid, user_cond, user);
+#else
 	return as_kingbase_modify_users(kingbase_conn, uid, user_cond, user);
+#endif
 }
 
 extern List acct_storage_p_modify_accts(kingbase_conn_t *kingbase_conn, uint32_t uid,
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+					bool is_activate,
+#endif
 					slurmdb_account_cond_t *acct_cond,
 					slurmdb_account_rec_t *acct)
 {
 	if (kingbase_db_query(kingbase_conn, "BEGIN")!= SLURM_SUCCESS) {
 		return NULL;
 	}
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	if (is_activate)
+		return as_kingbase_activate_accts(kingbase_conn, uid, acct_cond, acct);
+	else
+		return as_kingbase_modify_accts(kingbase_conn, uid, acct_cond, acct);
+#else
 	return as_kingbase_modify_accts(kingbase_conn, uid, acct_cond, acct);
+#endif
 }
 
 extern List acct_storage_p_modify_clusters(kingbase_conn_t *kingbase_conn,
@@ -3864,13 +3909,23 @@ extern List acct_storage_p_modify_clusters(kingbase_conn_t *kingbase_conn,
 
 extern List acct_storage_p_modify_assocs(
 	kingbase_conn_t *kingbase_conn, uint32_t uid,
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	bool is_activate,
+#endif
 	slurmdb_assoc_cond_t *assoc_cond,
 	slurmdb_assoc_rec_t *assoc)
 {
 	if (kingbase_db_query(kingbase_conn, "BEGIN")!= SLURM_SUCCESS) {
 		return NULL;
 	}
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	if (is_activate)
+		return as_kingbase_activate_assocs(kingbase_conn, uid, assoc_cond, assoc);
+	else
+		return as_kingbase_modify_assocs(kingbase_conn, uid, assoc_cond, assoc);
+#else
 	return as_kingbase_modify_assocs(kingbase_conn, uid, assoc_cond, assoc);
+#endif
 }
 
 extern List acct_storage_p_modify_federations(
@@ -3936,12 +3991,19 @@ extern int acct_storage_p_modify_reservation(kingbase_conn_t *kingbase_conn,
 }
 
 extern List acct_storage_p_remove_users(kingbase_conn_t *kingbase_conn, uint32_t uid,
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+					bool is_deactivate,
+#endif
 					slurmdb_user_cond_t *user_cond)
 {
 	if (kingbase_db_query(kingbase_conn, "BEGIN")!= SLURM_SUCCESS) {
 		return NULL;
 	}
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	return as_kingbase_remove_users(kingbase_conn, uid, is_deactivate, user_cond);
+#else
 	return as_kingbase_remove_users(kingbase_conn, uid, user_cond);
+#endif
 }
 
 extern List acct_storage_p_remove_coord(kingbase_conn_t *kingbase_conn, uint32_t uid,
@@ -3951,17 +4013,28 @@ extern List acct_storage_p_remove_coord(kingbase_conn_t *kingbase_conn, uint32_t
 	if (kingbase_db_query(kingbase_conn, "BEGIN")!= SLURM_SUCCESS) {
 		return NULL;
 	}
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	return as_kingbase_remove_coord(kingbase_conn, uid, false, acct_list, user_cond);
+#else
 	return as_kingbase_remove_coord(kingbase_conn, uid, acct_list, user_cond);
+#endif
 }
 
 extern List acct_storage_p_remove_accts(kingbase_conn_t *kingbase_conn, uint32_t uid,
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+					bool is_deactivate,
+#endif
 					slurmdb_account_cond_t *acct_cond)
 {
 	
 	if (kingbase_db_query(kingbase_conn, "BEGIN")!= SLURM_SUCCESS) {
 		return NULL;
 	}
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	return as_kingbase_remove_accts(kingbase_conn, uid, is_deactivate, acct_cond);
+#else
 	return as_kingbase_remove_accts(kingbase_conn, uid, acct_cond);
+#endif
 }
 
 extern List acct_storage_p_remove_clusters(kingbase_conn_t *kingbase_conn,
@@ -3976,13 +4049,317 @@ extern List acct_storage_p_remove_clusters(kingbase_conn_t *kingbase_conn,
 
 extern List acct_storage_p_remove_assocs(
 	kingbase_conn_t *kingbase_conn, uint32_t uid,
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	bool is_deactivate,
+#endif
 	slurmdb_assoc_cond_t *assoc_cond)
 {
-	if (kingbase_db_query(kingbase_conn, "BEGIN")!= SLURM_SUCCESS) {
+		if (kingbase_db_query(kingbase_conn, "BEGIN")!= SLURM_SUCCESS) {
 		return NULL;
 	}
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	return as_kingbase_remove_assocs(kingbase_conn, uid, is_deactivate, assoc_cond);
+#else
 	return as_kingbase_remove_assocs(kingbase_conn, uid, assoc_cond);
+#endif
 }
+
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+
+/* Activate deactivated entries and modify info per input parameters.
+ */
+extern int activate_common(kingbase_conn_t *kingbase_conn,
+			 uint16_t type,
+			 time_t now,
+			 char *user_name,
+			 char *table,
+			 char *cond_char,
+			 char *vals,
+			 char *cluster_name)
+{
+	char *query = NULL;
+	int rc = SLURM_SUCCESS;
+	char *tmp_cond_char = slurm_add_slash_to_quotes2(cond_char);
+	char *tmp_vals = NULL;
+	bool cluster_centric = true;
+
+	/* figure out which tables we need to append the cluster name to */
+	if ((table == cluster_table) || (table == acct_coord_table)
+	    || (table == acct_table) || (table == qos_table)
+	    || (table == txn_table) || (table == user_table)
+	    || (table == res_table) || (table == clus_res_table)
+	    || (table == federation_table))
+		cluster_centric = false;
+
+	if (vals && vals[1])
+		tmp_vals = slurm_add_slash_to_quotes2(vals+2);
+
+	if (cluster_centric) {
+		xassert(cluster_name);
+		xstrfmtcat(query,
+			   "update `%s_%s` set mod_time=%ld%s "
+			   "where deleted=%d and %s;",
+			   cluster_name, table, now, vals, SLURMDB_USER_DEACTIVATED, cond_char);
+		xstrfmtcat(query,
+			   "insert into %s "
+			   "(timestamp, action, name, cluster, actor, info) "
+			   "values (%ld, %d, '%s', '%s', '%s', '%s');",
+			   txn_table,
+			   now, type, tmp_cond_char, cluster_name,
+			   user_name, tmp_vals);
+	} else {
+		xstrfmtcat(query,
+			   "update %s set mod_time=%ld%s "
+			   "where deleted=%d and %s;",
+			   table, now, vals, SLURMDB_USER_DEACTIVATED, cond_char);
+		xstrfmtcat(query,
+			   "insert into %s "
+			   "(timestamp, action, name, actor, info) "
+			   "values (%ld, %d, '%s', '%s', '%s');",
+			   txn_table,
+			   now, type, tmp_cond_char, user_name, tmp_vals);
+	}
+	xfree(tmp_cond_char);
+	xfree(tmp_vals);
+	DB_DEBUG(DB_ASSOC, kingbase_conn->conn, "query\n%s", query);
+	//info("[query] line %d, %s: query: %s", __LINE__, __func__, query);	
+     
+	fetch_flag_t* fetch_flag = NULL;
+	fetch_result_t* data_rt = NULL;
+	fetch_flag = set_fetch_flag(false, false, false);
+	data_rt = xmalloc(sizeof(fetch_result_t));
+	rc = kingbase_for_fetch(kingbase_conn, query, fetch_flag, data_rt);
+	free_res_data(data_rt, fetch_flag); 
+	xfree(query);
+	if (rc == SLURM_ERROR ) {
+		return SLURM_ERROR;
+	}
+	return SLURM_SUCCESS;
+}
+
+/* Every option in assoc_char should have a 't1.' infront of it. */
+extern int deactivate_common(kingbase_conn_t *kingbase_conn,
+			 uint16_t type,
+			 time_t now,
+			 char *user_name,
+			 char *table,
+			 char *name_char,
+			 char *assoc_char,
+			 char *cluster_name,
+			 List ret_list,
+			 bool *jobs_running,
+			 bool *default_account)
+{
+	int rc = SLURM_SUCCESS;
+	char *query = NULL;
+	char *loc_assoc_char = NULL;
+	KCIResult *result = NULL;
+	int row;
+	time_t day_old = now - DELETE_SEC_BACK;
+	char *tmp_name_char = NULL;
+	bool cluster_centric = true;
+	uint32_t rpc_version;
+	uint32_t smallest_lft = 0xFFFFFFFF;
+
+	/* figure out which tables we need to append the cluster name to */
+	if ((table == cluster_table) || (table == acct_coord_table)
+	    || (table == acct_table) || (table == qos_table)
+	    || (table == txn_table) || (table == user_table)
+	    || (table == res_table) || (table == clus_res_table)
+	    || (table == federation_table))
+		cluster_centric = false;
+
+	if (((table == assoc_table) || (table == acct_table))) {
+		if (_check_is_def_acct_before_remove(kingbase_conn,
+						     cluster_name,
+						     assoc_char,
+						     ret_list,
+						     default_account))
+			return SLURM_SUCCESS;
+	}
+
+	if ((table == acct_coord_table) || (table == res_table)
+	    || (table == clus_res_table) || (table == federation_table)
+		|| (table == qos_table) || (table == wckey_table)) {
+		/* This doesn't apply for these tables since we are
+		 * only looking for association type tables.
+		 */
+	} else if (table != assoc_table) {
+		/* first check to see if we are running jobs now */
+		if (_check_jobs_before_remove(
+			    kingbase_conn, cluster_name, assoc_char,
+			    ret_list, jobs_running) || (*jobs_running))
+			return SLURM_SUCCESS;
+
+	} else {
+		/* first check to see if we are running jobs now */
+		if (_check_jobs_before_remove_assoc(
+			    kingbase_conn, cluster_name, name_char,
+			    ret_list, jobs_running) || (*jobs_running))
+			return SLURM_SUCCESS;
+	}
+
+	if (table != assoc_table) {
+		if (cluster_centric) {
+			xstrfmtcat(query,
+				   "update `%s_%s` set mod_time=%ld, "
+				   "deleted=%d where deleted=0 and (%s);",
+				   cluster_name, table, now, SLURMDB_USER_DEACTIVATED, name_char);
+		} else {
+			xstrfmtcat(query,
+				   "update %s set mod_time=%ld, deleted=%d "
+				   "where deleted=0 and (%s);",
+				   table, now, SLURMDB_USER_DEACTIVATED, name_char);
+		}
+	}
+
+	/* If we are removing assocs use the assoc_char since the
+	   name_char has lft between statements that can change over
+	   time.  The assoc_char has the actual ids of the assocs
+	   which never change.
+	*/
+	if (type == DBD_REMOVE_ASSOCS && assoc_char)
+		tmp_name_char = slurm_add_slash_to_quotes2(assoc_char);
+	else
+		tmp_name_char = slurm_add_slash_to_quotes2(name_char);
+
+	if (cluster_centric)
+		xstrfmtcat(query,
+			   "insert into %s (timestamp, action, name, "
+			   "actor, cluster) values "
+			   "(%ld, %d, '%s', '%s', '%s');",
+			   txn_table,
+			   now, type, tmp_name_char, user_name, cluster_name);
+	else
+		xstrfmtcat(query,
+			   "insert into %s (timestamp, action, name, actor) "
+			   "values (%ld, %d, '%s', '%s');",
+			   txn_table,
+			   now, type, tmp_name_char, user_name);
+
+	xfree(tmp_name_char);
+
+	DB_DEBUG(DB_ASSOC, kingbase_conn->conn, "query\n%s", query);
+	//info("[query] line %d, %s: query: %s", __LINE__, __func__, query);	
+	fetch_flag_t* fetch_flag = NULL;
+	fetch_result_t* data_rt = NULL;
+
+	fetch_flag = set_fetch_flag(false, false, false);
+	data_rt = xmalloc(sizeof(fetch_result_t));
+	rc = kingbase_for_fetch(kingbase_conn, query, fetch_flag, data_rt);
+	free_res_data(data_rt, fetch_flag);
+	xfree(query);
+	if (rc == SLURM_ERROR ) {
+		reset_kingbase_conn(kingbase_conn);
+		return SLURM_ERROR;
+	}else if((table == acct_coord_table)
+		|| (table == wckey_table)
+		|| (table == clus_res_table)
+		|| (table == res_table)
+		|| (table == federation_table)
+		|| (table == qos_table)) { 
+			return SLURM_SUCCESS;
+	}
+	/* mark deleted=1 or remove completely the accounting tables
+	 */
+	if (table != assoc_table) {
+		if (!assoc_char) {
+			error("no assoc_char");
+			if (kingbase_conn->flags & DB_CONN_FLAG_ROLLBACK) {
+				kingbase_db_rollback(kingbase_conn);
+			}
+			list_flush(kingbase_conn->update_list);
+			return SLURM_ERROR;
+		}
+
+		/*
+		 * If we are doing this on an assoc_table we have
+		 * already done this, so don't
+		 */
+		query = xstrdup_printf(
+			"select distinct t2.id_assoc from `%s_%s` as t2 where %s and t2.deleted=0;",
+			cluster_name, assoc_table, assoc_char);
+
+		DB_DEBUG(DB_ASSOC, kingbase_conn->conn, "query\n%s", query);
+		//info("[query] line %d, %s: query: %s", __LINE__, __func__, query);
+		result = kingbase_db_query_ret(kingbase_conn, query, 0);
+		if (KCIResultGetStatusCode(result) != EXECUTE_TUPLES_OK) {
+			xfree(query);
+			if (kingbase_conn->flags & DB_CONN_FLAG_ROLLBACK) {
+				kingbase_db_rollback(kingbase_conn);
+			}
+			list_flush(kingbase_conn->update_list);
+			KCIResultDealloc(result);
+			return SLURM_ERROR;
+		}
+		xfree(query);
+
+		rc = 0;
+		xfree(loc_assoc_char);
+		int tmp_inx = 0;
+        row = KCIResultGetRowCount(result);
+		while (tmp_inx < row) {
+			slurmdb_assoc_rec_t *rem_assoc = NULL;
+			if (loc_assoc_char)
+				xstrcat(loc_assoc_char, " or ");
+			xstrfmtcat(loc_assoc_char, "id_assoc=%s", KCIResultGetColumnValue(result,tmp_inx,0));
+
+			rem_assoc = xmalloc(sizeof(slurmdb_assoc_rec_t));
+			rem_assoc->id = slurm_atoul(KCIResultGetColumnValue(result, tmp_inx, 0 ));
+			rem_assoc->cluster = xstrdup(cluster_name);
+			if (addto_update_list(kingbase_conn->update_list,
+					      SLURMDB_REMOVE_ASSOC,
+					      rem_assoc) != SLURM_SUCCESS)
+				error("couldn't add to the update list");
+			tmp_inx++;
+		}
+		KCIResultDealloc(result);
+	} else
+		loc_assoc_char = assoc_char;
+
+	if (!loc_assoc_char) {
+		debug2("No associations with object being deleted");
+		return rc;
+	}
+
+	query = xstrdup_printf("update `%s_%s` as t1 set "
+			       "mod_time=%ld, deleted=%d "
+			       "where (%s);",
+			       cluster_name, assoc_table, now,
+			       SLURMDB_USER_DEACTIVATED, loc_assoc_char);
+
+	if (table != assoc_table)
+		xfree(loc_assoc_char);
+
+	DB_DEBUG(DB_ASSOC, kingbase_conn->conn, "query\n%s", query);
+	//info("[query] line %d, %s: query: %s", __LINE__, __func__, query);
+
+	fetch_flag = set_fetch_flag(false, false, false);
+	data_rt = xmalloc(sizeof(fetch_result_t));
+	rc = kingbase_for_fetch(kingbase_conn, query, fetch_flag, data_rt);
+	xfree(query);
+	if (rc != SLURM_SUCCESS) {
+		reset_kingbase_conn(kingbase_conn);
+	}
+    free_res_data(data_rt, fetch_flag); 
+
+	/* This already happened before, but we need to run it again
+	   since the first time we ran it we didn't know if we were
+	   going to remove the above associations.
+	*/
+	if ((rc == SLURM_SUCCESS) && (smallest_lft != 0xFFFFFFFF)) {
+		rc = as_kingbase_get_modified_lfts(kingbase_conn,
+						cluster_name,
+						smallest_lft);
+		if (rc != SLURM_SUCCESS) {
+			reset_kingbase_conn(kingbase_conn);
+		}
+	}
+
+	return rc;
+}
+
+#endif
 
 extern List acct_storage_p_remove_federations(
 					kingbase_conn_t *kingbase_conn, uint32_t uid,
@@ -4021,7 +4398,11 @@ extern List acct_storage_p_remove_wckeys(kingbase_conn_t *kingbase_conn,
 	if (kingbase_db_query(kingbase_conn, "BEGIN")!= SLURM_SUCCESS) {
 		return NULL;
 	}
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	return as_kingbase_remove_wckeys(kingbase_conn, uid, false, wckey_cond);
+#else
 	return as_kingbase_remove_wckeys(kingbase_conn, uid, wckey_cond);
+#endif
 }
 
 extern int acct_storage_p_remove_reservation(kingbase_conn_t *kingbase_conn,
@@ -4098,7 +4479,11 @@ extern List acct_storage_p_get_problems(kingbase_conn_t *kingbase_conn, uint32_t
 	if (check_connection(kingbase_conn) != SLURM_SUCCESS)
 		return NULL;
 
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+	if (!is_user_min_admin_level(kingbase_conn, uid, SLURMDB_ADMIN_READ_ONLY)) {
+#else
 	if (!is_user_min_admin_level(kingbase_conn, uid, SLURMDB_ADMIN_OPERATOR)) {
+#endif
 		errno = ESLURM_ACCESS_DENIED;
 		return NULL;
 	}

@@ -1124,7 +1124,11 @@ extern buf_t *pack_all_nodes(uint16_t show_flags, uid_t uid,
 	buf_t *buffer;
 	time_t now = time(NULL);
 	node_record_t *node_ptr;
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+	bool hidden, privileged = validate_read_only_admin(uid);
+#else
 	bool hidden, privileged = validate_operator(uid);
+#endif
 	static bool inited = false;
 	static config_record_t blank_config = {0};
 	static node_record_t blank_node = {0};
@@ -1241,7 +1245,11 @@ extern buf_t *pack_one_node(uint16_t show_flags, uid_t uid, char *node_name,
 	buf_t *buffer;
 	time_t now = time(NULL);
 	node_record_t *node_ptr;
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+	bool hidden, privileged = validate_read_only_admin(uid);
+#else
 	bool hidden, privileged = validate_operator(uid);
+#endif
 #ifdef __METASTACK_OPT_PART_VISIBLE
 	pack_node_info_t pack_info = {
 		.uid = uid,
@@ -6501,7 +6509,11 @@ extern buf_t *pack_one_cache_node(uint16_t show_flags, uid_t uid, char *node_nam
 	buf_t *buffer = NULL;
 	time_t now = time(NULL);
 	node_record_t *node_ptr = NULL;
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+	bool hidden, privileged = validate_read_only_admin(uid);
+#else
 	bool hidden, privileged = validate_operator(uid);
+#endif
 #ifdef __METASTACK_OPT_PART_VISIBLE
 	pack_node_info_t pack_info = {
 		.uid = uid,
@@ -6597,7 +6609,11 @@ extern buf_t *pack_all_cache_node(uint16_t show_flags, uid_t uid,
 	buf_t *buffer = NULL;
 	time_t now = time(NULL);
 	node_record_t *node_ptr = NULL;
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+	bool hidden, privileged = validate_read_only_admin(uid);
+#else
 	bool hidden, privileged = validate_operator(uid);
+#endif
 	static bool inited = false;
 	static config_record_t blank_config = {0};
 	static node_record_t blank_node = {0};

@@ -866,6 +866,14 @@ static void _record_profile2(struct jobacctinfo *jobacct, write_t *send)
 		FIELD_HAVERECOGN,
 		FIELD_CPUTIME,
 #endif
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+		FIELD_STEPDCU,
+		FIELD_STEPDCUMEM,
+		FIELD_GRESTHRESHOLD,
+#endif
+#ifdef __METASTACK_NEW_PROFILE_TIME_SYNC
+		FIELD_SENDTIMESTAPM,
+#endif
 		FIELD_CNT
 	};
 
@@ -888,7 +896,7 @@ static void _record_profile2(struct jobacctinfo *jobacct, write_t *send)
 #endif
 	} data[FIELD_CNT];
 
-#ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
+
 	/* Initializing all  member*/
 	data[FIELD_CPUTHRESHOLD].d = 0;
 	data[FIELD_STEPCPU].d = 0;
@@ -900,12 +908,22 @@ static void _record_profile2(struct jobacctinfo *jobacct, write_t *send)
 	data[FIELD_TIMER].u64 = 0;
 	data[FIELD_EVENTTYPE1START].u64 = 0;
 	data[FIELD_EVENTTYPE1END].u64 = 0;
+#ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
 	data[FIELD_SENDFLAG].u64 = 0;
 	data[FIELD_APPTYPESTEP].str = NULL;
 	data[FIELD_HAVERECOGN].u64 = 0;
 	data[FIELD_APPTYPECLI].str = NULL;
 	data[FIELD_CPUTIME].u64 = 0;
 #endif
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+	data[FIELD_STEPDCU].d = 0;
+	data[FIELD_STEPDCUMEM].d = 0;
+	data[FIELD_GRESTHRESHOLD].d = 0;
+#endif
+#ifdef __METASTACK_NEW_PROFILE_TIME_SYNC
+	data[FIELD_SENDTIMESTAPM].u64 = 0;
+#endif
+
 
 	char str[256];
 
@@ -934,14 +952,21 @@ static void _record_profile2(struct jobacctinfo *jobacct, write_t *send)
 	if (send->send_flag2 & JOBACCT_GATHER_PROFILE_ABNORMAL) {
 	/* Profile Mem and VMem as KB */
 		if (jobacct->node_alloc_cpu > 0) {
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+			data[FIELD_CPUTHRESHOLD].d = send->cpu_threshold;
+			data[FIELD_STEPCPU].d = jobacct->cpu_step_real;
+			data[FIELD_STEPCPUAVE].d = jobacct->cpu_step_ave;
+#else
 			data[FIELD_CPUTHRESHOLD].d = send->cpu_threshold / jobacct->node_alloc_cpu;
 			data[FIELD_STEPCPU].d = jobacct->cpu_step_real / jobacct->node_alloc_cpu;
-			data[FIELD_STEPCPUAVE].d = jobacct->cpu_step_ave / jobacct->node_alloc_cpu;	
+			data[FIELD_STEPCPUAVE].d = jobacct->cpu_step_ave / jobacct->node_alloc_cpu;
+#endif
 		} else {
 			data[FIELD_CPUTHRESHOLD].d = 0;
 			data[FIELD_STEPCPU].d = 0;
 			data[FIELD_STEPCPUAVE].d = 0;			
 		}
+
 
 		data[FIELD_STEPMEM].d = jobacct->mem_step / 1024;
 		data[FIELD_STEPVMEM].d = jobacct->vmem_step / 1024;	
@@ -949,11 +974,28 @@ static void _record_profile2(struct jobacctinfo *jobacct, write_t *send)
 
 		data[FIELD_FLAG].u64 = send->load_flag;
 		data[FIELD_TIMER].u64 = send->timer;
+
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+		data[FIELD_STEPDCU].d = jobacct->dcu_step_real;
+		//jobacct->dcu_mem_step单位为MB，转换为KB存储
+		data[FIELD_STEPDCUMEM].d = jobacct->dcu_mem_step * 1024;
+		data[FIELD_GRESTHRESHOLD].d = send->gres_threshold;
+#endif
+
 		if (send->load_flag & LOAD_LOW) { 
 			data[FIELD_EVENTTYPE1START].u64 = send->cpu_start;
 			data[FIELD_EVENTTYPE1END].u64 = send->cpu_end;
 		}
 
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+		if (send->load_flag & GRES_LOAD_LOW) {
+			data[FIELD_EVENTTYPE1START].u64 = send->cpu_start;
+			data[FIELD_EVENTTYPE1END].u64 = send->cpu_end;
+		}
+#endif
+#ifdef __METASTACK_NEW_PROFILE_TIME_SYNC
+		data[FIELD_SENDTIMESTAPM].u64 = send->send_timestamp;
+#endif
 		if (send->load_flag & PROC_AB) { 
 			/*
 				Since the acquisition period is a fixed interval, there is no need to record the start
@@ -1071,6 +1113,9 @@ static void _record_profile(struct jobacctinfo *jobacct)
 		data[FIELD_CPUTIME].d = 0;
 		data[FIELD_CPUUTIL].d = 0.0;
 		data[FIELD_GPUUTIL].d = 0.0;
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU		
+		data[FIELD_GPUMEM].u64 = 0;
+#endif
 		data[FIELD_READ].d = 0.0;
 		data[FIELD_WRITE].d = 0.0;
 	} else {
@@ -1285,6 +1330,18 @@ static void update_jobacct_ext( struct jobacctinfo *jobacct,
 		jobacct->max_cpu_util = 0.0;
 		jobacct->pre1_acct_time = jobacct->first_acct_time;
 		jobacct->pre1_total_cputime = cpu_calc;
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+		//jobacct->dcu_step_ave  = 0;
+		jobacct->dcu_step_max  = 0;
+		jobacct->dcu_step_min  = 0;
+		jobacct->dcu_step_real = 0;
+
+		jobacct->dcu_mem_step_max = 0;
+		jobacct->dcu_mem_step_min = 0;
+		jobacct->dcu_mem_step     = 0;
+		jobacct->gres_threshold = 100;
+		jobacct->alloc_gres = 0;
+#endif
 	} else {
 		struct timeval now_time;
 		gettimeofday(&now_time, NULL);
@@ -1473,6 +1530,13 @@ extern void jag_common_poll_data(List task_list, uint64_t cont_id,
 {
 	/* Update the data */
 	uint64_t total_job_mem = 0, total_job_vsize = 0;
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+	uint64_t total_job_dcu_mem = 0;
+	double total_job_dcu_util = 0.0;
+	static int gpumem_pos = -1;
+	static int gpuutil_pos = -1;
+	int count_list = 0;
+#endif
 	uint32_t last_taskid = NO_VAL;
 	list_itr_t *itr;
 	jag_prec_t *prec = NULL, tmp_prec;
@@ -1535,9 +1599,14 @@ extern void jag_common_poll_data(List task_list, uint64_t cont_id,
 
 	if (!list_count(prec_list) || !task_list || !list_count(task_list))
 		goto finished;	/* We have no business being here! */
-
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+	count_list = list_count(task_list);
+#endif
 	itr = list_iterator_create(task_list);
 	while ((jobacct = list_next(itr))) {
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+		count_list = count_list - 1;
+#endif
 		double cpu_calc;
 		double last_total_cputime;
 		jag_prec_t *permanent_anc;
@@ -1669,22 +1738,66 @@ extern void jag_common_poll_data(List task_list, uint64_t cont_id,
 				prec->tres_data[i].size_write;
 		}
 
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+		gpu_get_tres_pos(&gpumem_pos, &gpuutil_pos);
+		if (gpumem_pos != -1) {
+			if(jobacct->tres_usage_in_tot[gpumem_pos]!= INFINITE64) {
+				/* Profile gpumem as MB */
+				total_job_dcu_mem += (jobacct->tres_usage_in_tot[gpumem_pos] / 1048576);
+			}
+			if(jobacct->tres_usage_in_tot[gpuutil_pos] != INFINITE64) {
+				total_job_dcu_util += (double)jobacct->tres_usage_in_tot[gpuutil_pos];
+			}
+		}	
+		if (count_list == 0 && (gpumem_pos != -1)) {
+			/* Assign the value to the last structure of the linked list */
+			jobacct->dcu_step_real     =  total_job_dcu_util;
+			jobacct->dcu_step_max      =  MAX(jobacct->dcu_step_max, total_job_dcu_util);
+			jobacct->dcu_step_min      =  MIN(jobacct->dcu_step_min, total_job_dcu_util);
+			jobacct->dcu_mem_step  	   =  total_job_dcu_mem;
+			jobacct->dcu_mem_step_max  =  MAX(jobacct->dcu_mem_step_max, total_job_dcu_mem);
+			jobacct->dcu_mem_step_min  =  MIN(jobacct->dcu_mem_step_min, total_job_dcu_mem);
+			debug3("GPUUtil=%f and MemMB=%ld",total_job_dcu_util, total_job_dcu_mem );
+		} else if (gpumem_pos != -1) {
+			/* Ensure that the loop process is 0. */
+			jobacct->dcu_step_real     =  0;
+			jobacct->dcu_step_max      =  0;
+			jobacct->dcu_step_min      =  0;
+			jobacct->dcu_mem_step  	   =  0;
+			jobacct->dcu_mem_step_max  =  0;
+			jobacct->dcu_mem_step_min  =  0;
+		}
+
+#endif
 		total_job_mem += jobacct->tres_usage_in_tot[TRES_ARRAY_MEM];
 		total_job_vsize += jobacct->tres_usage_in_tot[TRES_ARRAY_VMEM];
 #ifdef __METASTACK_NEW_LOAD_ABNORMAL
 		if(data != NULL) {
 			if(stamp == false) {
 				if (data->send_flag2 & JOBACCT_GATHER_PROFILE_ABNORMAL) {
-					jobacct->node_alloc_cpu = data->node_alloc_cpu;
+					jobacct->node_alloc_cpu = data->alloc_cpus;
 					jobacct->timer = data->timer;
 					jobacct->cpu_threshold = data->cpu_threshold;
-
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+					jobacct->gres_threshold = data->gres_threshold;
+					jobacct->alloc_gres = data->alloc_gres;
+#endif
 					if(data->load_flag & LOAD_LOW) { 
 						jobacct->cpu_start[jobacct->cpu_count % JOBACCTINFO_START_END_ARRAY_SIZE] = data->cpu_start;
 						jobacct->cpu_end[jobacct->cpu_count % JOBACCTINFO_START_END_ARRAY_SIZE] = data->cpu_end;
 						jobacct->cpu_count++;
 						jobacct->flag |= data->load_flag;
 					}
+
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+					if (data->load_flag & GRES_LOAD_LOW) {
+						jobacct->gres_start[jobacct->gres_count % JOBACCTINFO_START_END_ARRAY_SIZE] = data->cpu_start;
+						jobacct->gres_end[jobacct->gres_count % JOBACCTINFO_START_END_ARRAY_SIZE] = data->cpu_end;
+						jobacct->gres_count++;
+						jobacct->flag |= data->load_flag;
+					}
+#endif
+
 					if(data->load_flag & PROC_AB) { 
 						jobacct->pid_start[jobacct->pid_count % JOBACCTINFO_START_END_ARRAY_SIZE] = data->pid_start;
 						jobacct->pid_end[jobacct->pid_count % JOBACCTINFO_START_END_ARRAY_SIZE] = data->pid_end;
@@ -1704,10 +1817,18 @@ extern void jag_common_poll_data(List task_list, uint64_t cont_id,
 					jobacct->mem_step = data->mem_step;
 					jobacct->vmem_step = data->vmem_step;
 					jobacct->step_pages = data->step_pages;
-
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+					jobacct->dcu_step_real = data->dcu_step_real;
+					jobacct->dcu_mem_step = data->dcu_mem_step;
+					jobacct->dcu_step_max = MAX(data->dcu_step_real, jobacct->dcu_step_max);
+					jobacct->dcu_step_min = MIN(data->dcu_step_real, jobacct->dcu_step_min);
+					jobacct->dcu_mem_step = data->dcu_mem_step;
+					jobacct->dcu_mem_step_max = MAX(data->dcu_mem_step, jobacct->dcu_mem_step_max);
+					jobacct->dcu_mem_step_min = MIN(data->dcu_mem_step, jobacct->dcu_mem_step_min);
+#endif
 					jobacct->cpu_step_max  = MAX(data->cpu_step_real, jobacct->cpu_step_max);
 					jobacct->cpu_step_min  = MIN(data->cpu_step_real, jobacct->cpu_step_min);
-					jobacct->mem_step_max  = MAX( data->mem_step,  data->mem_step);
+					jobacct->mem_step_max  = MAX( data->mem_step, jobacct->mem_step_max);
 					jobacct->mem_step_min  = MIN( data->mem_step, jobacct->mem_step_min);
 					jobacct->vmem_step_max = MAX(data->vmem_step, jobacct->vmem_step_max);
 					jobacct->vmem_step_min = MIN(data->vmem_step, jobacct->vmem_step_min);				
@@ -1794,7 +1915,9 @@ extern void jag_common_poll_data(List task_list, uint64_t cont_id,
 #endif
 		}
 	}
+
 	list_iterator_destroy(itr);
+
 #ifdef __METASTACK_NEW_LOAD_ABNORMAL
 	if(collect && (collect->step)) {
 		list_itr_t *itr1 = NULL;
@@ -1823,6 +1946,10 @@ extern void jag_common_poll_data(List task_list, uint64_t cont_id,
 		list_iterator_destroy(itr1);
 		collect->cpu_step_real = total_job_cpuutil;
 		collect->cpu_step_ave = total_job_cpuutil_ave;
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+		collect->dcu_step_real = total_job_dcu_util;
+		collect->dcu_mem_step = total_job_dcu_mem;
+#endif
 		collect->mem_step = total_job_mem;
 		collect->vmem_step = total_job_vsize;
 		collect->load_flag = collect->load_flag | pid_status;
@@ -1852,3 +1979,4 @@ extern void jag_common_poll_data(List task_list, uint64_t cont_id,
 finished:
 	processing = 0;
 }
+

@@ -8565,6 +8565,13 @@ extern int validate_job_create_req(job_desc_msg_t * job_desc, uid_t submit_uid,
 		}
 	}
 
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+	if (assoc_mgr_get_admin_level(acct_db_conn,submit_uid) == SLURMDB_ADMIN_READ_ONLY) {
+		error("The read-only administrator does not have permission to submit the job.");
+		return ESLURM_ACCESS_DENIED;
+	}
+#endif
+
 	rc = job_submit_g_submit(job_desc, submit_uid, err_msg);
 	if (rc != SLURM_SUCCESS)
 		return rc;
@@ -11291,7 +11298,11 @@ extern buf_t *pack_all_jobs(uint16_t show_flags, uid_t uid, uint32_t filter_uid,
 	assoc_mgr_lock(&locks);
 	assoc_mgr_fill_in_user(acct_db_conn, &pack_info.user_rec,
 			       accounting_enforce, NULL, true);
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+	pack_info.privileged = validate_read_only_user_rec(&pack_info.user_rec);
+#else
 	pack_info.privileged = validate_operator_user_rec(&pack_info.user_rec);
+#endif
 #ifdef __METASTACK_OPT_PART_VISIBLE
     /**
      * assoc_list may have been channged in func: assoc_mgr_fill_in_user
@@ -11364,7 +11375,11 @@ extern buf_t *pack_spec_jobs(list_t *job_ids, uint16_t show_flags, uid_t uid,
 	assoc_mgr_lock(&locks);
 	assoc_mgr_fill_in_user(acct_db_conn, &pack_info.user_rec,
 			       accounting_enforce, NULL, true);
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+	pack_info.privileged = validate_read_only_user_rec(&pack_info.user_rec);
+#else
 	pack_info.privileged = validate_operator_user_rec(&pack_info.user_rec);
+#endif
 #ifdef __METASTACK_OPT_PART_VISIBLE
 	/**
      * assoc_list may have been channged in func: assoc_mgr_fill_in_user
@@ -11466,7 +11481,11 @@ extern buf_t *pack_one_job(uint32_t job_id, uint16_t show_flags, uid_t uid,
 #endif
 	job_ptr = find_job_record(job_id);
 
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+	if (!(valid_operator = validate_read_only_user_rec(&user_rec)))
+#else
 	if (!(valid_operator = validate_operator_user_rec(&user_rec)))
+#endif
 		hide_job = _hide_job_user_rec(job_ptr, &user_rec, show_flags);
 
 	if (!(show_flags & SHOW_ALL) && job_ptr && IS_JOB_REVOKED(job_ptr))
@@ -17985,7 +18004,11 @@ extern int job_alloc_info_ptr_user(slurmdb_user_rec_t *user, job_record_t *job_p
 	uint8_t prolog = 0;
 
 	if ((slurm_conf.private_data & PRIVATE_DATA_JOBS) &&
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+	    (job_ptr->user_id != user->uid) && !validate_read_only_user_rec(user) &&
+#else
 	    (job_ptr->user_id != user->uid) && !validate_operator_user_rec(user) &&
+#endif
 	    (((slurm_mcs_get_privatedata() == 0) &&
 	      !assoc_mgr_is_user_acct_coord_user_rec(user, job_ptr->account)) ||
 	     ((slurm_mcs_get_privatedata() == 1) &&
@@ -18036,7 +18059,11 @@ extern int job_alloc_info_ptr(uint32_t uid, job_record_t *job_ptr)
 	uint8_t prolog = 0;
 
 	if ((slurm_conf.private_data & PRIVATE_DATA_JOBS) &&
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+	    (job_ptr->user_id != uid) && !validate_read_only_admin(uid) &&
+#else
 	    (job_ptr->user_id != uid) && !validate_operator(uid) &&
+#endif
 	    (((slurm_mcs_get_privatedata() == 0) &&
 	      !assoc_mgr_is_user_acct_coord(acct_db_conn, uid,
 					    job_ptr->account, false)) ||
@@ -23734,7 +23761,11 @@ extern buf_t *pack_spec_cache_jobs(list_t *job_ids, uint16_t show_flags, uid_t u
 	assoc_mgr_lock(&locks);
 	assoc_mgr_fill_in_user(acct_db_conn, &pack_info.user_rec,
 					accounting_enforce, NULL, true);
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+	pack_info.privileged = validate_read_only_user_rec(&pack_info.user_rec);
+#else
 	pack_info.privileged = validate_operator_user_rec(&pack_info.user_rec);
+#endif
 
 #ifdef __METASTACK_OPT_PART_VISIBLE
 	/**
@@ -23806,7 +23837,11 @@ extern buf_t *pack_spec_cache_jobs(list_t *job_ids, uint16_t show_flags, uid_t u
 	assoc_mgr_lock(&locks);
 	assoc_mgr_fill_in_user(acct_db_conn, &pack_info.user_rec,
 						accounting_enforce, NULL, true);
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+	pack_info.privileged = validate_read_only_user_rec(&pack_info.user_rec);
+#else
 	pack_info.privileged = validate_operator_user_rec(&pack_info.user_rec);
+#endif
 #ifdef __METASTACK_OPT_PART_VISIBLE
 	/**
 	 * assoc_list may have been channged in func: assoc_mgr_fill_in_user
@@ -23884,7 +23919,11 @@ extern buf_t *pack_spec_cache_jobs(list_t *job_ids, uint16_t show_flags, uid_t u
 #endif
 
 	job_ptr = find_hash_job_record(job_id, 2);
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+	if (!(valid_operator = validate_read_only_user_rec(&user_rec)))
+#else
 	if (!(valid_operator = validate_operator_user_rec(&user_rec)))
+#endif
 		hide_job = _hide_job_user_rec(job_ptr, &user_rec, show_flags);
 	
 	if (!(show_flags & SHOW_ALL) && job_ptr && IS_JOB_REVOKED(job_ptr))

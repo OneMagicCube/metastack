@@ -1977,6 +1977,9 @@ static const struct {
 	T(SLURMDB_ACCT_FLAG_WASSOC, "WithAssociations"),
 	T(SLURMDB_ACCT_FLAG_WCOORD, "WithCoordinators"),
 	T(SLURMDB_ACCT_FLAG_USER_COORD_NO, "NoUsersAreCoords"),
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	T(SLURMDB_ACCT_FLAG_DEACTIVATED, "Deactivated"),
+#endif
 	T(SLURMDB_ACCT_FLAG_USER_COORD, "UsersAreCoords"),
 	T(SLURMDB_ACCT_FLAG_INVALID, "INVALID"),
 };
@@ -2398,6 +2401,11 @@ extern char *slurmdb_admin_level_str(slurmdb_admin_level_t level)
 	case SLURMDB_ADMIN_NONE:
 		return "None";
 		break;
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+	case SLURMDB_ADMIN_READ_ONLY:
+		return "ReadOnly Administrator";
+		break;
+#endif
 	case SLURMDB_ADMIN_OPERATOR:
 		return "Operator";
 		break;
@@ -2414,6 +2422,10 @@ extern slurmdb_admin_level_t str_2_slurmdb_admin_level(char *level)
 		return SLURMDB_ADMIN_NOTSET;
 	} else if (!xstrncasecmp(level, "None", 1)) {
 		return SLURMDB_ADMIN_NONE;
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+	} else if (!xstrncasecmp(level, "ReadOnly", 1)) {
+		return SLURMDB_ADMIN_READ_ONLY;
+#endif
 	} else if (!xstrncasecmp(level, "Operator", 1)) {
 		return SLURMDB_ADMIN_OPERATOR;
 	} else if (!xstrncasecmp(level, "SuperUser", 1)

@@ -85,8 +85,13 @@ extern List slurmdb_associations_modify(void *db_conn,
 	if (db_api_uid == -1)
 		db_api_uid = getuid();
 
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	return acct_storage_g_modify_assocs(db_conn, db_api_uid, false,
+					    assoc_cond, assoc);
+#else
 	return acct_storage_g_modify_assocs(db_conn, db_api_uid,
 					    assoc_cond, assoc);
+#endif
 }
 
 /*
@@ -100,5 +105,42 @@ extern List slurmdb_associations_remove(
 	if (db_api_uid == -1)
 		db_api_uid = getuid();
 
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	return acct_storage_g_remove_assocs(db_conn, db_api_uid, false, assoc_cond);
+#else
 	return acct_storage_g_remove_assocs(db_conn, db_api_uid, assoc_cond);
+#endif
 }
+
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+/*
+ * activate existing associations in the accounting system
+ * IN:  slurmdb_assoc_cond_t *assoc_cond
+ * IN:  slurmdb_assoc_rec_t *assoc
+ * RET: List containing (char *'s) else NULL on error
+ */
+extern List slurmdb_associations_activate(void *db_conn,
+					slurmdb_assoc_cond_t *assoc_cond,
+					slurmdb_assoc_rec_t *assoc)
+{
+	if (db_api_uid == -1)
+		db_api_uid = getuid();
+
+	return acct_storage_g_modify_assocs(db_conn, db_api_uid, true,
+					    assoc_cond, assoc);
+}
+
+/*
+ * deactivate associations from accounting system
+ * IN:  slurmdb_assoc_cond_t *assoc_cond
+ * RET: List containing (char *'s) else NULL on error
+ */
+extern List slurmdb_associations_deactivate(
+	void *db_conn, slurmdb_assoc_cond_t *assoc_cond)
+{
+	if (db_api_uid == -1)
+		db_api_uid = getuid();
+
+	return acct_storage_g_remove_assocs(db_conn, db_api_uid, true, assoc_cond);
+}
+#endif

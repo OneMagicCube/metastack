@@ -40,6 +40,10 @@
 #include "src/common/uid.h"
 #include "src/common/xstring.h"
 
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+#include "src/common/assoc_mgr.h"
+#endif
+
 static uint32_t tres_cnt = 0;
 static char **tres_names = NULL;
 static uint32_t req_flags = 0;
@@ -619,6 +623,45 @@ static void _print_assoc_mgr_info(assoc_mgr_info_msg_t *msg)
 	}
 }
 
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+static bool validate_read_only_user_uid(uid_t uid)
+{
+    assoc_mgr_info_request_msg_t req;
+    assoc_mgr_info_msg_t *msg = NULL;
+    char *user = NULL;
+    int cc = 0;
+    list_itr_t *itr = NULL;
+    slurmdb_user_rec_t *user_rec = NULL;
+	slurmdb_admin_level_t level = SLURMDB_ADMIN_NOTSET;
+
+    memset(&req, 0, sizeof(assoc_mgr_info_request_msg_t));
+
+
+    user = uid_to_string(uid);
+    req.flags |= ASSOC_MGR_INFO_FLAG_USERS;
+    req.user_list = list_create(xfree_ptr);
+    slurm_addto_char_list_with_case(req.user_list, user, 0);
+
+    cc = slurm_load_assoc_mgr_info(&req, &msg);
+    if (cc == SLURM_SUCCESS && msg->user_list && list_count(msg->user_list)) {
+        itr = list_iterator_create(msg->user_list);
+        while ((user_rec = list_next(itr))) {
+            level =  user_rec->admin_level;
+        }
+		list_iterator_destroy(itr);
+    }
+	
+	xfree(user);
+	slurm_free_assoc_mgr_info_msg(msg);
+	slurm_free_assoc_mgr_info_request_members(&req);
+
+	if (level >= SLURMDB_ADMIN_READ_ONLY)
+		return true;
+	else
+		return false;
+}
+#endif
+
 /* scontrol_print_assoc_mgr_info()
  *
  * Retrieve and display the association manager information
@@ -695,15 +738,22 @@ extern void scontrol_print_assoc_mgr_info(int argc, char **argv)
 		}
 	}
 
-
-	/**fix bug 103731: For slurmctld security, root user cannot perform full queries. */
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+	/**
+	 * fix bug 103731
+	 * For slurmctld security, users with read-only admin privileges or above are prohibited from performing full queries. 
+	 */
+	uid_t uid = getuid();
+	if (((uid == 0) || (uid == slurm_conf.slurm_user_id)|| validate_read_only_user_uid(uid)) &&
+#else
 	if ((geteuid() == 0) && 
+#endif
 		((!req.acct_list || !list_count(req.acct_list)) || !(req.flags & ASSOC_MGR_INFO_FLAG_ASSOC)) && 
 		((!req.qos_list || !list_count(req.qos_list)) || !(req.flags & ASSOC_MGR_INFO_FLAG_QOS))&& 
 		((!req.user_list || !list_count(req.user_list)) || !(req.flags & ASSOC_MGR_INFO_FLAG_USERS))) {
 		exit_code = 1;
 		if (quiet_flag != 1) {
-			fprintf(stderr, "Error: root user must explicitly specify the query target.\n");
+			fprintf(stderr, "Error: Users with read-only admin privileges or above must explicitly specify the query target.\n");
 			fprintf(stderr, "Usage examples:\n"
 							"  scontrol show assoc flags=assoc accounts=<account_name>\n"
 							"  scontrol show assoc flags=users users=<user_name>\n"

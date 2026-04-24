@@ -133,7 +133,19 @@ static char *_get_gpu_type(void)
 #endif
 	} else if (autodetect_flags & GRES_AUTODETECT_GPU_NRT) {
 		return "gpu/nrt";
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+	} else if (autodetect_flags & GRES_AUTODETECT_GPU_DTK) {
+#ifdef HAVE_DTK
+		if (!dlopen("librocm_smi64.so", RTLD_NOW | RTLD_GLOBAL) && 
+			!dlopen("librocm_smi64.so.1", RTLD_NOW | RTLD_GLOBAL))
+			info("Configured with dtk, but that lib wasn't found.");
+		else
+			return "gpu/dtk";
+#else
+		info("Configured with DTK, but dtk isn't enabled during the build.");
+#endif
 	}
+#endif
 
 	return "gpu/generic";
 }

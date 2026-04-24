@@ -170,6 +170,9 @@ typedef struct {
 #ifdef __METASTACK_NEW_GRES_NPU
 #define GRES_AUTODETECT_GPU_DSMI  0x00000020
 #endif
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+#define GRES_AUTODETECT_GPU_DTK 0x00000040
+#endif
 
 #define GRES_AUTODETECT_GPU_FLAGS 0x000000ff /* reserve first 8 bits for gpu
 					      * flags */
@@ -581,8 +584,10 @@ extern void gres_recv_stepd(buf_t *buffer, List *gres_devices);
 /* Send GRES information to slurmstepd on the specified file descriptor */
 extern void gres_g_send_stepd(int fd, slurm_msg_t *msg);
 
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
 /* Receive GRES information from slurmd on the specified file descriptor */
-extern int gres_g_recv_stepd(int fd, slurm_msg_t *msg);
+extern int gres_g_recv_stepd(int fd, slurm_msg_t *msg, uint32_t *auto_flag);
+#endif
 
 /*
  * Pack this node's gres configuration into a buffer

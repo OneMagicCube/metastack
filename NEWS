@@ -3742,6 +3742,7 @@ documents those changes that are of interest to users and administrators.
     fatal warning messages).
  -- configure: replace --with-rmsi_dir option with proper handling for
     --with-rsmi=dir.
+ -- configure: Add the --with-dtk option to enable support for DCU data collection.
  -- Pass additional job environment variables to MailProg.
  -- Add SLURM_JOB_WORK_DIR to Prolog, Epilog.
  -- Removed sched/hold plugin.

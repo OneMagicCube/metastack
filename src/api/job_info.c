@@ -1852,6 +1852,11 @@ extern int slurm_job_node_ready(uint32_t job_id)
 			rc = READY_JOB_FATAL;
 		else	/* EAGAIN */
 			rc = READY_JOB_ERROR;
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+		if (job_rc == ESLURM_ACCESS_DENIED) {
+			rc = ESLURM_ACCESS_DENIED;
+		}
+#endif
 		slurm_free_return_code_msg(resp.data);
 	} else if (resp.msg_type == RESPONSE_PROLOG_EXECUTING) {
 		rc = READY_JOB_ERROR;

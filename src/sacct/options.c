@@ -49,6 +49,10 @@
 #include "sacct.h"
 #include <time.h>
 
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+#include "src/common/assoc_mgr.h"
+#endif
+
 /* getopt_long options, integers but not characters */
 #define OPT_LONG_DELIMITER 0x100
 #define OPT_LONG_LOCAL     0x101
@@ -1317,7 +1321,12 @@ extern void parse_command_line(int argc, char **argv)
 			all_users = true;
 
 	/* set all_users for user root if not requesting any */
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+	if (!job_cond->userid_list && (!params.opt_uid || 
+		assoc_mgr_get_admin_level(acct_db_conn, params.opt_uid) >= SLURMDB_ADMIN_READ_ONLY))
+#else
 	if (!job_cond->userid_list && !params.opt_uid)
+#endif
 		all_users = true;
 
 	if (all_users) {

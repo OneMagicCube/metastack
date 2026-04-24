@@ -2404,7 +2404,14 @@ _handle_aggregate(int fd, stepd_step_rec_t *job, uid_t uid)
 	uint64_t mem_real = 0;
 	uint64_t vmem_real = 0;
 	uint64_t page_fault = 0;
-	uint64_t node_alloc_cpu = 0;
+	// uint64_t node_alloc_cpu = 0;
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+	double dcu_util = 0.0;
+	uint64_t dcu_mem_step = 0;
+#endif
+#ifdef __METASTACK_NEW_PROFILE_TIME_SYNC
+	time_t send_timestamp = 0;
+#endif
 
 	debug("_handle_aggregate for %ps", &job->step_id);
 	debug3("uid = %u", uid);
@@ -2432,7 +2439,14 @@ _handle_aggregate(int fd, stepd_step_rec_t *job, uid_t uid)
 	safe_read(fd, &vmem_real, sizeof(uint64_t));
 	safe_read(fd, &page_fault, sizeof(uint64_t));
 	safe_read(fd, &rank, sizeof(uint32_t));
-	safe_read(fd, &node_alloc_cpu, sizeof(uint64_t));
+	// safe_read(fd, &node_alloc_cpu, sizeof(uint64_t));
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+	safe_read(fd, &dcu_util, sizeof(double));
+	safe_read(fd, &dcu_mem_step, sizeof(uint64_t));
+#endif
+#ifdef __METASTACK_NEW_PROFILE_TIME_SYNC
+	safe_read(fd, &send_timestamp, sizeof(uint64_t));
+#endif
     
     /*Set global variables and transfer data between threads through global variables*/
 	slurm_mutex_lock(&step_gather.lock);
@@ -2442,9 +2456,15 @@ _handle_aggregate(int fd, stepd_step_rec_t *job, uid_t uid)
 	step_gather.step_mem += mem_real;
 	step_gather.step_vmem += vmem_real;
 	step_gather.page_fault += page_fault;
-	step_gather.node_alloc_cpu += node_alloc_cpu;
+	// step_gather.node_alloc_cpu += node_alloc_cpu;
 	step_gather.load_status |= load_flag;
-	
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+	step_gather.step_dcu += dcu_util;
+	step_gather.dcu_mem_step += dcu_mem_step;
+#endif
+#ifdef __METASTACK_NEW_PROFILE_TIME_SYNC
+	step_gather.send_timestamp = send_timestamp;
+#endif
 	step_gather.wait_child_count++; 
 
 	slurm_mutex_unlock(&step_gather.lock);
@@ -2505,6 +2525,9 @@ _handle_stat_jobacct(int fd, stepd_step_rec_t *step, uid_t uid)
 			update_data = false;
 			if (temp_jobacct) {
 				jobacctinfo_aggregate(jobacct, temp_jobacct);
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU				
+				jobacctinfo_aggregate_2(jobacct, temp_jobacct);
+#endif
 				jobacctinfo_destroy(temp_jobacct);
 			}
 			log_flag(JAG, "%s: step_extern cont_id=%"PRIu64" includes pid=%"PRIu64,

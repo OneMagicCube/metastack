@@ -197,6 +197,11 @@ static void _process_abnormal_dete(){
 		if ( xstrcasestr(opt.abnormal_dete, "collect_step=")) {
 			remove_field(opt.acctg_freq, "collect_step=");
 		}
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+		if ( xstrcasestr(opt.abnormal_dete, "avegpuutil=")) {
+			remove_field(opt.acctg_freq, "avegpuutil=");
+		}
+#endif
 	}
 
 	if (opt.acctg_freq) {

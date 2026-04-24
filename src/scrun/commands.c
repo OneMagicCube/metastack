@@ -48,6 +48,10 @@
 #include "src/common/xstring.h"
 #include "src/interfaces/serializer.h"
 
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+#include "src/common/assoc_mgr.h"
+#endif
+
 #include "src/scrun/scrun.h"
 
 static data_for_each_cmd_t _foreach_load_annotation(const char *key,
@@ -164,9 +168,33 @@ static void _load_config_environ()
 	(void) data_list_for_each(denv, _foreach_env, &i);
 }
 
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+static bool _user_is_read_only_admin(void)
+{
+	uid_t uid = getuid();
+	void *db_conn = NULL;
+	slurmdb_admin_level_t level;
+
+	if (!(db_conn = slurmdb_connection_get(NULL)))
+		return false;
+
+	level = assoc_mgr_get_admin_level(db_conn, uid);
+	slurmdb_connection_close(&db_conn);
+
+	return (level == SLURMDB_ADMIN_READ_ONLY);
+}
+#endif
+
 extern int command_create(void)
 {
 	xstrfmtcat(state.spool_dir, "%s/%s/", state.root_dir, state.id);
+
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+	if (_user_is_read_only_admin()) {
+		error("Read-only administrators only have the permission to perform query operations");
+		return ESLURM_ACCESS_DENIED;
+	}
+#endif
 
 	if (mkdirpath(state.spool_dir, S_IRWXU, true)) {
 		if (errno != EEXIST) {
@@ -199,6 +227,13 @@ extern int command_start(void)
 	slurm_msg_t req, *resp = NULL;
 	int rc;
 	slurm_step_id_t step = {0};
+
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+	if (_user_is_read_only_admin()) {
+		error("Read-only administrators only have the permission to perform query operations");
+		return ESLURM_ACCESS_DENIED;
+	}
+#endif
 
 	get_anchor_state();
 	check_state();
@@ -333,6 +368,13 @@ extern int command_kill(void)
 	container_signal_msg_t sig_msg;
 	int rc, signal = state.requested_signal;
 
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+	if (_user_is_read_only_admin()) {
+		error("Read-only administrators only have the permission to perform query operations");
+		return ESLURM_ACCESS_DENIED;
+	}
+#endif
+
 	debug("%s: processing %s", __func__, state.id);
 
 	get_anchor_state();
@@ -417,6 +459,13 @@ extern int command_delete(void)
 	int rc;
 	slurm_msg_t req, *resp = NULL;
 	container_delete_msg_t delete_msg;
+
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+	if (_user_is_read_only_admin()) {
+		error("Read-only administrators only have the permission to perform query operations");
+		return ESLURM_ACCESS_DENIED;
+	}
+#endif
 
 	debug("%s: processing %s", __func__, state.id);
 

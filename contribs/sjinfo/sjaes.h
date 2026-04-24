@@ -28,4 +28,5 @@
 // /* Names for the values of the `has_arg' field of `struct option'.  */
 
 #define KEYDIR "/opt/gridview/slurm"
+
 #endif /* !_SJAES_H */

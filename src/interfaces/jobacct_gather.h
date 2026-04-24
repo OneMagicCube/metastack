@@ -166,24 +166,42 @@ struct jobacctinfo {
 	
 	/* sstat display */
 	uint64_t node_alloc_cpu;
-    uint64_t timer;
+	uint64_t timer;
 	uint32_t cpu_threshold;	
 #endif
 #ifdef __METASTACK_OPT_INFLUXDB_ENFORCE
-    List pjobs;
+	List pjobs;
 #endif
 #ifdef __METASTACK_OPT_INFLUXDB_PERFORMANCE
 	time_t cur_time_ns;
+#endif
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+	//double dcu_step_ave;
+	double dcu_step_max;
+	double dcu_step_min;
+	double dcu_step_real;
+
+	uint64_t dcu_mem_step_max;
+	uint64_t dcu_mem_step_min;
+	uint64_t dcu_mem_step;
+	uint64_t *gres_start;
+	uint64_t *gres_end;
+	uint64_t gres_count;
+	uint32_t gres_threshold;
+	uint64_t alloc_gres;
 #endif
 };
 
 #ifdef __METASTACK_NEW_LOAD_ABNORMAL
 
 #define MAX_SIZE 1000000               /*fifo max size*/
-#define LOAD_LOW   0x0000000000000001  /*cpu event*/
-#define PROC_AB    0x0000000000000010  /*pocess status read only*/
-#define JNODE_STAT 0x0000000000000100
-
+#define 	LOAD_LOW   			0x0000000000000001  /*cpu event*/
+#define 	PROC_AB    			0x0000000000000010  /*pocess status read only*/
+#define 	JNODE_STAT 			0x0000000000000100
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+#define 	GRES_LOAD_LOW 		0x0000000000001000	/* gres event */
+#define		NO_EVENT			0x0000000000000000
+#endif
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
 #define JOBACCT_GATHER_PROFILE_ABNORMAL 0x0000000000000001
 /*
@@ -215,7 +233,7 @@ typedef struct {
 	time_t pid_end;
 	time_t node_start;
 	time_t node_end;
-	uint64_t node_alloc_cpu;
+	// uint64_t node_alloc_cpu;
     uint64_t timer;
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
 	pid_t *pids;
@@ -228,6 +246,16 @@ typedef struct {
 	uint64_t have_recogn; 	 /* Flag whether data needs to be saved or sent to influxdb */
 	char* apptype_cli;	 /* Save the application type obtained by the cli_filter plugin */
 	uint64_t cputime;	/*  cputime is consumed by the most important processes */
+#endif
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+	uint64_t alloc_cpus;
+	uint64_t alloc_gres;
+	double dcu_step_real;
+	uint64_t dcu_mem_step;
+	uint32_t gres_threshold;
+#endif
+#ifdef __METASTACK_NEW_PROFILE_TIME_SYNC
+	time_t send_timestamp;
 #endif
 } write_t;
 
@@ -254,6 +282,13 @@ typedef struct {
 	uint64_t max_cpu_time;
 	char *max_cputime_comm;
 #endif
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+	double dcu_step_real;
+	uint64_t dcu_mem_step;
+#endif
+#ifdef __METASTACK_NEW_PROFILE_TIME_SYNC
+	time_t send_timestamp;
+#endif
 } collection_t;
 extern collection_t share_data;
 
@@ -277,7 +312,14 @@ typedef struct {
 	slurm_addr_t parent_addr_gather;
 	bitstr_t *bits;
 	bool wait_children;
-	uint64_t node_alloc_cpu;
+	// uint64_t node_alloc_cpu;
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+	double step_dcu;
+	uint64_t dcu_mem_step;
+#endif
+#ifdef __METASTACK_NEW_PROFILE_TIME_SYNC
+	time_t send_timestamp;
+#endif
 } step_gather_t;
 extern step_gather_t step_gather;
 
@@ -287,6 +329,13 @@ typedef enum {
 	THREE_TREE,
 	PARENT_SUM
 } type_test_t;
+#ifdef  __METASTACK_NEW_GRES_GATHER_DCU
+/* Used to obtain the specified autodetect flag of a job  */
+typedef struct {
+	uint32_t auto_gpu_flag;
+} step_gpu_t;
+extern step_gpu_t gpu_gather;
+#endif
 #endif
 
 /* Define jobacctinfo_t below to avoid including extraneous slurm headers */

@@ -4228,7 +4228,11 @@ extern buf_t *show_resv(uid_t uid, uint16_t protocol_version)
 
 	/* Create this list once since it will not change during this call. */
 	if ((slurm_conf.private_data & PRIVATE_DATA_RESERVATIONS)
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+	    && !validate_read_only_admin(uid)) {
+#else
 	    && !validate_operator(uid)) {
+#endif
 		slurmdb_assoc_rec_t assoc;
 
 		check_permissions = true;

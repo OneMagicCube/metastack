@@ -244,7 +244,14 @@ static void *_timer_thread(void *args)
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
 	bool apptype_recogn_is_first = true;
 #endif
-
+#ifdef __METASTACK_NEW_PROFILE_TIME_SYNC
+	/* Indicate the difference from the job start time of the assignment */
+	time_t diff1 = 0;
+	/* Used to indicate the moment when the first step_collect thread is activated only after a delay */
+	bool first_stepd = false;
+	/* Used to indicate whether step_collect is activated (only applicable for the first activation) */
+	bool first_crond = false;
+#endif
 #if HAVE_SYS_PRCTL_H
 	if (prctl(PR_SET_NAME, "acctg_prof", NULL, NULL, NULL) < 0) {
 		error("%s: cannot set my name to %s %m",
@@ -264,8 +271,8 @@ static void *_timer_thread(void *args)
 		slurm_mutex_lock(&g_context_lock);
 		now = time(NULL);
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
-		for (i=0; i<PROFILE_CNT + 1; i++) {
-			if(i < PROFILE_CNT) {
+		for (i = 0; i < PROFILE_CNT + 1; i++) {
+			if (i < PROFILE_CNT) {
 				if (acct_gather_suspend_test()) {
 					/* Handle suspended time as if it
 					* didn't happen */
@@ -281,6 +288,37 @@ static void *_timer_thread(void *args)
 				}
 
 				diff = now - acct_gather_profile_timer[i].last_notify;
+#ifdef __METASTACK_NEW_PROFILE_TIME_SYNC
+				/*
+					New logic ensures security verification
+				*/
+				if ((!first_stepd) && (i == PROFILE_STEPD) && rank_stepd 
+						&& (acct_gather_profile_timer[i].freq) && (rank_stepd->job_start > 0) 
+						&& (rank_stepd->timer > 0)) {
+					diff1 = now - rank_stepd->job_start;
+					if (diff1 < 0) {
+						debug2(" The node may be out of time sync. ");
+					} else {
+						if (diff1 == rank_stepd->timer) {
+							first_crond = true;
+						} else if (diff1 < rank_stepd->timer) {
+							continue;
+						} else if (diff1 > rank_stepd->timer) {
+							/*
+								When the start time of the operation step is later than the start time 
+								of the operation by multiple periods, the start time of the delayed 
+								startup is determined by taking the remainder.
+							*/
+							time_t integer = diff1 % rank_stepd->timer;
+							if (integer == 0) 
+								first_crond = true;
+							else
+								continue;
+						}
+					}
+					first_stepd = true;
+				} 
+#endif
 				/* info ("%d is %d and %d", i, */
 				/*       acct_gather_profile_timer[i].freq, */
 				/*       diff); */
@@ -291,14 +329,17 @@ static void *_timer_thread(void *args)
 					cannot be obtained at this time). The main purpose of doing 
 					this is to ensure that the data is obtained as soon as possible. 
 					Besides, the results recognized by cli_filter.lua can also be 
-					cached at the beginning. Ensure that it can be sent to influxdb
+					cached at the beginning. Ensure that it can be sent to TSDB
 					 (in metastack2.3.x, if the job running time is less than the 
 					 acquisition interval, no data will be sent to influxdb).
 				*/
+
 				if (i == PROFILE_APPTYPE && apptype_recogn_is_first)
 					apptype_recogn_is_first = false;
+#endif
+#ifdef __METASTACK_NEW_PROFILE_TIME_SYNC
 				else if (!acct_gather_profile_timer[i].freq
-					|| (diff < acct_gather_profile_timer[i].freq))
+					|| (diff < acct_gather_profile_timer[i].freq) || (i == PROFILE_STEPD && !first_crond)) /* Only delay the startup of the step_collect thread */
 					continue;
 #endif
 				if (!acct_gather_profile_test())
@@ -714,7 +755,9 @@ static void acct_gather_set_parameters(char *freq, char* freq_def, acct_gather_r
 	step_rank->timer = -1;
 	step_rank->cpu_min_load = -1;
 	step_rank->switch_step = false;
-    
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+	step_rank->gpu_min_load = -1;
+#endif    
 	if(!acct_gather_parse_switch(freq_def)) {
 
 		/*Read parameter settings*/
@@ -739,25 +782,43 @@ static void acct_gather_set_parameters(char *freq, char* freq_def, acct_gather_r
 			} 
 			
 		} 
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+		step_rank->gpu_min_load = acct_gather_parse_gpu_load(freq, freq_def);
+        if((step_rank->gpu_min_load < 0 ) || (step_rank->gpu_min_load > 100 )) {
+			if(step_rank->gpu_min_load < 0) {
+				debug3("If the avegpuutil is not set or the value is faulty," 
+				  "set it to the default value.(avegpuutil=0)");	
+				  step_rank->gpu_min_load = 0;			
+			} 
+			if(step_rank->gpu_min_load > 100) {
+				debug3("If the avegpuutil is not set or the value is faulty," 
+				  "set it to the default value.(avegpuutil=100)");
+				  step_rank->gpu_min_load = 100;					
+			} 
+			
+		} 
+#endif
 		/*Job step enable exception detection flag*/
-		enable = acct_gather_parse_monitor(freq, freq_def);
-		
+		enable = acct_gather_parse_monitor(freq, freq_def);	
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
 		/*determine job step type*/
 		switch(step_rank->step) {
 			case DATA_STEP:
-				if(enable == ENABLE_DIG || enable == ENABLE_ALL)
+				if(enable == ENABLE_DIG ||enable == ENABLE_DIG_BATCH|| enable == ENABLE_ALL)
 					step_rank->switch_step = true;
 				break;
 			case EXTERN_STEP:
-				step_rank->switch_step = false;
+				if(enable == ENABLE_ALL)
+					step_rank->switch_step = true;
 				break;
 			case BATCH_STEP:
-				if(enable == ENABLE_BATCH || enable == ENABLE_ALL)
+				if(enable == ENABLE_BATCH ||enable == ENABLE_DIG_BATCH || enable == ENABLE_ALL)
 					step_rank->switch_step = true;
 				break;
 			default:
 				break;
 		}
+#endif
 	}
 }
 
@@ -767,8 +828,9 @@ extern int acct_gather_profile_startpoll(char *freq, char *freq_def, acct_gather
 	int i;
 	uint32_t profile = ACCT_GATHER_PROFILE_NOT_SET;
 #ifdef __METASTACK_NEW_LOAD_ABNORMAL
-	if(step_rank->step != EXTERN_STEP)
-	 	acct_gather_set_parameters(freq, freq_def, step_rank);
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+	acct_gather_set_parameters(freq, freq_def, step_rank);
+#endif
 #endif
 	xassert(plugin_inited != PLUGIN_NOT_INITED);
 
@@ -824,14 +886,13 @@ extern int acct_gather_profile_startpoll(char *freq, char *freq_def, acct_gather
 			 */
 #ifdef __METASTACK_NEW_LOAD_ABNORMAL
 			_set_freq(i, freq, freq_def);
-			if((step_rank->timer > 0) && (step_rank->step != EXTERN_STEP) &&
-						(step_rank->timer <= acct_gather_profile_timer[i].freq)) {
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+			if((step_rank->timer > 0) && (step_rank->timer <= acct_gather_profile_timer[i].freq)) {
 				step_rank->timer = ((acct_gather_profile_timer[i].freq + 59) / 60) * 60;
-			}  else if(step_rank->step == EXTERN_STEP) {
-				step_rank->switch_step = false;
-			}
+			}  
 			jobacct_gather_startpoll(
 				acct_gather_profile_timer[i].freq, step_rank);
+#endif
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
 			if(step_rank->enable_watchdog) {
 				/*set the frequency of new threads*/
@@ -861,14 +922,16 @@ extern int acct_gather_profile_startpoll(char *freq, char *freq_def, acct_gather
 				acct_gather_profile_timer[i].freq);
 			break;
 #ifdef __METASTACK_NEW_LOAD_ABNORMAL
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
 		case PROFILE_STEPD:
-			if((step_rank->timer > 0)  && (step_rank->step != EXTERN_STEP)) {
+			if(step_rank->timer > 0) {
 				/*set the frequency of new threads*/
 				_set_freq_2(i, freq, freq_def, step_rank);
 				jobacct_gather_stepdpoll(
 					acct_gather_profile_timer[i].freq, step_rank);
 			}
 			break;
+#endif
 #endif
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
 		case PROFILE_APPTYPE:
@@ -902,6 +965,10 @@ extern int acct_gather_profile_startpoll(char *freq, char *freq_def, acct_gather
 	load_args->period           = step_rank->period;
 	load_args->init_time        = step_rank->init_time;
 	load_args->style_step       = step_rank->style_step;
+#ifdef __METASTACK_NEW_PROFILE_TIME_SYNC
+	load_args->job_start        = step_rank->job_start;
+	load_args->timer			= step_rank->timer;
+#endif
 	slurm_thread_create(&timer_thread_id, _timer_thread, load_args);
 #else
 	/* create polling thread */

@@ -676,7 +676,11 @@ extern List as_kingbase_get_resvs(kingbase_conn_t *kingbase_conn, uid_t uid,
 
 	if (slurm_conf.private_data & PRIVATE_DATA_RESERVATIONS) {
 		if (!(is_admin = is_user_min_admin_level(
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+			      kingbase_conn, uid, SLURMDB_ADMIN_READ_ONLY))) {
+#else
 			      kingbase_conn, uid, SLURMDB_ADMIN_OPERATOR))) {
+#endif
 			error("Only admins can look at reservations");
 			errno = ESLURM_ACCESS_DENIED;
 			return NULL;

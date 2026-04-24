@@ -2028,7 +2028,11 @@ extern List priority_p_get_priority_factors_list(uid_t uid)
 #ifdef __METASTACK_OPT_PART_VISIBLE
 			if ((slurm_conf.private_data & PRIVATE_DATA_JOBS) &&
 			    (job_ptr->user_id != uid) &&
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+				!validate_read_only_user_rec(&user_rec) &&
+#else
 				!validate_operator_user_rec(&user_rec) &&
+#endif
 			    (((slurm_mcs_get_privatedata() == 0) &&
 			      !assoc_mgr_is_user_acct_coord_user_rec(&user_rec, job_ptr->account))||
 			     ((slurm_mcs_get_privatedata() == 1) &&
@@ -2037,7 +2041,11 @@ extern List priority_p_get_priority_factors_list(uid_t uid)
 #else
 			if ((slurm_conf.private_data & PRIVATE_DATA_JOBS) &&
 			    (job_ptr->user_id != uid) &&
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+			    !validate_read_only_admin(uid) &&
+#else
 			    !validate_operator(uid) &&
+#endif
 			    (((slurm_mcs_get_privatedata() == 0) &&
 			      !assoc_mgr_is_user_acct_coord(acct_db_conn, uid,
 			                                    job_ptr->account,

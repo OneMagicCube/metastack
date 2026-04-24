@@ -238,6 +238,12 @@ extern int addto_update_list(List update_list, slurmdb_update_type_t type,
 	case SLURMDB_REMOVE_USER:
 	case SLURMDB_ADD_COORD:
 	case SLURMDB_REMOVE_COORD:
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	case SLURMDB_ACTIVATE_USER:
+	case SLURMDB_DEACTIVATE_USER:
+	case SLURMDB_ACTIVATE_COORD:
+	case SLURMDB_DEACTIVATE_COORD:
+#endif
 		update_object->objects = list_create(slurmdb_destroy_user_rec);
 		break;
 	case SLURMDB_ADD_TRES:
@@ -245,6 +251,9 @@ extern int addto_update_list(List update_list, slurmdb_update_type_t type,
 		update_object->objects = list_create(slurmdb_destroy_tres_rec);
 		break;
 	case SLURMDB_ADD_ASSOC:
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	case SLURMDB_ACTIVATE_ASSOC:
+#endif
 		/* We are going to send these to the slurmctld's so
 		   lets set up the correct limits to INFINITE instead
 		   of NO_VAL */
@@ -268,6 +277,9 @@ extern int addto_update_list(List update_list, slurmdb_update_type_t type,
 		/* fall through */
 	case SLURMDB_MODIFY_ASSOC:
 	case SLURMDB_REMOVE_ASSOC:
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	case SLURMDB_DEACTIVATE_ASSOC:
+#endif
 		xassert(assoc->cluster);
 		update_object->objects = list_create(
 			slurmdb_destroy_assoc_rec);
@@ -298,6 +310,10 @@ extern int addto_update_list(List update_list, slurmdb_update_type_t type,
 	case SLURMDB_ADD_WCKEY:
 	case SLURMDB_MODIFY_WCKEY:
 	case SLURMDB_REMOVE_WCKEY:
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	case SLURMDB_ACTIVATE_WCKEY:
+	case SLURMDB_DEACTIVATE_WCKEY:
+#endif
 		xassert(wckey->cluster);
 		update_object->objects = list_create(
 			slurmdb_destroy_wckey_rec);

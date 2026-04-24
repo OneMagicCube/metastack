@@ -1517,9 +1517,14 @@ this option on multiple lines.\fR
 
 .TP
 \fBExtraMsgFile\fR
-Allow custom error messages for submission failures, configuring each error code 
-with a message on a separate line. See the configuration example in 
-slurm_warning.conf.example in the etc directory
+Allow custom error messages for submission failures, configuring each error code
+with a message and optional language type on a separate line.
+If configured, localized messages can be provided based on the language
+environment of the client machine. Users can also manually configure the
+preferred message language through the \fBSLURM_LANG\fR environment variable.
+Multi-language messages are supported only in \fBUTF-8\fR encoded
+environments. See the configuration example in
+\fIslurm_warning.conf.example\fR in the \fIetc\fR directory.
 .IP
 
 .TP
@@ -7841,6 +7846,55 @@ when PowerDownOnIdle is set to NO.</p>
 
 Also see \fBSuspendTime\fR.
 .IP
+
+.\" __METASTACK_OPT_APP  
+.TP  
+\fBAppName\fR  
+Define an application configuration record. Multiple \fBAppName\fR lines may  
+appear in the configuration file. The format is:  
+.IP  
+.nf  
+AppName=<\fIname\fR> Version=<\fIversion\fR> [Description=<\fIdesc\fR>] [Watchdog=<\fIwatchdog_name\fR>] [Default=yes|no]  
+.fi  
+.IP  
+.RS  
+.TP  
+\fBVersion\fR (Required)  
+Version string for this application (e.g. "5.7.1").  
+.IP  
+
+.TP  
+\fBDescription\fR  
+A text description of this application.  
+.IP  
+
+.TP  
+\fBWatchdog\fR  
+Name of a WatchDogName entry to bind to this application. The referenced  
+WatchDogName must be defined in the configuration.  
+.IP  
+
+.TP  
+\fBDefault\fR  
+If set to "yes", this application is used as the default when a job does not  
+explicitly specify an application. Only one application may be the default.  
+Default value is "no".  
+.IP  
+
+.TP
+\fBExample:\fR
+.nf
+AppName=vasp Version=5.7.1 Description="VASP 5.7.1" Watchdog=vasp_dog Default=yes  
+AppName=gromacs Version=2024.1 Description="GROMACS 2024.1"  
+.fi
+.IP
+
+.TP
+\fBNOTE:\fR
+The "appname" and "version" are concatenated using "-" to form a unique index. 
+Therefore, it is not recommended to include "-" in the "app-name".
+.RE
+.\" __METASTACK_OPT_APP
 
 .TP
 \fBPreemptMode\fR

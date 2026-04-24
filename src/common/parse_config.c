@@ -1669,7 +1669,7 @@ int s_p_parse_file(s_p_hashtbl_t *hashtbl, uint32_t *hash_val, char *filename,
 				line_number += merged_lines;  
 				continue;  
 			}  
-#endif  
+#endif
 			if (!_parse_next_key(hashtbl, line, &leftover,
 					     ignore_new)) {
 				rc = SLURM_ERROR;

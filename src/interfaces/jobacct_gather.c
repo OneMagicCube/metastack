@@ -139,17 +139,18 @@ step_gather_t step_gather = {
 	{},
 	(bitstr_t *)NULL,
 	true,
+	0.0,
+	0,
 	0
 };
+#ifdef  __METASTACK_NEW_GRES_GATHER_DCU
+step_gpu_t gpu_gather = {
+	0x00000000
+};
+#endif
 
 typedef struct slurm_jobacct_gather_ops {
 	void (*poll_data) (List task_list, uint64_t cont_id, bool profile, collection_t *collect, write_t *data);
-	int (*endpoll)    ();
-	int (*add_task)   (pid_t pid, jobacct_id_t *jobacct_id);
-} slurm_jobacct_gather_ops_t;
-#else
-typedef struct slurm_jobacct_gather_ops {
-	void (*poll_data) (List task_list, uint64_t cont_id, bool profile);
 	int (*endpoll)    ();
 	int (*add_task)   (pid_t pid, jobacct_id_t *jobacct_id);
 } slurm_jobacct_gather_ops_t;
@@ -186,6 +187,13 @@ collection_t share_data = {
 	.vmem_step = 0,
 	.step_pages = 0,
 	.start = 0,
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+	.dcu_step_real = 0.0,
+	.dcu_mem_step = 0,
+#endif
+#ifdef __METASTACK_NEW_PROFILE_TIME_SYNC
+	.send_timestamp = 0,
+#endif
 };
 #endif
 
@@ -255,6 +263,10 @@ static void _init_tres_usage(struct jobacctinfo *jobacct,
 	jobacct->pid_end = xmalloc(alloc_start_end_size);
 	jobacct->node_start = xmalloc(alloc_start_end_size);
 	jobacct->node_end = xmalloc(alloc_start_end_size);
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+	jobacct->gres_start = xmalloc(alloc_start_end_size);
+	jobacct->gres_end = xmalloc(alloc_start_end_size);
+#endif
 #endif
 	for (i = 0; i < jobacct->tres_count; i++) {
 		jobacct->tres_ids[i] =
@@ -320,6 +332,10 @@ static void _free_tres_usage(struct jobacctinfo *jobacct)
 		xfree(jobacct->pid_end);
 		xfree(jobacct->node_start);
 		xfree(jobacct->node_end);
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+		xfree(jobacct->gres_start);
+		xfree(jobacct->gres_end);
+#endif
 #endif
 		xfree(jobacct->tres_usage_in_max);
 		xfree(jobacct->tres_usage_in_max_nodeid);
@@ -365,6 +381,10 @@ static void _copy_tres_usage(jobacctinfo_t **dest_jobacct,
 		(*dest_jobacct)->pid_end[i] = source_jobacct->pid_end[i];
 		(*dest_jobacct)->node_start[i] = source_jobacct->node_start[i];
 		(*dest_jobacct)->node_end[i] = source_jobacct->node_end[i];
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+		(*dest_jobacct)->gres_start[i] = source_jobacct->gres_start[i];
+		(*dest_jobacct)->gres_end[i] = source_jobacct->gres_end[i];
+#endif
 	}	
 #endif
 	for (i = 0; i < source_jobacct->tres_count; i++) {
@@ -726,10 +746,12 @@ static void _acct_send_data_step(acct_gather_rank_t *job_send, step_gather_msg_t
 		 * of the way that the launch message forwarding works.
 		 */
 		retcode = slurm_send_recv_rc_msg_only_one(&req, &rc, timeout);
-		debug("Rank %d sending data to rank %d ip parent = %pA is sucessed ",
-				 step_gather.rank_gather, step_gather.parent_rank_gather, &req.address);
+
 		if ((retcode != 0) || (rc != 0))
 			debug("Rank %d sending data to rank %d error", step_gather.rank_gather, step_gather.parent_rank_gather);
+		else
+			debug("Rank %d sending data to rank %d ip parent = %pA is sucessed ",
+				 step_gather.rank_gather, step_gather.parent_rank_gather, &req.address);
 	} 
 	
 }
@@ -765,7 +787,13 @@ static char **_build_watch_dog_env(acct_gather_rank_t *watch_dog)
 		setenvf(&my_env, "SLURM_JOB_STDOUT", "%s", watch_dog->job_stdout);
 	if(watch_dog->job_stderr != NULL)
 		setenvf(&my_env, "SLURM_JOB_STDERR", "%s", watch_dog->job_stderr);
-
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+	if(watch_dog->cwd != NULL)
+		setenvf(&my_env, "SLURM_JOB_CMD", "%s", watch_dog->cwd);
+	if(watch_dog->script != NULL)
+		setenvf(&my_env, "SLURM_JOB_SCRIPT", "%s", watch_dog->script);
+#endif
+	/* Job step environment variables on this node */
 	slurm_mutex_lock(&watch_dog_env_lock);
 	if((watch_dog_node_step_collect.update == true) || (update_watch_dog == true)) {
 		setenvf(&my_env, "SLURM_JOB_NODE_AVE_CPU", "%.2f",watch_dog_node_step_collect.cpu_step_ave);
@@ -773,6 +801,10 @@ static char **_build_watch_dog_env(acct_gather_rank_t *watch_dog)
 		setenvf(&my_env, "SLURM_JOB_NODE_MEM", "%ld", watch_dog_node_step_collect.mem_step);
 		setenvf(&my_env, "SLURM_JOB_NODE_VMEM", "%ld", watch_dog_node_step_collect.vmem_step);
 		setenvf(&my_env, "SLURM_JOB_NODE_PAGES", "%ld", watch_dog_node_step_collect.step_pages);
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+		setenvf(&my_env, "SLURM_JOB_NODE_GPU_UTIL", "%.2f", watch_dog_node_step_collect.dcu_step_real);
+		setenvf(&my_env, "SLURM_JOB_NODE_GPU_MEM", "%ld", watch_dog_node_step_collect.dcu_mem_step);
+#endif
 		watch_dog_node_step_collect.update = false;
 		if(update_watch_dog == false)
 			update_watch_dog = true;
@@ -803,6 +835,10 @@ static char **_build_watch_dog_env(acct_gather_rank_t *watch_dog)
 			setenvf(&my_env, "SLURM_JOB_MEM", "%ld", watch_dog_collect.mem_step);
 			setenvf(&my_env, "SLURM_JOB_VMEM", "%ld", watch_dog_collect.vmem_step);
 			setenvf(&my_env, "SLURM_JOB_PAGES", "%ld", watch_dog_collect.step_pages);
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+			setenvf(&my_env, "SLURM_JOB_GPU_UTIL", "%.2f", watch_dog_collect.dcu_step_real);
+		    setenvf(&my_env, "SLURM_JOB_GPU_MEM", "%ld", watch_dog_collect.dcu_mem_step);
+#endif
 			watch_dog_collect.update = false;
 			if(update_node_watch_dog == false)
 				update_node_watch_dog = true;
@@ -893,6 +929,10 @@ static void *step_watch_dog(void *args)
 		xfree(watch_dog_tran->watch_dog_script);
 		xfree(watch_dog_tran->job_stdout);
 		xfree(watch_dog_tran->job_stderr);
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+		xfree(watch_dog_tran->cwd);
+		xfree(watch_dog_tran->script);
+#endif
 #ifdef __METASTACK_OPT_APP  
 		xfree(watch_dog_tran->app_name);  
 		xfree(watch_dog_tran->app_version);  
@@ -911,8 +951,15 @@ static void init_step_gather()
 	step_gather.step_mem = 0;
 	step_gather.step_vmem = 0;
 	step_gather.page_fault = 0;
-	step_gather.load_status = 0 ;
-	step_gather.node_alloc_cpu = 0;
+	step_gather.load_status = 0;
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+	step_gather.step_dcu = 0.0;
+	step_gather.dcu_mem_step = 0;
+#endif
+#ifdef __METASTACK_NEW_PROFILE_TIME_SYNC
+	step_gather.send_timestamp = 0;
+#endif
+	// step_gather.node_alloc_cpu = 0;
 }
 
 
@@ -929,8 +976,15 @@ static void data_summation(write_t *write_data, step_gather_msg_t* msg, acct_gat
 			write_data->send_flag = false;
 			write_data->load_flag = msg->load_flag;
 			write_data->cpu_threshold = job_info->cpu_min_load;
-			write_data->node_alloc_cpu = job_info->node_alloc_cpu;
+			// write_data->node_alloc_cpu = job_info->node_alloc_cpu;
 			write_data->timer = job_info->timer;
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+			write_data->dcu_step_real = msg->dcu_util;
+			write_data->dcu_mem_step = msg->dcu_mem_step;
+#endif
+#ifdef __METASTACK_NEW_PROFILE_TIME_SYNC
+			write_data->send_timestamp = msg->send_timestamp;
+#endif
 			break;
 		case SECOND_TREE:
 			msg->cpu_ave += step_gather.step_cpu_ave;
@@ -938,8 +992,15 @@ static void data_summation(write_t *write_data, step_gather_msg_t* msg, acct_gat
 			msg->mem_real += step_gather.step_mem;
 			msg->vmem_real += step_gather.step_vmem;
 			msg->page_fault += step_gather.page_fault;
-			msg->node_alloc_cpu +=step_gather.node_alloc_cpu;
+			// msg->node_alloc_cpu += step_gather.node_alloc_cpu;
 			msg->load_flag  = msg->load_flag | step_gather.load_status; 
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+			msg->dcu_util += step_gather.step_dcu;
+			msg->dcu_mem_step += step_gather.dcu_mem_step;
+#endif
+#ifdef __METASTACK_NEW_PROFILE_TIME_SYNC
+			write_data->send_timestamp = msg->send_timestamp;
+#endif
 			break;
 		case THREE_TREE:
 			msg->cpu_ave += step_gather.step_cpu_ave;
@@ -947,9 +1008,16 @@ static void data_summation(write_t *write_data, step_gather_msg_t* msg, acct_gat
 			msg->mem_real += step_gather.step_mem;
 			msg->vmem_real += step_gather.step_vmem;
 			msg->page_fault += step_gather.page_fault;
-			msg->node_alloc_cpu +=step_gather.node_alloc_cpu;
+			// msg->node_alloc_cpu +=step_gather.node_alloc_cpu;
 			/*if have node not respond set load_status*/
-			msg->load_flag  = msg->load_flag | step_gather.load_status; 		
+			msg->load_flag  = msg->load_flag | step_gather.load_status; 	
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+			msg->dcu_util += step_gather.step_dcu;
+			msg->dcu_mem_step += step_gather.dcu_mem_step;
+#endif
+#ifdef __METASTACK_NEW_PROFILE_TIME_SYNC
+			msg->send_timestamp = step_gather.send_timestamp;
+#endif
 			break;
 		case PARENT_SUM:
 			write_data->cpu_step_ave = msg->cpu_ave;
@@ -959,8 +1027,15 @@ static void data_summation(write_t *write_data, step_gather_msg_t* msg, acct_gat
 			write_data->step_pages = msg->page_fault;
 			write_data->send_flag = true;
 			write_data->load_flag = msg->load_flag;
-			write_data->node_alloc_cpu = msg->node_alloc_cpu;
-			write_data->timer = job_info->timer;	
+			// write_data->node_alloc_cpu = msg->node_alloc_cpu;
+			write_data->timer = job_info->timer;
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+			write_data->dcu_step_real = msg->dcu_util;
+			write_data->dcu_mem_step = msg->dcu_mem_step;
+#endif
+#ifdef __METASTACK_NEW_PROFILE_TIME_SYNC
+			write_data->send_timestamp = (step_gather.send_timestamp ? step_gather.send_timestamp : msg->send_timestamp);
+#endif
 			break;
 		default:
 			break;
@@ -977,12 +1052,18 @@ static void *step_collect(void *args)
 	write_t *write_data = NULL;
 	write_data = xmalloc(sizeof(write_t));
 	time_t record_time = 0;
-	uint64_t threshold = 0;
+	uint64_t cpu_threshold = 0;
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+	uint64_t gres_threshold = 0;
+#endif
+#ifdef __METASTACK_NEW_PROFILE_TIME_SYNC
+	time_t send_timestamp = 0;
+#endif
 	uint64_t minutes_synch = 0;
 	uint64_t minutes_count = 0;
 
 	bool  start = false;
-	time_t diff_time = time(NULL);
+	// time_t diff_time = time(NULL);
 	
 	/* write_data data initialization*/
 	write_data->cpu_step_ave = 0.0;
@@ -994,6 +1075,10 @@ static void *step_collect(void *args)
 	write_data->load_flag = 0;
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
 	write_data->send_flag2 = 0;
+#endif
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+	write_data->alloc_cpus = job_info->alloc_cpus;
+	write_data->alloc_gres = job_info->alloc_gres;
 #endif
 #if HAVE_SYS_PRCTL_H
 	if (prctl(PR_SET_NAME, "acctg_step", NULL, NULL, NULL) < 0) {
@@ -1011,20 +1096,21 @@ static void *step_collect(void *args)
 		slurm_cond_wait(&profile_stepd->notify,
 				&profile_stepd->notify_mutex);
 		slurm_mutex_unlock(&profile_stepd->notify_mutex);
-
+#ifdef __METASTACK_NEW_PROFILE_TIME_SYNC
+		send_timestamp = time(NULL);
+#endif
 		/* shutting down, woken by jobacct_gather_fini() */
 		if (!_init_run_test())
 			break;
 
-	  if(!start) {
-			if(difftime(time(NULL), diff_time) >= (job_info->frequency))
-				start = true;
-		} else
-			minutes_count++;
+	  	if (!start)
+			start = true;
+		else
+			minutes_count++;	
 
 		slurm_mutex_lock(&share_data.lock);
 
-		if(minutes_count >= minutes_synch ) {
+		if (minutes_count >= minutes_synch ) {
 			msg.rank = rank;
 			msg.cpu_util = share_data.cpu_step_real;
 			msg.cpu_ave =  share_data.cpu_step_ave;
@@ -1032,7 +1118,14 @@ static void *step_collect(void *args)
 			msg.vmem_real = share_data.vmem_step;
 			msg.load_flag = share_data.load_flag;
 			msg.page_fault  = share_data.step_pages;
-			msg.node_alloc_cpu =(uint64_t)job_info->node_alloc_cpu;
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+			msg.dcu_util = share_data.dcu_step_real;
+			msg.dcu_mem_step = share_data.dcu_mem_step;	
+#endif
+#ifdef __METASTACK_NEW_PROFILE_TIME_SYNC
+			msg.send_timestamp = send_timestamp;
+#endif
+			// msg.node_alloc_cpu =(uint64_t)job_info->node_alloc_cpu;
 			share_data.start = time(NULL);
 			update = true;
 		}
@@ -1043,20 +1136,32 @@ static void *step_collect(void *args)
 	    
 		/*batch step*/	
 
-		if((job_info->step_id.step_id == SLURM_BATCH_SCRIPT) && update) {
+		if ((job_info->step_id.step_id == SLURM_BATCH_SCRIPT) && update) {
 
 			update = false;
 			minutes_count = 0;
 
 			data_summation(write_data, &msg, job_info, COLLECT_BATCH);
 			/*abnormal event determination of cpu*/
-			threshold = job_info->cpu_min_load * write_data->node_alloc_cpu;
-			write_data->cpu_threshold = threshold;
-			if(threshold > write_data->cpu_step_real) {
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+			cpu_threshold = job_info->cpu_min_load * write_data->alloc_cpus;
+			gres_threshold = job_info->gpu_min_load * write_data->alloc_gres;
+			write_data->gres_threshold = gres_threshold;
+#endif
+			write_data->cpu_threshold = cpu_threshold;
+			if (cpu_threshold > write_data->cpu_step_real) {
 				write_data->cpu_start = record_time - job_info->timer;
 				write_data->cpu_end = record_time;
-				write_data->load_flag=write_data->load_flag|LOAD_LOW;
+				write_data->load_flag = write_data->load_flag | LOAD_LOW;
 			}
+
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+			if (gres_threshold > write_data->dcu_step_real) {
+				write_data->load_flag = write_data->load_flag | GRES_LOAD_LOW;
+				write_data->cpu_start = record_time - job_info->timer;
+				write_data->cpu_end = record_time;
+			}
+#endif
 
 			/*abnormal event determination of process status*/
 			if(write_data->load_flag & PROC_AB) {
@@ -1071,11 +1176,16 @@ static void *step_collect(void *args)
 			}
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
 			slurm_mutex_lock(&watch_dog_all_env_lock);
-			watch_dog_collect.cpu_step_ave  = write_data->cpu_step_ave ;
-			watch_dog_collect.cpu_step_real = write_data->cpu_step_real ;
-			watch_dog_collect.mem_step 	    = write_data->mem_step ;
-			watch_dog_collect.vmem_step     = write_data->vmem_step ;
-			watch_dog_collect.step_pages    = write_data->step_pages ;
+			watch_dog_collect.cpu_step_ave  = write_data->cpu_step_ave;
+			watch_dog_collect.cpu_step_real = write_data->cpu_step_real;
+			watch_dog_collect.mem_step 	    = write_data->mem_step;
+
+			watch_dog_collect.vmem_step     = write_data->vmem_step;
+			watch_dog_collect.step_pages    = write_data->step_pages;
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+			watch_dog_collect.dcu_step_real = write_data->dcu_step_real;
+			watch_dog_collect.dcu_mem_step  = write_data->dcu_mem_step;
+#endif
 			watch_dog_collect.update		= true;
 			slurm_mutex_unlock(&watch_dog_all_env_lock);
 #endif
@@ -1087,7 +1197,7 @@ static void *step_collect(void *args)
 			memset(&msg, 0, sizeof(msg));
 		}
 
-		if((job_info->step_id.step_id != SLURM_BATCH_SCRIPT) && update)  {
+		if ((job_info->step_id.step_id != SLURM_BATCH_SCRIPT) && update) {
 
 			/* digital work steps */
 			slurm_mutex_lock(&step_gather.lock);
@@ -1100,13 +1210,13 @@ static void *step_collect(void *args)
 				update = false;
 				/*convert to milliseconds*/
 				if(step_gather.max_depth_gather > 0)
-					millisecond_delay = (job_info->timer*1000)/step_gather.max_depth_gather;
+					millisecond_delay = (job_info->timer * 1000) / step_gather.max_depth_gather;
 				else
-					millisecond_delay = job_info->timer*1000;
+					millisecond_delay = job_info->timer * 1000;
 
 				debug3("Rank %d sending data to rank %d ip parent = %pA,jobid is %ps  msg.cpu_util=%.2f millisecond_delay=%d",
 						rank, step_gather.parent_rank_gather, &step_gather.parent_addr_gather, &job_info->step_id, msg.cpu_util, millisecond_delay);
-				_acct_send_data_step (job_info, msg, millisecond_delay);
+				_acct_send_data_step(job_info, msg, millisecond_delay);
 				memset(&msg, 0, sizeof(msg));
 
 			} else if((step_gather.children_gather > 0) && (step_gather.parent_rank_gather >=0) ) {
@@ -1131,7 +1241,7 @@ static void *step_collect(void *args)
 					if(step_gather.depth_gather > 0)
 						millisecond_delay = (job_info->timer - diff) * 1000 /step_gather.depth_gather;
 					else
-						millisecond_delay = 10*1000; //calculate the maximum number of milliseconds accepted for sending RPC.
+						millisecond_delay = 10 * 1000; //calculate the maximum number of milliseconds accepted for sending RPC.
 
 					_acct_send_data_step(job_info, msg, millisecond_delay);
 					update = false;
@@ -1168,23 +1278,39 @@ static void *step_collect(void *args)
 			slurm_mutex_unlock(&step_gather.lock);
 		}
 
-		if(head) {
+		if (head) {
 			head = false;
-			if(write_data->send_flag) {
+			if (write_data->send_flag) {
 				write_data->send_flag = false;
 				/*need to multiply by allocated alloc cpu*/
-				threshold = job_info->cpu_min_load * write_data->node_alloc_cpu;
-				write_data->cpu_threshold = threshold;
-				if(threshold > write_data->cpu_step_real) {
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+				/*need to multiply by allocated alloc cpu*/
+				cpu_threshold = job_info->cpu_min_load * job_info->alloc_cpus;
+				gres_threshold = job_info->gpu_min_load * job_info->alloc_gres;
+#endif
+				write_data->cpu_threshold = cpu_threshold;
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+				write_data->gres_threshold = gres_threshold;
+#endif
+				if (cpu_threshold > write_data->cpu_step_real) {
 					write_data->cpu_start = record_time - job_info->timer;
 					write_data->cpu_end = record_time;
-					write_data->load_flag=write_data->load_flag| LOAD_LOW;
+					write_data->load_flag = write_data->load_flag | LOAD_LOW;
 				}
-				if(write_data->load_flag & PROC_AB){
+
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+				if (gres_threshold > write_data->dcu_step_real) {
+					write_data->cpu_start = record_time - job_info->timer;
+					write_data->cpu_end = record_time;
+					write_data->load_flag = write_data->load_flag | GRES_LOAD_LOW;
+				}
+#endif
+
+				if (write_data->load_flag & PROC_AB) {
 					write_data->pid_start = record_time - job_info->timer;
 					write_data->pid_end = record_time;
 				}
-				if(write_data->load_flag & JNODE_STAT){
+				if (write_data->load_flag & JNODE_STAT) {
 					write_data->node_start = record_time - job_info->timer;
 					write_data->node_end = record_time;
 				}
@@ -1195,6 +1321,10 @@ static void *step_collect(void *args)
 				watch_dog_collect.mem_step 	    = write_data->mem_step ;
 				watch_dog_collect.vmem_step     = write_data->vmem_step ;
 				watch_dog_collect.step_pages    = write_data->step_pages ;
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+				watch_dog_collect.dcu_step_real = write_data->dcu_step_real;
+				watch_dog_collect.dcu_mem_step  = write_data->dcu_mem_step;
+#endif
 				watch_dog_collect.update		= true;
 				slurm_mutex_unlock(&watch_dog_all_env_lock);
 #endif
@@ -1203,7 +1333,6 @@ static void *step_collect(void *args)
 #endif
 				_poll_data(1, NULL, write_data);
 			}
-
 		}
 	}
 
@@ -1225,6 +1354,12 @@ static void *_watch_tasks(void *arg)
 	int count = 0,  update_share = 0;
 	collection_t *collect = NULL;
 	List fifo = NULL;
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+	List fifo_gres = NULL;
+	bool is_gres_job = false;
+	double total_step_dcuutil = 0.0;
+	double tmp_dcuutil = 0.0;
+#endif
 	bool reset = false;
 	bool start = false;
 	/*Resource consumption variable*/
@@ -1243,10 +1378,19 @@ static void *_watch_tasks(void *arg)
 	/*Set time limit*/
 	if(count > MAX_SIZE) 
 		count = MAX_SIZE;
+	
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+	if (job_message->alloc_gres > 0)
+		is_gres_job = true;
+#endif
 
 	collect->step = job_message->switch_step;
 	if((count > 0) && (collect->step)) {
 		fifo = list_create(xfree_ptr);
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+		if (is_gres_job) 
+			fifo_gres = list_create(xfree_ptr);
+#endif
 	}
 #endif 
 #if HAVE_SYS_PRCTL_H
@@ -1282,6 +1426,7 @@ static void *_watch_tasks(void *arg)
 		slurm_mutex_unlock(&g_context_lock);
 #ifdef __METASTACK_NEW_LOAD_ABNORMAL
 		double *item = NULL;
+		double *gres_item = NULL;
 		if((start) && (collect->step) && (count > 0)) {
 			/*******************
 			 *calculate threshold
@@ -1292,7 +1437,17 @@ static void *_watch_tasks(void *arg)
 				*cpu_step_real = collect->cpu_step_real;
 				list_enqueue(fifo, cpu_step_real);
 				total_step_cpuutil += collect->cpu_step_real;
+
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+				if (is_gres_job) {
+					double *dcu_step_real = xmalloc(sizeof(double));
+					*dcu_step_real = collect->dcu_step_real;
+					list_enqueue(fifo_gres, dcu_step_real);
+					total_step_dcuutil += collect->dcu_step_real;
+				}
+#endif
 			}
+
 
 			if(list_count(fifo) >= count) {
 				/*dequeue*/
@@ -1303,11 +1458,31 @@ static void *_watch_tasks(void *arg)
 				} else {
 					total_step_cpuutil = 0;
 					reset = true;
-				}  
+				}
+				xfree(item);
+                item = NULL; 
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU 
+				if (is_gres_job) {
+					gres_item = (double*)list_dequeue(fifo_gres);
+					if (gres_item && (*gres_item) >= 0) {
+						tmp_dcuutil = total_step_dcuutil / (list_count(fifo_gres) + 1);
+						total_step_dcuutil = total_step_dcuutil - *gres_item;
+					} else {
+						total_step_dcuutil = 0;
+						reset = true;
+					}
+					xfree(gres_item);
+            		gres_item = NULL;
+				}
+#endif
 			}
 
 			if(reset) {
 				list_flush(fifo);
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+				if (is_gres_job)
+					list_flush(fifo_gres);
+#endif
                 reset = false;
 			}
 			update_share++;
@@ -1316,18 +1491,19 @@ static void *_watch_tasks(void *arg)
 				update_share  = 0; 
 				slurm_mutex_lock(&share_data.lock);
 				share_data.cpu_step_real = tmp_cpuutil;
-
 				share_data.cpu_step_ave = collect->cpu_step_ave;
 				share_data.load_flag =  collect->load_flag;
 				share_data.mem_step = collect->mem_step;
 				share_data.vmem_step = collect->vmem_step;
 				share_data.step_pages = collect->step_pages;
 				//share_data.update = true;
-
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+				share_data.dcu_step_real = tmp_dcuutil;
+				share_data.dcu_mem_step = collect->dcu_mem_step;
+#endif
 				slurm_mutex_unlock(&share_data.lock);
 			} 
 		}
-		xfree(item);
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
 		if(collect && collect->pids) {
 			slurm_mutex_lock(&watch_dog_env_lock);
@@ -1337,6 +1513,12 @@ static void *_watch_tasks(void *arg)
 			watch_dog_node_step_collect.vmem_step	  = collect->vmem_step;
 			watch_dog_node_step_collect.step_pages	  = collect->step_pages;
 			watch_dog_node_step_collect.npids		  = collect->npids;
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+			if (is_gres_job) {
+				watch_dog_node_step_collect.dcu_step_real = collect->dcu_step_real; /* The GPU resource consumption of the current node job step. */
+				watch_dog_node_step_collect.dcu_mem_step  = collect->dcu_mem_step;  /* The GPU resource consumption of the current node job step. */  
+			}
+#endif
 			watch_dog_node_step_collect.update		  = true;
 			if(watch_dog_node_step_collect.pids)
 				xfree(watch_dog_node_step_collect.pids);
@@ -1356,6 +1538,9 @@ static void *_watch_tasks(void *arg)
 #ifdef __METASTACK_NEW_LOAD_ABNORMAL
 	if((collect->step) && (count > 0)) {
 		FREE_NULL_LIST(fifo);
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+		FREE_NULL_LIST(fifo_gres);
+#endif
 	}
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
 	if(watch_dog_node_step_collect.pids)
@@ -1858,6 +2043,12 @@ extern int jobacct_gather_watchdog(int frequency, acct_gather_rank_t *step_rank)
 		load_args->job_stdout 		= xstrdup(step_rank->job_stdout);
 	if(step_rank->job_stderr)
 		load_args->job_stderr       = xstrdup(step_rank->job_stderr);
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+	if(step_rank->cwd)
+		load_args->cwd 				= xstrdup(step_rank->cwd);
+	if(step_rank->script)
+		load_args->script       	= xstrdup(step_rank->script);	
+#endif
 	load_args->init_time 			= step_rank->init_time;
 	load_args->period 				= step_rank->period;
 	load_args->enable_watchdog 		= step_rank->enable_watchdog;
@@ -1909,8 +2100,13 @@ extern int	jobacct_gather_stepdpoll(uint16_t frequency, acct_gather_rank_t *jobi
 	jobinfo_watch->cpu_min_load = jobinfo->cpu_min_load;
 	jobinfo_watch->frequency = frequency;	
 	jobinfo_watch->step_id = jobinfo->step_id;   
-	jobinfo_watch->node_alloc_cpu = jobinfo->node_alloc_cpu;
-
+	// jobinfo_watch->node_alloc_cpu = jobinfo->node_alloc_cpu;
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+	jobinfo_watch->step = jobinfo->step;
+	jobinfo_watch->alloc_cpus = jobinfo->alloc_cpus;
+	jobinfo_watch->alloc_gres = jobinfo->alloc_gres;
+	jobinfo_watch->gpu_min_load = jobinfo->gpu_min_load;
+#endif
 	slurm_thread_create(&watch_stepd_thread_id, step_collect, jobinfo_watch);
 	debug3("jobacct stepd gather dynamic logging enabled");
 
@@ -1993,8 +2189,13 @@ extern int jobacct_gather_startpoll(uint16_t frequency, acct_gather_rank_t *jobi
 	jobinfo_watch->timer= jobinfo->timer;
 	jobinfo_watch->cpu_min_load = jobinfo->cpu_min_load;
 	jobinfo_watch->frequency = frequency;	
-	jobinfo_watch->step_id = jobinfo->step_id;   
-	jobinfo_watch->node_alloc_cpu = jobinfo->node_alloc_cpu;
+	jobinfo_watch->step_id = jobinfo->step_id;
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+	jobinfo_watch->alloc_gres = jobinfo->alloc_gres;
+	jobinfo_watch->alloc_cpus = jobinfo->alloc_cpus;
+	jobinfo_watch->gpu_min_load = jobinfo->gpu_min_load;
+#endif
+	// jobinfo_watch->node_alloc_cpu = jobinfo->node_alloc_cpu;
 	slurm_thread_create(&watch_tasks_thread_id, _watch_tasks, jobinfo_watch);
 #endif
 
@@ -2285,6 +2486,18 @@ extern jobacctinfo_t *jobacctinfo_create(jobacct_id_t *jobacct_id)
 	jobacct->timer = 0;
 	jobacct->cpu_threshold = 100;
 #endif
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+	//jobacct->dcu_step_ave = 0.0;
+	jobacct->dcu_step_max = 0.0;
+	jobacct->dcu_step_min = INFINITE64;
+	jobacct->dcu_step_real = 0.0;
+
+	jobacct->dcu_mem_step_max = 0;
+	jobacct->dcu_mem_step_min = INFINITE64;
+	jobacct->dcu_mem_step = 0;
+	jobacct->gres_threshold = 100;
+	jobacct->alloc_gres = 0;
+#endif
 	jobacct->dataset_id = -1;
 	jobacct->sys_cpu_sec = 0;
 	jobacct->sys_cpu_usec = 0;
@@ -2566,7 +2779,82 @@ extern void jobacctinfo_pack_detial(jobacctinfo_t *jobacct, uint16_t rpc_version
 	}
 	pack8((uint8_t) 1, buffer);
 #ifdef __META_PROTOCOL
-	if(rpc_version >= META_3_0_PROTOCOL_VERSION) {
+	if (rpc_version >= META_3_2_PROTOCOL_VERSION) {
+		if ((tmp_64 = jobacct->flag) < 0)
+			tmp_64 = 0;
+		pack64(tmp_64, buffer);
+
+		if ((tmp_dbl = jobacct->cpu_step_ave) < 0.0)
+			tmp_dbl = 0.0;
+		packdouble(tmp_dbl, buffer);
+		if ((tmp_dbl = jobacct->cpu_step_max) < 0.0)
+			tmp_dbl = 0.0;
+		packdouble(tmp_dbl, buffer);
+		if ((tmp_dbl = jobacct->cpu_step_min) < 0.0)
+			tmp_dbl = 0.0;
+		packdouble(tmp_dbl, buffer);
+		if ((tmp_dbl = jobacct->cpu_step_real) < 0.0)
+			tmp_dbl = 0.0;
+		packdouble(tmp_dbl, buffer);
+
+		if ((tmp_64 = jobacct->mem_step_max) < 0)
+			tmp_64 = 0;
+		pack64(tmp_64, buffer);
+		if ((tmp_64 = jobacct->mem_step_min) < 0)
+			tmp_64 = 0;
+		pack64(tmp_64, buffer);
+		if ((tmp_64 = jobacct->mem_step) < 0)
+			tmp_64 = 0;
+		pack64(tmp_64, buffer);
+
+		if ((tmp_64 = jobacct->vmem_step_max) < 0)
+			tmp_64 = 0;
+		pack64(tmp_64, buffer);
+		if ((tmp_64 = jobacct->vmem_step_min) < 0)
+			tmp_64 = 0;
+		pack64(tmp_64, buffer);
+		if ((tmp_64 = jobacct->vmem_step) < 0)
+			tmp_64 = 0;
+		pack64(tmp_64, buffer);
+
+		if ((tmp_64 = jobacct->step_pages) < 0)
+			tmp_64 = 0;
+		pack64(tmp_64, buffer);
+
+		if ((tmp_64 = jobacct->acct_flag) < 0)
+			tmp_64 = 0;
+		pack64(tmp_64, buffer);	
+		pack64((uint64_t)jobacct->cpu_count, buffer);
+		pack64((uint64_t)jobacct->pid_count, buffer);
+		pack64((uint64_t)jobacct->node_count, buffer);
+
+		pack64_array(jobacct->cpu_start, JOBACCTINFO_START_END_ARRAY_SIZE, buffer);
+		pack64_array(jobacct->cpu_end, JOBACCTINFO_START_END_ARRAY_SIZE, buffer);
+		pack64_array(jobacct->pid_start, JOBACCTINFO_START_END_ARRAY_SIZE, buffer);
+		pack64_array(jobacct->pid_end, JOBACCTINFO_START_END_ARRAY_SIZE, buffer);
+		pack64_array(jobacct->node_start, JOBACCTINFO_START_END_ARRAY_SIZE, buffer);
+		pack64_array(jobacct->node_end, JOBACCTINFO_START_END_ARRAY_SIZE, buffer);
+		if ((tmp_64 = jobacct->node_alloc_cpu) < 0)
+			tmp_64 = 0;
+		pack64(tmp_64, buffer);
+		if ((tmp_64 = jobacct->timer) < 0)
+			tmp_64 = 0;
+		pack64(tmp_64, buffer);
+		if ((tmp_32 = jobacct->cpu_threshold) < 0)
+			tmp_32 = 0;
+		pack32(tmp_32, buffer);
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+		pack64((uint64_t)jobacct->gres_count, buffer);
+		pack64_array(jobacct->gres_start, JOBACCTINFO_START_END_ARRAY_SIZE, buffer);
+		pack64_array(jobacct->gres_end, JOBACCTINFO_START_END_ARRAY_SIZE, buffer);
+		if ((tmp_64 = jobacct->alloc_gres) < 0)
+			tmp_64 = 0;
+		pack64(tmp_64, buffer);
+		if ((tmp_32 = jobacct->gres_threshold) < 0)
+			tmp_32 = 0;
+		pack32(tmp_32, buffer);
+#endif
+	} else if (rpc_version >= META_3_0_PROTOCOL_VERSION) {
 		if ((tmp_64 = jobacct->flag) < 0)
 			tmp_64 = 0;
 		pack64(tmp_64, buffer);
@@ -2727,7 +3015,7 @@ extern int jobacctinfo_unpack_detial(jobacctinfo_t **jobacct, uint16_t rpc_versi
 	if (uint8_tmp == (uint8_t) 0)
 		return SLURM_SUCCESS;
 #ifdef __META_PROTOCOL
-	if(rpc_version >= META_3_0_PROTOCOL_VERSION){
+	if (rpc_version >= META_3_2_PROTOCOL_VERSION) {
 		safe_unpack64(&tmp_int64, buffer);
 		(*jobacct)->flag = tmp_int64;
 
@@ -2766,8 +3054,62 @@ extern int jobacctinfo_unpack_detial(jobacctinfo_t **jobacct, uint16_t rpc_versi
 		safe_unpack64_array(&(*jobacct)->pid_start,&uint32_tmp, buffer);
 		safe_unpack64_array(&(*jobacct)->pid_end,&uint32_tmp, buffer);
 		safe_unpack64_array(&(*jobacct)->node_start,&uint32_tmp, buffer);
-		safe_unpack64_array(&(*jobacct)->node_end,&uint32_tmp, buffer);		
+		safe_unpack64_array(&(*jobacct)->node_end,&uint32_tmp, buffer);
+		safe_unpack64(&tmp_int64, buffer);
+		(*jobacct)->node_alloc_cpu = tmp_int64;
+		safe_unpack64(&tmp_int64, buffer);
+		(*jobacct)->timer = tmp_int64;
+		safe_unpack32(&tmp_int32, buffer);
+		(*jobacct)->cpu_threshold = tmp_int32;
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+		safe_unpack64(&(*jobacct)->gres_count, buffer);
+		safe_unpack64_array(&(*jobacct)->gres_start,&uint32_tmp, buffer);
+		safe_unpack64_array(&(*jobacct)->gres_end,&uint32_tmp, buffer);
+		safe_unpack64(&tmp_int64, buffer);
+		(*jobacct)->alloc_gres = tmp_int64;
+		safe_unpack32(&tmp_int32, buffer);
+		(*jobacct)->gres_threshold = tmp_int32;
+#endif
+	} else if (rpc_version >= META_3_0_PROTOCOL_VERSION) {
+		safe_unpack64(&tmp_int64, buffer);
+		(*jobacct)->flag = tmp_int64;
 
+		safe_unpackdouble(&tmp_double, buffer);
+		(*jobacct)->cpu_step_ave = tmp_double;
+		safe_unpackdouble(&tmp_double, buffer);
+		(*jobacct)->cpu_step_max = tmp_double;
+		safe_unpackdouble(&tmp_double, buffer);
+		(*jobacct)->cpu_step_min = tmp_double;
+		safe_unpackdouble(&tmp_double, buffer);
+		(*jobacct)->cpu_step_real = tmp_double;
+
+		safe_unpack64(&tmp_int64, buffer);
+		(*jobacct)->mem_step_max = tmp_int64;
+		safe_unpack64(&tmp_int64, buffer);
+		(*jobacct)->mem_step_min = tmp_int64;
+		safe_unpack64(&tmp_int64, buffer);
+		(*jobacct)->mem_step = tmp_int64;
+
+		safe_unpack64(&tmp_int64, buffer);
+		(*jobacct)->vmem_step_max = tmp_int64;
+		safe_unpack64(&tmp_int64, buffer);
+		(*jobacct)->vmem_step_min = tmp_int64;
+		safe_unpack64(&tmp_int64, buffer);
+		(*jobacct)->vmem_step = tmp_int64;
+
+		safe_unpack64(&tmp_int64, buffer);
+		(*jobacct)->step_pages = tmp_int64;
+		safe_unpack64(&tmp_int64, buffer);
+		(*jobacct)->acct_flag = tmp_int64;	
+		safe_unpack64(&(*jobacct)->cpu_count, buffer);
+		safe_unpack64(&(*jobacct)->pid_count, buffer);
+		safe_unpack64(&(*jobacct)->node_count, buffer);
+		safe_unpack64_array(&(*jobacct)->cpu_start,&uint32_tmp, buffer);
+		safe_unpack64_array(&(*jobacct)->cpu_end,&uint32_tmp, buffer);
+		safe_unpack64_array(&(*jobacct)->pid_start,&uint32_tmp, buffer);
+		safe_unpack64_array(&(*jobacct)->pid_end,&uint32_tmp, buffer);
+		safe_unpack64_array(&(*jobacct)->node_start,&uint32_tmp, buffer);
+		safe_unpack64_array(&(*jobacct)->node_end,&uint32_tmp, buffer);
 		safe_unpack64(&tmp_int64, buffer);
 		(*jobacct)->node_alloc_cpu = tmp_int64;
 		safe_unpack64(&tmp_int64, buffer);
@@ -2821,7 +3163,7 @@ extern int jobacctinfo_unpack_detial(jobacctinfo_t **jobacct, uint16_t rpc_versi
 		safe_unpack64_array(&(*jobacct)->node_start,&uint32_tmp, buffer);
 		safe_unpack64_array(&(*jobacct)->node_end,&uint32_tmp, buffer);		
 
-		safe_unpack64(&tmp_int64, buffer);
+		safe_unpack64(&tmp_int64, buffer);	
 		(*jobacct)->node_alloc_cpu = tmp_int64;
 		safe_unpack64(&tmp_int64, buffer);
 		(*jobacct)->timer = tmp_int64;
@@ -2946,7 +3288,87 @@ extern void jobacctinfo_pack(jobacctinfo_t *jobacct, uint16_t rpc_version,
 
 	pack8((uint8_t) 1, buffer);
 #ifdef __META_PROTOCOL
-	if (rpc_version >= META_3_0_PROTOCOL_VERSION) {
+	if (rpc_version >= META_3_2_PROTOCOL_VERSION) {
+		pack64(jobacct->user_cpu_sec, buffer);
+		pack32((uint32_t)jobacct->user_cpu_usec, buffer);
+		pack64(jobacct->sys_cpu_sec, buffer);
+		pack32((uint32_t)jobacct->sys_cpu_usec, buffer);
+		pack32((uint32_t)jobacct->act_cpufreq, buffer);
+		pack64((uint64_t)jobacct->energy.consumed_energy, buffer);
+
+		pack32_array(jobacct->tres_ids, jobacct->tres_count, buffer);
+
+		slurm_pack_list(jobacct->tres_list,
+				slurmdb_pack_tres_rec, buffer,
+				SLURM_PROTOCOL_VERSION);
+
+		pack64_array(jobacct->tres_usage_in_max,
+				jobacct->tres_count, buffer);
+		pack64_array(jobacct->tres_usage_in_max_nodeid,
+				jobacct->tres_count, buffer);
+		pack64_array(jobacct->tres_usage_in_max_taskid,
+				jobacct->tres_count, buffer);
+		pack64_array(jobacct->tres_usage_in_min,
+				jobacct->tres_count, buffer);
+		pack64_array(jobacct->tres_usage_in_min_nodeid,
+				jobacct->tres_count, buffer);
+		pack64_array(jobacct->tres_usage_in_min_taskid,
+				jobacct->tres_count, buffer);
+		pack64_array(jobacct->tres_usage_in_tot,
+				jobacct->tres_count, buffer);
+		pack64_array(jobacct->tres_usage_out_max,
+				jobacct->tres_count, buffer);
+		pack64_array(jobacct->tres_usage_out_max_nodeid,
+				jobacct->tres_count, buffer);
+		pack64_array(jobacct->tres_usage_out_max_taskid,
+				jobacct->tres_count, buffer);
+		pack64_array(jobacct->tres_usage_out_min,
+				jobacct->tres_count, buffer);
+		pack64_array(jobacct->tres_usage_out_min_nodeid,
+				jobacct->tres_count, buffer);
+		pack64_array(jobacct->tres_usage_out_min_taskid,
+				jobacct->tres_count, buffer);
+		pack64_array(jobacct->tres_usage_out_tot,
+				jobacct->tres_count, buffer);
+#ifdef __METASTACK_OPT_SSTAT_CPUUTIL
+		if ((tmp_dbl = jobacct->cpu_util) < 0)
+			tmp_dbl = 0;
+		packdouble(tmp_dbl, buffer);
+
+		if ((tmp_dbl=jobacct->avg_cpu_util) < 0)
+			tmp_dbl = 0;
+		packdouble(tmp_dbl, buffer);
+
+		if ((tmp_dbl = jobacct->min_cpu_util) < 0)
+			tmp_dbl = 0;
+		packdouble(tmp_dbl, buffer);
+
+		if ((tmp_dbl = jobacct->max_cpu_util) < 0)
+			tmp_dbl = 0;
+		packdouble(tmp_dbl, buffer);
+#endif
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+		// if ((tmp_dbl = jobacct->dcu_step_ave) < 0)
+		// 	tmp_dbl = 0;
+		//packdouble(tmp_dbl, buffer);
+
+		if ((tmp_dbl=jobacct->dcu_step_max) < 0)
+			tmp_dbl = 0;
+		packdouble(tmp_dbl, buffer);
+
+		if ((tmp_dbl = jobacct->dcu_step_min) < 0)
+			tmp_dbl = 0;
+		packdouble(tmp_dbl, buffer);
+
+		if ((tmp_dbl = jobacct->dcu_step_real) < 0)
+			tmp_dbl = 0;
+		packdouble(tmp_dbl, buffer);
+
+		pack64((uint64_t)jobacct->dcu_mem_step_max, buffer);
+		pack64((uint64_t)jobacct->dcu_mem_step_min, buffer);
+		pack64((uint64_t)jobacct->dcu_mem_step, buffer);
+#endif
+	} else if (rpc_version >= META_3_0_PROTOCOL_VERSION) {
 		pack64(jobacct->user_cpu_sec, buffer);
 		pack32((uint32_t)jobacct->user_cpu_usec, buffer);
 		pack64(jobacct->sys_cpu_sec, buffer);
@@ -3135,7 +3557,81 @@ extern int jobacctinfo_unpack(jobacctinfo_t **jobacct, uint16_t rpc_version,
 		_free_tres_usage(*jobacct);
 	}
 #ifdef __META_PROTOCOL
-	if(rpc_version >= META_3_0_PROTOCOL_VERSION) {
+	if (rpc_version >= META_3_2_PROTOCOL_VERSION) {
+		safe_unpack64(&(*jobacct)->user_cpu_sec, buffer);
+		safe_unpack32(&uint32_tmp, buffer);
+		(*jobacct)->user_cpu_usec = uint32_tmp;
+		safe_unpack64(&(*jobacct)->sys_cpu_sec, buffer);
+		safe_unpack32(&uint32_tmp, buffer);
+		(*jobacct)->sys_cpu_usec = uint32_tmp;
+
+		safe_unpack32(&(*jobacct)->act_cpufreq, buffer);
+		safe_unpack64(&(*jobacct)->energy.consumed_energy, buffer);
+
+		safe_unpack32_array(&(*jobacct)->tres_ids,
+					&(*jobacct)->tres_count, buffer);
+		if (slurm_unpack_list(&(*jobacct)->tres_list,
+					slurmdb_unpack_tres_rec,
+					slurmdb_destroy_tres_rec,
+					buffer, rpc_version) != SLURM_SUCCESS)
+			goto unpack_error;
+		safe_unpack64_array(&(*jobacct)->tres_usage_in_max,
+					&uint32_tmp, buffer);
+		safe_unpack64_array(&(*jobacct)->tres_usage_in_max_nodeid,
+					&uint32_tmp, buffer);
+		safe_unpack64_array(&(*jobacct)->tres_usage_in_max_taskid,
+					&uint32_tmp, buffer);
+		safe_unpack64_array(&(*jobacct)->tres_usage_in_min,
+					&uint32_tmp, buffer);
+		safe_unpack64_array(&(*jobacct)->tres_usage_in_min_nodeid,
+					&uint32_tmp, buffer);
+		safe_unpack64_array(&(*jobacct)->tres_usage_in_min_taskid,
+					&uint32_tmp, buffer);
+		safe_unpack64_array(&(*jobacct)->tres_usage_in_tot,
+					&uint32_tmp, buffer);
+		safe_unpack64_array(&(*jobacct)->tres_usage_out_max,
+					&uint32_tmp, buffer);
+		safe_unpack64_array(&(*jobacct)->tres_usage_out_max_nodeid,
+					&uint32_tmp, buffer);
+		safe_unpack64_array(&(*jobacct)->tres_usage_out_max_taskid,
+					&uint32_tmp, buffer);
+		safe_unpack64_array(&(*jobacct)->tres_usage_out_min,
+					&uint32_tmp, buffer);
+		safe_unpack64_array(&(*jobacct)->tres_usage_out_min_nodeid,
+					&uint32_tmp, buffer);
+		safe_unpack64_array(&(*jobacct)->tres_usage_out_min_taskid,
+					&uint32_tmp, buffer);
+		safe_unpack64_array(&(*jobacct)->tres_usage_out_tot,
+					&uint32_tmp, buffer);
+#ifdef __METASTACK_OPT_SSTAT_CPUUTIL
+		double tmp_double;
+		safe_unpackdouble(&tmp_double, buffer);
+		(*jobacct)->cpu_util = tmp_double;
+		safe_unpackdouble(&tmp_double, buffer);
+		(*jobacct)->avg_cpu_util = tmp_double;
+
+		safe_unpackdouble(&tmp_double, buffer);
+		(*jobacct)->min_cpu_util = tmp_double;
+
+		safe_unpackdouble(&tmp_double, buffer);
+		(*jobacct)->max_cpu_util = tmp_double;
+#endif
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+		// safe_unpackdouble(&tmp_double, buffer);
+		// (*jobacct)->dcu_step_ave = tmp_double;
+		safe_unpackdouble(&tmp_double, buffer);
+		(*jobacct)->dcu_step_max = tmp_double;
+
+		safe_unpackdouble(&tmp_double, buffer);
+		(*jobacct)->dcu_step_min = tmp_double;
+
+		safe_unpackdouble(&tmp_double, buffer);
+		(*jobacct)->dcu_step_real = tmp_double;	
+		safe_unpack64(&(*jobacct)->dcu_mem_step_max, buffer);
+		safe_unpack64(&(*jobacct)->dcu_mem_step_min, buffer);
+		safe_unpack64(&(*jobacct)->dcu_mem_step, buffer);
+#endif
+	} else if(rpc_version >= META_3_0_PROTOCOL_VERSION) {
 		safe_unpack64(&(*jobacct)->user_cpu_sec, buffer);
 		safe_unpack32(&uint32_tmp, buffer);
 		(*jobacct)->user_cpu_usec = uint32_tmp;
@@ -3349,6 +3845,9 @@ extern void jobacctinfo_aggregate_2(jobacctinfo_t *dest, jobacctinfo_t *from)
 		dest->cpu_count = from->cpu_count;
 		dest->pid_count = from->pid_count;
 		dest->node_count = from->node_count;
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+		dest->gres_count = from->gres_count;
+#endif
 
 		for (int i = 0; i < JOBACCTINFO_START_END_ARRAY_SIZE; i++) {
 			if((dest->cpu_start!=NULL) && from->cpu_start!=NULL)
@@ -3365,8 +3864,18 @@ extern void jobacctinfo_aggregate_2(jobacctinfo_t *dest, jobacctinfo_t *from)
 				dest->node_start[i] = from->node_start[i];
 			if((dest->node_end!=NULL) && from->node_end!=NULL)
 				dest->node_end[i] = from->node_end[i];
-		}	
 
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+			if ((dest->gres_start!=NULL) && from->gres_start!=NULL)
+				dest->gres_start[i] = from->gres_start[i];
+			if ((dest->gres_end!=NULL) && from->gres_end!=NULL)
+				dest->gres_end[i] = from->gres_end[i];
+#endif
+		}	
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+		dest->alloc_gres = from->alloc_gres;
+		dest->gres_threshold = from->gres_threshold;
+#endif
 		dest->node_alloc_cpu = 	from->node_alloc_cpu;
 		dest->timer = 	from->timer;
 		dest->cpu_threshold = 	from->cpu_threshold;		
@@ -3388,6 +3897,16 @@ extern void jobacctinfo_aggregate(jobacctinfo_t *dest, jobacctinfo_t *from)
 	dest->avg_cpu_util += from->avg_cpu_util;
 	dest->min_cpu_util += from->min_cpu_util;
 	dest->max_cpu_util += from->max_cpu_util;
+#endif
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+	// dest->dcu_step_ave  += from->dcu_step_ave;
+	dest->dcu_step_max  += from->dcu_step_max;
+	dest->dcu_step_min  += from->dcu_step_min;
+	dest->dcu_step_real += from->dcu_step_real;
+
+	dest->dcu_mem_step_max += from->dcu_mem_step_max;
+	dest->dcu_mem_step_min += from->dcu_mem_step_min;
+	dest->dcu_mem_step 	   += from->dcu_mem_step;
 #endif
 	dest->user_cpu_sec	+= from->user_cpu_sec;
 	dest->user_cpu_usec	+= from->user_cpu_usec;
@@ -3446,6 +3965,15 @@ extern void jobacctinfo_2_stats(slurmdb_stats_t *stats, jobacctinfo_t *jobacct)
 	stats->cpu_count = (uint64_t)jobacct->cpu_count;
 	stats->pid_count = (uint64_t)jobacct->pid_count;
 	stats->node_count = (uint64_t)jobacct->node_count;
+#endif
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+	// stats->dcu_step_ave =(double)jobacct->dcu_step_ave;
+	stats->dcu_step_max =(double)jobacct->dcu_step_max;
+	stats->dcu_step_min =(double)jobacct->dcu_step_min;
+	stats->dcu_step_real=(double)jobacct->dcu_step_real;
+	stats->dcu_mem_step_max = (uint64_t)jobacct->dcu_mem_step_max;
+	stats->dcu_mem_step_min = (uint64_t)jobacct->dcu_mem_step_min;
+	stats->dcu_mem_step 	= (uint64_t)jobacct->dcu_mem_step;
 #endif
 	if (jobacct->energy.consumed_energy == NO_VAL64)
 		stats->consumed_energy = NO_VAL64;

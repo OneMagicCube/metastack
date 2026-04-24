@@ -851,7 +851,11 @@ extern int as_kingbase_get_usage(kingbase_conn_t *kingbase_conn, uid_t uid,
 
 	if (slurm_conf.private_data & PRIVATE_DATA_USAGE) {
 		if (!(is_admin = is_user_min_admin_level(
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+			      kingbase_conn, uid, SLURMDB_ADMIN_READ_ONLY))) {
+#else
 			      kingbase_conn, uid, SLURMDB_ADMIN_OPERATOR))) {
+#endif
 			list_itr_t *itr = NULL;
 			slurmdb_coord_rec_t *coord = NULL;
 			slurmdb_user_rec_t user;

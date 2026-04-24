@@ -326,6 +326,40 @@ static int _foreach_add_acct(void *x, void *arg)
 	char *query;
 	slurmdb_acct_flags_t base_flags;
 
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	MYSQL_ROW row = NULL;
+	int deleted_val = 0;
+	/* Check the account is deactivated */
+	query = xstrdup_printf("select deleted from %s where name='%s'", acct_table, name);
+	result = mysql_db_query_ret(add_acct_cond->mysql_conn, query, 0);
+	xfree(query);
+	if (!result)
+		return -1;
+
+	cnt = mysql_num_rows(result);
+	row = mysql_fetch_row(result);
+	if (cnt) {
+		deleted_val = slurm_atoul(row[0]);
+		mysql_free_result(result);
+		if (deleted_val == 0) {
+			if (!add_acct_cond->ret_str)
+				xstrcatat(add_acct_cond->ret_str, &add_acct_cond->ret_str_pos,
+					" Adding Account(s)\n");
+			xstrfmtcatat(add_acct_cond->ret_str, &add_acct_cond->ret_str_pos,
+					"  Account '%s' exists and is active\n", name);
+			return 0;
+		} else if (deleted_val == SLURMDB_USER_DEACTIVATED) {
+			if (!add_acct_cond->ret_str)
+				xstrcatat(add_acct_cond->ret_str, &add_acct_cond->ret_str_pos,
+					" Adding Account(s)\n");
+			xstrfmtcatat(add_acct_cond->ret_str, &add_acct_cond->ret_str_pos,
+					"  Account '%s' exists but is deactivated. Please activate it.\n", name);
+			return 0;
+		} 
+	} else {
+		mysql_free_result(result);
+	}
+#else
 	/* Check to see if it is already in the acct_table */
 	query = xstrdup_printf("select name from %s where name='%s' and !deleted",
 			       acct_table, name);
@@ -340,6 +374,7 @@ static int _foreach_add_acct(void *x, void *arg)
 	/* If so, just return */
 	if (cnt)
 		return 0;
+#endif
 
 	/* Else, add it */
 	acct = add_acct_cond->acct_in;
@@ -362,7 +397,11 @@ static int _foreach_add_acct(void *x, void *arg)
 			  " Adding Account(s)\n");
 
 	xstrfmtcatat(add_acct_cond->ret_str, &add_acct_cond->ret_str_pos,
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+		     "  Add Account '%s'\n", name);
+#else
 		     "  %s\n", name);
+#endif
 
 	if (add_acct_cond->insert_query)
 		xstrfmtcatat(add_acct_cond->insert_query,
@@ -811,6 +850,9 @@ extern List as_mysql_modify_accts(mysql_conn_t *mysql_conn, uint32_t uid,
 }
 
 extern List as_mysql_remove_accts(mysql_conn_t *mysql_conn, uint32_t uid,
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+				  bool is_deactivate,
+#endif
 				  slurmdb_account_cond_t *acct_cond)
 {
 	list_itr_t *itr = NULL;
@@ -842,12 +884,24 @@ extern List as_mysql_remove_accts(mysql_conn_t *mysql_conn, uint32_t uid,
 		return NULL;
 	}
 
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+	if (is_deactivate) {
+		xstrcatat(extra, &at, "where deleted=0");
+	} else {
+		xstrfmtcatat(extra, &at, "where (deleted=0 || deleted=%d)", SLURMDB_USER_DEACTIVATED);
+	}
+#else
 	xstrcatat(extra, &at, "where deleted=0");
+#endif
 
 	_setup_acct_cond_limits(acct_cond, &extra, &at);
 
 	if (!extra) {
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+		error("Nothing to %s", is_deactivate ? "deactivate" : "remove");
+#else
 		error("Nothing to remove");
+#endif
 		return NULL;
 	}
 
@@ -891,7 +945,11 @@ extern List as_mysql_remove_accts(mysql_conn_t *mysql_conn, uint32_t uid,
 
 	/* We need to remove these accounts from the coord's that have it */
 	coord_list = as_mysql_remove_coord(
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+		mysql_conn, uid, is_deactivate, ret_list, NULL);
+#else
 		mysql_conn, uid, ret_list, NULL);
+#endif
 	FREE_NULL_LIST(coord_list);
 
 	user_name = uid_to_string((uid_t) uid);
@@ -906,10 +964,23 @@ extern List as_mysql_remove_accts(mysql_conn_t *mysql_conn, uint32_t uid,
 			slurm_mutex_lock(&assoc_lock);
 		}
 
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+		if (is_deactivate)
+			rc = deactivate_common(mysql_conn, DBD_DEACTIVATE_ACCOUNTS, now,
+						user_name, acct_table, name_char,
+						assoc_char, object, ret_list,
+						&jobs_running, &default_account);
+		else
+			rc = remove_common(mysql_conn, DBD_REMOVE_ACCOUNTS, now,
+						user_name, acct_table, name_char,
+						assoc_char, object, ret_list,
+						&jobs_running, &default_account);
+#else
 		rc = remove_common(mysql_conn, DBD_REMOVE_ACCOUNTS, now,
 					user_name, acct_table, name_char,
 					assoc_char, object, ret_list,
 					&jobs_running, &default_account);
+#endif
 
 		if (rpc_version < SLURM_23_11_PROTOCOL_VERSION) {
 			slurm_mutex_unlock(&assoc_lock);
@@ -939,6 +1010,138 @@ extern List as_mysql_remove_accts(mysql_conn_t *mysql_conn, uint32_t uid,
 		errno = SLURM_SUCCESS;
 	return ret_list;
 }
+
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+extern List as_mysql_activate_accts(mysql_conn_t *mysql_conn, uint32_t uid,
+				  slurmdb_account_cond_t *acct_cond,
+				  slurmdb_account_rec_t *acct)
+{
+	List ret_list = NULL;
+	int rc = SLURM_SUCCESS;
+	char *object = NULL, *at = NULL;
+	char *vals = NULL, *extra = NULL, *query = NULL, *name_char = NULL;
+	time_t now = time(NULL);
+	char *user_name = NULL;
+	slurmdb_assoc_flags_t assoc_flags = ASSOC_FLAG_NONE;
+	MYSQL_RES *result = NULL;
+	MYSQL_ROW row;
+
+	if (!acct_cond || !acct) {
+		error("we need something to activate");
+		return NULL;
+	}
+
+	if (check_connection(mysql_conn) != SLURM_SUCCESS)
+		return NULL;
+
+	if (!is_user_min_admin_level(mysql_conn, uid, SLURMDB_ADMIN_OPERATOR)) {
+		errno = ESLURM_ACCESS_DENIED;
+		return NULL;
+	}
+
+	xstrfmtcatat(extra, &at, "where deleted=%d", SLURMDB_USER_DEACTIVATED);
+
+	_setup_acct_cond_limits(acct_cond, &extra, &at);
+
+	xstrcat(vals, ", deleted=0");
+	if (acct->description)
+		xstrfmtcat(vals, ", description='%s'", acct->description);
+	if (acct->organization)
+		xstrfmtcat(vals, ", organization='%s'", acct->organization);
+
+	if (acct->flags & SLURMDB_ACCT_FLAG_USER_COORD_NO) {
+		xstrfmtcat(vals, ", flags=flags&~%u",
+			   SLURMDB_ACCT_FLAG_USER_COORD);
+		assoc_flags |= ASSOC_FLAG_USER_COORD_NO;
+	} else if (acct->flags & SLURMDB_ACCT_FLAG_USER_COORD) {
+		xstrfmtcat(vals, ", flags=flags|%u",
+			   SLURMDB_ACCT_FLAG_USER_COORD);
+		assoc_flags |= ASSOC_FLAG_USER_COORD;
+	}
+
+	if (!extra || !vals) {
+		xfree(extra);
+		xfree(vals);
+		errno = SLURM_NO_CHANGE_IN_DATA;
+		error("Nothing to activate");
+		return NULL;
+	}
+
+	query = xstrdup_printf("select name from %s %s;", acct_table, extra);
+	xfree(extra);
+	DB_DEBUG(DB_ASSOC, mysql_conn->conn, "query\n%s", query);
+	if (!(result = mysql_db_query_ret(
+		      mysql_conn, query, 0))) {
+		xfree(query);
+		xfree(vals);
+		return NULL;
+	}
+
+	rc = 0;
+	ret_list = list_create(xfree_ptr);
+	while ((row = mysql_fetch_row(result))) {
+		object = xstrdup(row[0]);
+		list_append(ret_list, object);
+		if (!rc) {
+			xstrfmtcat(name_char, "(name='%s'", object);
+			rc = 1;
+		} else  {
+			xstrfmtcat(name_char, " || name='%s'", object);
+		}
+
+	}
+	mysql_free_result(result);
+
+	if (!list_count(ret_list)) {
+		errno = SLURM_NO_CHANGE_IN_DATA;
+		DB_DEBUG(DB_ASSOC, mysql_conn->conn,
+		         "didn't affect anything\n%s", query);
+		xfree(query);
+		xfree(vals);
+		return ret_list;
+	}
+	xfree(query);
+	xstrcat(name_char, ")");
+
+	user_name = uid_to_string((uid_t) uid);
+	rc = activate_common(mysql_conn, DBD_ACTIVATE_ACCOUNTS, now,
+			   user_name, acct_table, name_char, vals, NULL);
+	xfree(user_name);
+	if (rc == SLURM_ERROR) {
+		error("Couldn't activate accounts");
+		FREE_NULL_LIST(ret_list);
+		errno = SLURM_ERROR;
+		ret_list = NULL;
+	}
+
+	xfree(name_char);
+	xfree(vals);
+
+
+	/* activate the coordinator if it exists */
+	List coord_list = NULL;
+
+	coord_list = as_mysql_activate_coord(mysql_conn, uid, ret_list, NULL);
+	if (coord_list) {
+		FREE_NULL_LIST(coord_list);
+	}
+
+	if (ret_list &&
+	    (assoc_flags &
+	     (ASSOC_FLAG_USER_COORD_NO | ASSOC_FLAG_USER_COORD))) {
+		flag_coord_acct_t flag_coord_acct = {
+			.acct_list = ret_list,
+			.flags = assoc_flags,
+			.mysql_conn = mysql_conn,
+		};
+
+		/* Update associations based on account flags */
+		_handle_flag_coord(&flag_coord_acct);
+	}
+
+	return ret_list;
+}
+#endif
 
 extern List as_mysql_get_accts(mysql_conn_t *mysql_conn, uid_t uid,
 			       slurmdb_account_cond_t *acct_cond)
@@ -982,7 +1185,11 @@ extern List as_mysql_get_accts(mysql_conn_t *mysql_conn, uid_t uid,
 
 	if (slurm_conf.private_data & PRIVATE_DATA_ACCOUNTS) {
 		if (!(is_admin = is_user_min_admin_level(
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+			      mysql_conn, uid, SLURMDB_ADMIN_READ_ONLY))) {
+#else
 			      mysql_conn, uid, SLURMDB_ADMIN_OPERATOR))) {
+#endif
 			if (slurmdbd_conf->flags &
 			    DBD_CONF_FLAG_DISABLE_COORD_DBD) {
 				error("Coordinator privilege revoked with DisableCoordDBD, only admins/operators can add accounts.");
@@ -1004,7 +1211,15 @@ extern List as_mysql_get_accts(mysql_conn_t *mysql_conn, uid_t uid,
 	}
 
 	if (acct_cond->flags & SLURMDB_ACCT_FLAG_DELETED)
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+		xstrfmtcatat(extra, &at, "where (deleted=0 || deleted=1 || deleted=%d)", SLURMDB_USER_DEACTIVATED);
+	else if (acct_cond->flags & SLURMDB_ACCT_FLAG_DEACTIVATED)
+		xstrfmtcatat(extra, &at, "where (deleted=0 || deleted=%d)", SLURMDB_USER_DEACTIVATED);
+	else if (acct_cond->flags & SLURMDB_ACCT_FLAG_ONLY_DEACTIVATED)
+		xstrfmtcatat(extra, &at, "where deleted=%d", SLURMDB_USER_DEACTIVATED);
+#else
 		xstrcatat(extra, &at, "where (deleted=0 || deleted=1)");
+#endif
 	else
 		xstrcatat(extra, &at, "where deleted=0");
 
@@ -1074,6 +1289,12 @@ empty:
 		acct_cond->assoc_cond->acct_list = list_create(NULL);
 		if (acct_cond->flags & SLURMDB_ACCT_FLAG_DELETED)
 			acct_cond->assoc_cond->with_deleted = 1;
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+		else if (acct_cond->flags & SLURMDB_ACCT_FLAG_DEACTIVATED)
+			acct_cond->assoc_cond->with_deleted = SLURMDB_QUERY_WITH_DEACTIVATED;
+		else if (acct_cond->flags & SLURMDB_ACCT_FLAG_ONLY_DEACTIVATED)
+			acct_cond->assoc_cond->with_deleted = SLURMDB_QUERY_ONLY_DEACTIVATED;
+#endif
 	}
 
 	while ((row = mysql_fetch_row(result))) {
@@ -1086,8 +1307,15 @@ empty:
 		acct->organization = xstrdup(row[SLURMDB_REQ_ORG]);
 		acct->flags = slurm_atoul(row[SLURMDB_REQ_FLAGS]);
 
+#ifdef __METASTACK_OPT_USER_DEACTIVATE
+		if (slurm_atoul(row[SLURMDB_REQ_DELETED]) == 1)
+			acct->flags |= SLURMDB_ACCT_FLAG_DELETED;
+		else if (slurm_atoul(row[SLURMDB_REQ_DELETED]) == SLURMDB_USER_DEACTIVATED)
+			acct->flags |= SLURMDB_ACCT_FLAG_DEACTIVATED;
+#else
 		if (slurm_atoul(row[SLURMDB_REQ_DELETED]))
 			acct->flags |= SLURMDB_ACCT_FLAG_DELETED;
+#endif
 
 		if (acct_cond && (acct_cond->flags & SLURMDB_ACCT_FLAG_WCOORD))
 			acct->coordinators =

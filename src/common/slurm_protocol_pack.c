@@ -15102,6 +15102,9 @@ static void _pack_launch_tasks_request_msg(launch_tasks_request_msg_t *msg,
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
 		packstr(msg->apptype, buffer);
 #endif
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+		pack32(msg->cpu_count, buffer);
+#endif
 #ifdef __METASTACK_OPT_APP
 		packstr(msg->app_name, buffer);  
 		packstr(msg->app_version, buffer);  
@@ -15973,6 +15976,9 @@ static int _unpack_launch_tasks_request_msg(launch_tasks_request_msg_t **msg_ptr
 #endif
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
 		safe_unpackstr(&msg->apptype, buffer);
+#endif
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+		safe_unpack32(&msg->cpu_count, buffer);
 #endif
 #ifdef __METASTACK_OPT_APP  
 		safe_unpackstr(&msg->app_name, buffer);  
@@ -17209,7 +17215,56 @@ static void _pack_prolog_launch_msg(const slurm_msg_t *smsg, buf_t *buffer)
 	prolog_launch_msg_t *msg = smsg->data;
 	xassert(msg);
 #ifdef __META_PROTOCOL
-	if (smsg->protocol_version >= META_3_0_PROTOCOL_VERSION) {
+	if (smsg->protocol_version >= META_3_2_PROTOCOL_VERSION) {
+		gres_prep_pack(msg->job_gres_prep, buffer,
+				smsg->protocol_version);
+		pack32(msg->job_id, buffer);
+		pack32(msg->het_job_id, buffer);
+		pack32(msg->uid, buffer);
+		pack32(msg->gid, buffer);
+
+		/* Remove alias_list 2 versions after 23.11 */
+		packnull(buffer);
+
+		packstr(msg->nodes, buffer);
+		packstr(msg->work_dir, buffer);
+
+		pack16(msg->x11, buffer);
+		packstr(msg->x11_alloc_host, buffer);
+		pack16(msg->x11_alloc_port, buffer);
+		packstr(msg->x11_magic_cookie, buffer);
+		packstr(msg->x11_target, buffer);
+		pack16(msg->x11_target_port, buffer);
+
+		packstr_array(msg->spank_job_env, msg->spank_job_env_size,
+				buffer);
+		slurm_cred_pack(msg->cred, buffer, smsg->protocol_version);
+
+		if (msg->job_ptr_buf) {
+			packbool(true, buffer);
+			packbuf(msg->job_ptr_buf, buffer);
+			packbuf(msg->job_node_array_buf, buffer);
+			packbuf(msg->part_ptr_buf, buffer);
+		} else {
+			packbool(false, buffer);
+		}
+#ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
+		packstr(msg->watch_dog, buffer);
+		packstr(msg->watch_dog_script, buffer);
+		pack32(msg->init_time, buffer);
+		pack32(msg->period, buffer);
+		packbool(msg->enable_all_nodes, buffer);
+		packbool(msg->enable_all_stepds, buffer);
+		pack32(msg->style_step, buffer);
+#endif
+#ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
+		packstr(msg->apptype, buffer);
+#endif
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+		packstr(msg->acctg_freq, buffer);
+		pack32(msg->cpu_count, buffer);
+#endif
+	} else if (smsg->protocol_version >= META_3_0_PROTOCOL_VERSION) {
 		gres_prep_pack(msg->job_gres_prep, buffer,
 				smsg->protocol_version);
 		pack32(msg->job_id, buffer);
@@ -17383,7 +17438,64 @@ static int _unpack_prolog_launch_msg(slurm_msg_t *smsg, buf_t *buffer)
 	prolog_launch_msg_t *msg = xmalloc(sizeof(*msg));
 	smsg->data = msg;
 #ifdef __META_PROTOCOL
-	if(smsg->protocol_version >= META_3_0_PROTOCOL_VERSION) {
+	if(smsg->protocol_version >= META_3_2_PROTOCOL_VERSION) {
+		if (gres_prep_unpack(&msg->job_gres_prep, buffer,
+			smsg->protocol_version))
+			goto unpack_error;
+		safe_unpack32(&msg->job_id, buffer);
+		safe_unpack32(&msg->het_job_id, buffer);
+		safe_unpack32(&msg->uid, buffer);
+		safe_unpack32(&msg->gid, buffer);
+
+		safe_unpackstr(&msg->alias_list, buffer);
+		safe_unpackstr(&msg->nodes, buffer);
+		safe_unpackstr(&msg->work_dir, buffer);
+
+		safe_unpack16(&msg->x11, buffer);
+		safe_unpackstr(&msg->x11_alloc_host, buffer);
+		safe_unpack16(&msg->x11_alloc_port, buffer);
+		safe_unpackstr(&msg->x11_magic_cookie, buffer);
+		safe_unpackstr(&msg->x11_target, buffer);
+		safe_unpack16(&msg->x11_target_port, buffer);
+
+		safe_unpackstr_array(&msg->spank_job_env,
+						&msg->spank_job_env_size,
+						buffer);
+		if (!(msg->cred = slurm_cred_unpack(buffer,
+							smsg->protocol_version)))
+			goto unpack_error;
+
+		safe_unpackbool(&tmp_bool, buffer);
+		if (tmp_bool) {
+			if (job_record_unpack(&msg->job_ptr, 0, buffer,
+							smsg->protocol_version))
+				goto unpack_error;
+			if (slurm_unpack_list(&msg->job_node_array,
+							node_record_unpack,
+							purge_node_rec, buffer,
+							smsg->protocol_version))
+				goto unpack_error;
+			if (part_record_unpack(&msg->part_ptr, buffer,
+							smsg->protocol_version))
+				goto unpack_error;
+		}
+#ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
+		safe_unpackstr(&msg->watch_dog, buffer);
+		safe_unpackstr(&msg->watch_dog_script, buffer);
+		safe_unpack32(&msg->init_time, buffer);
+		safe_unpack32(&msg->period, buffer);
+		safe_unpackbool(&msg->enable_all_nodes, buffer);
+		safe_unpackbool(&msg->enable_all_stepds, buffer);
+		safe_unpack32(&msg->style_step, buffer);
+#endif
+#ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
+		safe_unpackstr(&msg->apptype, buffer);
+#endif
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+		safe_unpackstr(&msg->acctg_freq, buffer);
+		safe_unpack32(&msg->cpu_count, buffer);
+#endif
+	} else if(smsg->protocol_version >= META_3_0_PROTOCOL_VERSION) {
 		if (gres_prep_unpack(&msg->job_gres_prep, buffer,
 			smsg->protocol_version))
 			goto unpack_error;
@@ -17716,8 +17828,7 @@ static void pack_step_gather_msg(step_gather_msg_t *msg, buf_t *buffer,
 			 uint16_t protocol_version)
 {
 #ifdef __META_PROTOCOL
-
-	if(protocol_version >= META_3_0_PROTOCOL_VERSION){
+	if (protocol_version >= META_3_2_PROTOCOL_VERSION ) {
 		pack_step_id(&msg->step_id, buffer, protocol_version);
 		pack32((uint32_t)msg->rank, buffer);
 		packdouble(msg->cpu_ave, buffer);
@@ -17727,7 +17838,24 @@ static void pack_step_gather_msg(step_gather_msg_t *msg, buf_t *buffer,
 		pack64(msg->vmem_real, buffer);
 		pack64(msg->page_fault, buffer);
 		pack64(msg->load_flag, buffer);
-		pack64(msg->node_alloc_cpu, buffer);
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+		packdouble(msg->dcu_util, buffer);
+		pack64(msg->dcu_mem_step, buffer);
+#endif
+#ifdef __METASTACK_NEW_PROFILE_TIME_SYNC
+		pack_time(msg->send_timestamp, buffer);
+#endif
+	} else if (protocol_version >= META_3_0_PROTOCOL_VERSION){
+		pack_step_id(&msg->step_id, buffer, protocol_version);
+		pack32((uint32_t)msg->rank, buffer);
+		packdouble(msg->cpu_ave, buffer);
+		packdouble(msg->cpu_util, buffer);
+
+		pack64(msg->mem_real, buffer);
+		pack64(msg->vmem_real, buffer);
+		pack64(msg->page_fault, buffer);
+		pack64(msg->load_flag, buffer);
+		// pack64(msg->node_alloc_cpu, buffer);
 	} else if(protocol_version >= SLURM_24_05_PROTOCOL_VERSION) {
 		// Skip the packaging step during build
 	} else if(protocol_version >= SLURM_ONE_BACK_PROTOCOL_VERSION) {
@@ -17744,7 +17872,7 @@ static void pack_step_gather_msg(step_gather_msg_t *msg, buf_t *buffer,
 		pack64(msg->vmem_real, buffer);
 		pack64(msg->page_fault, buffer);
 		pack64(msg->load_flag, buffer);
-		pack64(msg->node_alloc_cpu, buffer);
+		// pack64(msg->node_alloc_cpu, buffer);
 	} else if(protocol_version >= SLURM_MIN_PROTOCOL_VERSION) {
 		// Skip the packaging step during build
 	}
@@ -17761,7 +17889,7 @@ _unpack_step_gather_msg(step_gather_msg_t ** msg_ptr, buf_t *buffer,
 	*msg_ptr = msg;
 
 #ifdef __META_PROTOCOL
-	if(protocol_version >= META_3_0_PROTOCOL_VERSION){
+	if (protocol_version >= META_3_2_PROTOCOL_VERSION) {
 		if (unpack_step_id_members(&msg->step_id, buffer,
 						protocol_version) != SLURM_SUCCESS)
 			goto unpack_error;
@@ -17773,7 +17901,26 @@ _unpack_step_gather_msg(step_gather_msg_t ** msg_ptr, buf_t *buffer,
 		safe_unpack64(&msg->vmem_real, buffer);
 		safe_unpack64(&msg->page_fault, buffer);
 		safe_unpack64(&msg->load_flag, buffer);
-		safe_unpack64(&msg->node_alloc_cpu, buffer);
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+		safe_unpackdouble(&msg->dcu_util, buffer);
+		safe_unpack64(&msg->dcu_mem_step, buffer);
+#endif
+#ifdef __METASTACK_NEW_PROFILE_TIME_SYNC
+		safe_unpack_time(&msg->send_timestamp, buffer);
+#endif
+	} else if (protocol_version >= META_3_0_PROTOCOL_VERSION) {
+		if (unpack_step_id_members(&msg->step_id, buffer,
+						protocol_version) != SLURM_SUCCESS)
+			goto unpack_error;
+		safe_unpack32(&msg->rank, buffer);
+		safe_unpackdouble(&msg->cpu_ave, buffer);
+		safe_unpackdouble(&msg->cpu_util, buffer);
+				
+		safe_unpack64(&msg->mem_real, buffer);
+		safe_unpack64(&msg->vmem_real, buffer);
+		safe_unpack64(&msg->page_fault, buffer);
+		safe_unpack64(&msg->load_flag, buffer);
+		// safe_unpack64(&msg->node_alloc_cpu, buffer);
 	} else if(protocol_version >= SLURM_24_05_PROTOCOL_VERSION) {
 		// Skip the packaging step during build
 	} else if(protocol_version >= SLURM_ONE_BACK_PROTOCOL_VERSION) {
@@ -17792,7 +17939,7 @@ _unpack_step_gather_msg(step_gather_msg_t ** msg_ptr, buf_t *buffer,
 		safe_unpack64(&msg->vmem_real, buffer);
 		safe_unpack64(&msg->page_fault, buffer);
 		safe_unpack64(&msg->load_flag, buffer);
-		safe_unpack64(&msg->node_alloc_cpu, buffer);
+		// safe_unpack64(&msg->node_alloc_cpu, buffer);
 	} else if(protocol_version >= SLURM_MIN_PROTOCOL_VERSION) {
 		// Skip the packaging step during build
 	}

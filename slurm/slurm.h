@@ -408,6 +408,10 @@ typedef struct sbcast_cred sbcast_cred_t;		/* opaque data type */
 #define __METASTACK_OPT_FAIL_BY_PART
 #endif
 
+#ifndef __METASTACK_OPT_READ_ONLY_ADMIN
+#define __METASTACK_OPT_READ_ONLY_ADMIN
+#endif
+
 /* 
 	The process information of the job step is collected at the beginning of the job running to judge the application type
 */
@@ -615,8 +619,16 @@ typedef struct sbcast_cred sbcast_cred_t;		/* opaque data type */
 #define __METASTACK_BUG_SPREAD_JOB_CRASH_CTLD
 #endif
 
+#ifndef __METASTACK_OPT_MSG_OUTPUT_MULTI_LANG
+#define __METASTACK_OPT_MSG_OUTPUT_MULTI_LANG
+#endif
+
 #ifndef __METASTACK_OPT_APP  
 #define __METASTACK_OPT_APP
+#endif
+
+#ifndef __METASTACK_OPT_USER_DEACTIVATE
+#define __METASTACK_OPT_USER_DEACTIVATE
 #endif
 
 /*****************************************************************************\
@@ -626,6 +638,13 @@ typedef struct sbcast_cred sbcast_cred_t;		/* opaque data type */
 #define HOST_NAME_MAX 64
 #endif
 
+#ifndef __METASTACK_NEW_GRES_GATHER_DCU
+#define __METASTACK_NEW_GRES_GATHER_DCU
+#endif
+
+#ifndef __METASTACK_NEW_PROFILE_TIME_SYNC
+#define __METASTACK_NEW_PROFILE_TIME_SYNC
+#endif
 /*****************************************************************************\
  *	DEFINITIONS FOR INPUT VALUES
 \*****************************************************************************/

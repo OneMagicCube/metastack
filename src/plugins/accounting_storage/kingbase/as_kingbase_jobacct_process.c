@@ -1900,7 +1900,11 @@ extern List as_kingbase_jobacct_process_get_jobs(kingbase_conn_t *kingbase_conn,
 	    (job_cond->flags & JOBCOND_FLAG_SCRIPT) ||
 	    (job_cond->flags & JOBCOND_FLAG_ENV)) {
 		if (!(is_admin = is_user_min_admin_level(
+#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
+			      kingbase_conn, uid, SLURMDB_ADMIN_READ_ONLY))) {
+#else
 			      kingbase_conn, uid, SLURMDB_ADMIN_OPERATOR))) {
+#endif
 			/*
 			 * Only fill in the coordinator accounts here we will
 			 * check them later when we actually try to get the jobs
