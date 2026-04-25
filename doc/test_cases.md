@@ -200,6 +200,13 @@
 | TestSacctAppFilter | test_filter_combined_appname_and_version | --appname 和 --appversion 组合 | 同时匹配两条件的作业 |
 | TestSacctAppFilter | test_filter_appname_no_match | --appname 不匹配任何作业 | 返回空结果 |
 | TestSacctAppHelpformat | test_helpformat_lists_app_fields | sacct -e 列表查询 | AppName, Version, Source 在字段列表中 |
+| TestSacctOutputFormat | test_sacct_parsable_pipe_format | sacct -p 管道分隔输出 | 字段以 \| 分隔，行尾有 \| |
+| TestSacctOutputFormat | test_sacct_parsable2_no_trailing_delim | sacct -P 输出 | 行尾无 \|，字段数与表头一致 |
+| TestSacctOutputFormat | test_sacct_format_width_appname | sacct --format=AppName%30 宽度控制 | AppName 列输出宽度为 30 |
+| TestSacctOutputFormat | test_sacct_noheader_omits_header | sacct --noheader | 不输出表头行 |
+| TestSacctOutputFormat | test_sacct_starttime_with_appname | sacct -S now-1hour --appname=x | 时间窗口和 app 过滤组合生效 |
+| TestSacctOutputFormat | test_sacct_jobid_with_appname_filter | sacct -j JOBID --appname=x | 同时匹配则返回，否则空 |
+| TestSacctOutputFormat | test_sacct_json_output_contains_app | sacct --json | JSON 输出含 app 字段（不支持则 skip）|
 
 ---
 

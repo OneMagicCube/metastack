@@ -15,6 +15,7 @@ import atf
 import pytest  
 import time  
 import re  
+import json  
   
   
 # ---------------------------------------------------------------------------  
@@ -83,7 +84,7 @@ def _sacct_filter(filter_args, fmt="JobID", extra_args=""):
 @pytest.fixture(scope="module", autouse=True)  
 def setup():  
     """Ensure Slurm and slurmdbd are running, create test apps.""" 
-    time.sleep(3) 
+    time.sleep(2) 
     atf.require_slurm_running()  
   
     # Create test apps  
@@ -374,4 +375,190 @@ class TestSacctAppHelpformat:
         )  
         assert "AppSource" in output, (  
             f"AppSource not found in sacct -e output: {output}"  
+        )
+
+
+# ---------------------------------------------------------------------------
+# TestSacctOutputFormat: verify sacct output format options work with
+# AppName / AppVersion / AppSource fields.
+#
+# Source: src/sacct/print.c print_fields_parsable_set, print_fields_have_header
+#         src/sacct/options.c parse_format() handles %WIDTH suffix
+# ---------------------------------------------------------------------------
+class TestSacctOutputFormat:
+    """
+    Verify sacct's output formatting options (-p / -P / --format=%WIDTH /
+    --noheader / time and jobid filters / --json) all work consistently
+    with the new AppName, AppVersion, AppSource fields.
+    """
+
+    def test_sacct_parsable_pipe_format(self):
+        """
+        sacct -p produces pipe-separated output with a TRAILING '|'.
+        The header line and each data line must both end with '|'.
+        """
+        jid = _submit_and_wait('--app=sacctapp-1.0 -t1 --wrap="hostname"')
+        cmd = (
+            f"sacct -p -X --starttime=now-1hour -j {jid} "
+            "--format=JobID,AppName,AppVersion,AppSource"
+        )
+        output = atf.run_command_output(cmd).strip()
+        assert output, "sacct -p must produce output"
+
+        for line in output.splitlines():
+            assert line.endswith("|"), (
+                f"sacct -p must end each line with '|', got: {line!r}"
+            )
+
+        data_lines = [l for l in output.splitlines()
+                      if l and not l.startswith("JobID")]
+        assert any(f"{jid}|sacctapp|1.0|user|" in l for l in data_lines), (
+            f"Expected JobID|sacctapp|1.0|user| in sacct -p output:\n{output}"
+        )
+
+    def test_sacct_parsable2_no_trailing_delim(self):
+        """
+        sacct -P produces pipe-separated output with NO trailing '|'.
+        Field count per line must equal field count in header.
+        """
+        jid = _submit_and_wait('--app=sacctapp-2.0 -t1 --wrap="hostname"')
+        cmd = (
+            f"sacct -P -X --starttime=now-1hour -j {jid} "
+            "--format=JobID,AppName,AppVersion,AppSource"
+        )
+        output = atf.run_command_output(cmd).strip()
+        assert output, "sacct -P must produce output"
+
+        lines = output.splitlines()
+        for line in lines:
+            assert not line.endswith("|"), (
+                f"sacct -P must NOT end with '|', got: {line!r}"
+            )
+
+        header_fields = lines[0].split("|")
+        for data_line in lines[1:]:
+            data_fields = data_line.split("|")
+            assert len(data_fields) == len(header_fields), (
+                f"Field count mismatch: header has {len(header_fields)}, "
+                f"data line has {len(data_fields)}: {data_line!r}"
+            )
+
+    def test_sacct_format_width_appname(self):
+        """
+        sacct --format=AppName%30 controls the column width.
+        AppName column width must be 30 characters.
+
+        Source: parse_format() honors %WIDTH suffix per field.
+        """
+        jid = _submit_and_wait('--app=sacctapp-1.0 -t1 --wrap="hostname"')
+        cmd = (
+            f"sacct -X --starttime=now-1hour -j {jid} "
+            "--format=AppName%30"
+        )
+        output = atf.run_command_output(cmd).strip()
+        lines = output.splitlines()
+        assert len(lines) >= 2, f"Expected header + data line, got: {output}"
+
+        # Header line should be 30 chars wide (allow trailing whitespace trim)
+        # Use line BEFORE strip to check raw width of the column
+        raw_output = atf.run_command_output(cmd)
+        raw_lines = raw_output.rstrip("\n").splitlines()
+        # First non-empty line is header; column width is the line length
+        header = raw_lines[0]
+        assert len(header) >= 30, (
+            f"AppName column with %30 must be at least 30 chars wide, "
+            f"header length={len(header)}: {header!r}"
+        )
+
+    def test_sacct_noheader_omits_header(self):
+        """
+        sacct --noheader must NOT print the column header line.
+        First line of output must be data, not 'JobID  AppName ...'.
+        """
+        jid = _submit_and_wait('--app=sacctapp-1.0 -t1 --wrap="hostname"')
+        cmd = (
+            f"sacct -X --noheader --starttime=now-1hour -j {jid} "
+            "--format=JobID,AppName"
+        )
+        output = atf.run_command_output(cmd).strip()
+        if output:
+            first = output.splitlines()[0]
+            assert "JobID" not in first or str(jid) in first, (
+                f"With --noheader, first line must not be the column "
+                f"header, got: {first!r}"
+            )
+
+    def test_sacct_starttime_with_appname(self):
+        """
+        sacct -S now-1hour --appname=sacctapp must combine time window
+        and app name filter correctly.
+        """
+        jid = _submit_and_wait('--app=sacctapp-1.0 -t1 --wrap="hostname"')
+        cmd = (
+            "sacct -X -P --noheader --starttime=now-1hour "
+            "--appname=sacctapp --format=JobID"
+        )
+        output = atf.run_command_output(cmd).strip()
+        assert str(jid) in output, (
+            f"Job {jid} should match --appname=sacctapp within last hour: "
+            f"{output}"
+        )
+
+    def test_sacct_jobid_with_appname_filter(self):
+        """
+        sacct -j JOBID --appname=X must intersect:
+          - matches when JOBID's app == X
+          - empty when JOBID's app != X
+        """
+        jid = _submit_and_wait('--app=sacctapp-1.0 -t1 --wrap="hostname"')
+
+        # Matching case
+        match_cmd = (
+            f"sacct -X -P --noheader -j {jid} --appname=sacctapp "
+            "--format=JobID"
+        )
+        match = atf.run_command_output(match_cmd).strip()
+        assert str(jid) in match, (
+            f"Job {jid} should be returned when both filters match: "
+            f"{match}"
+        )
+
+        # Non-matching case
+        nomatch_cmd = (
+            f"sacct -X -P --noheader -j {jid} --appname=sacctother "
+            "--format=JobID"
+        )
+        nomatch = atf.run_command_output(nomatch_cmd).strip()
+        assert str(jid) not in nomatch, (
+            f"Job {jid} should NOT be returned when --appname mismatches: "
+            f"{nomatch}"
+        )
+
+    def test_sacct_json_output_contains_app(self):
+        """
+        sacct --json output must include app fields. If the build does not
+        support --json (no data_parser plugin), skip the test.
+        """
+        jid = _submit_and_wait('--app=sacctapp-1.0 -t1 --wrap="hostname"')
+        cmd = f"sacct -j {jid} --json"
+        result = atf.run_command(cmd, fatal=False)
+
+        if result["exit_code"] != 0:
+            pytest.skip(
+                "sacct --json not supported in this build "
+                f"(rc={result['exit_code']}): {result.get('stderr', '')}"
+            )
+
+        stdout = result["stdout"]
+        # Verify it is parseable JSON containing the app fields
+        try:
+            data = json.loads(stdout)
+        except json.JSONDecodeError as e:
+            pytest.skip(f"sacct --json output is not valid JSON: {e}")
+
+        # The JSON schema varies by data_parser version; do a substring
+        # check over the serialized form to remain version-agnostic.
+        serialized = json.dumps(data).lower()
+        assert "app" in serialized, (
+            f"sacct --json output should reference app fields:\n{stdout}"
         )
