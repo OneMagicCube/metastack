@@ -350,8 +350,9 @@ env_vars_t env_vars[] = {
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
   { "SBATCH_JOB_APPTYPE", LONG_OPT_APPTYPE},
 #endif
-#ifdef __METASTACK_OPT_APP  
-  { "SBATCH_APP", LONG_OPT_APP },  
+#ifdef __METASTACK_OPT_APP
+  { "SBATCH_APP", LONG_OPT_APP },
+  { "SBATCH_APP_SOURCE", LONG_OPT_APP_SOURCE },
 #endif
   { NULL }
 };
