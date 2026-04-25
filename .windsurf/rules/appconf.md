@@ -9,12 +9,12 @@
     - **优先扩展而非修改**：如果原生函数无法满足需求，优先考虑通过 Hook、新增辅助函数或在宏定义包裹下进行最小化侵入，严禁大范围重构原生底层 API。
 ## 2. 文档更新机制 (Bidirectional Sync)
 - **代码驱动更新**：在完成代码修改后，必须扫描变更影响，并**主动提示并自动更新**对应的文档：
-    - **业务逻辑变更** -> 更新 `docs/design.md`
-    - **性能优化/重构细节** -> 更新 `docs/technical_design.md`
-    - **新增/改动功能特性** -> 必须同步更新或新增 `docs/test_cases.md` 中的测试条目
+    - **业务逻辑变更** -> 更新 `doc/design.md`
+    - **性能优化/重构细节** -> 更新 `doc/technical_design.md`
+    - **新增/改动功能特性** -> 必须同步更新或新增 `doc/test_cases.md` 中的测试条目
 - **文档驱动开发**：
-    - 如果我修改了 `docs/design.md`，请扫描变更并提出代码实现建议。
-    - 如果我修改了 `docs/test_cases.md`，请扫描变更并更新或生成对应的自动化测试脚本。
+    - 如果我修改了 `doc/design.md`，请扫描变更并提出代码实现建议。
+    - 如果我修改了 `doc/test_cases.md`，请扫描变更并更新或生成对应的自动化测试脚本。
 
 ## 3. 代码实现规范 (Macro Definition)
 - **版本归属**：本项目当前处于 `metastack-3.2` 版本开发阶段。
@@ -51,14 +51,14 @@
 - **强制要求**：每次涉及代码修改的任务完成后，必须在回复的最后提供一个符合 Git 规范的 Commit Message 文本。
 - **格式要求**：
   - **Header**: `type(scope): subject` (例如 `feat(slurm): add app recognition logic`)
-  - **Body**: 必须包含本次修改是否涉及 `__METASTACK_OPT_APP` 宏，以及是否同步更新了 `docs/` 下的文档。
+  - **Body**: 必须包含本次修改是否涉及 `__METASTACK_OPT_APP` 宏，以及是否同步更新了 `doc/` 下的文档。
 - **示例格式**：
     ```text
     feat/fix/refactor: 简要描述变更内容
     
     - 实现细节描述
     - 宏定义检查: 已包裹在 __METASTACK_OPT_APP 宏内
-    - 文档状态: 已同步更新 docs/design.md 或 technical_design.md
+    - 文档状态: 已同步更新 doc/design.md 或 technical_design.md
     ```
 
 ## 8. 测试驱动与用例同步规范 (Test-Driven Sync)
@@ -66,11 +66,11 @@
 - **核心地位**：`doc/test_cases.md` 是本项目测试逻辑的唯一事实来源。所有自动化测试脚本（如 `testsuite/python/tests/test_148*`）必须基于该文档生成的用例编写。
 - **强制同步逻辑**：
     - **修改代码后**：Cascade 在完成代码修改后，必须扫描修改点是否影响了现有的测试逻辑（例如：新增了参数、改动了输出格式或引入了新宏）。
-    - **自动触发询问**：如果代码变动涉及业务逻辑或 API，AI 必须主动询问：“检测到功能变更，是否需要我更新 `docs/test_cases.md` 中的对应测试项或新增测试用例？”
+    - **自动触发询问**：如果代码变动涉及业务逻辑或 API，AI 必须主动询问：“检测到功能变更，是否需要我更新 `doc/test_cases.md` 中的对应测试项或新增测试用例？”
 - **更新规范**：
     - **结构对齐**：新增用例必须严格遵循 `test_148_x.py` 系列的表格结构，包括：测试类、测试用例、测试内容、预期结果。
     - **覆盖率要求**：新功能必须至少包含一个正向用例（Success Case）和一个异常用例（Edge/Error Case）。
     - **宏定义声明**：在“测试内容”中必须明确标注该测试是否依赖 `__METASTACK_OPT_APP` 宏。
 - **测试脚本生成流**：
-    - 禁止 AI 在没有更新 `docs/test_cases.md` 的情况下直接修改 `testsuite/python` 下的脚本。
+    - 禁止 AI 在没有更新 `doc/test_cases.md` 的情况下直接修改 `testsuite/python` 下的脚本。
     - 流程必须是：`修改代码` -> `更新 test_cases.md` -> `根据文档重构/生成 .py 测试文件`。
