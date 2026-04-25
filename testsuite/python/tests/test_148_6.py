@@ -731,20 +731,3 @@ class TestStateFileEdgeCases:
             )
         finally:
             _delete_app("oldver_pre")
-
-    def test_dump_atomic_on_disk_full(self):
-        """
-        Simulate a write failure during dump_all_app_state. The original
-        app_state must remain intact (atomic rename via *.new). Reliable
-        disk-full simulation requires environment-specific quota setup, so
-        this test is skipped by default and serves as a documentation
-        anchor for manual QA.
-
-        Source: dump_all_app_state() L1761-1799 — write to *.new first,
-                only rename to app_state on success.
-        """
-        pytest.skip(
-            "Disk-full simulation requires quota/cgroup setup; "
-            "covered by manual QA. See dump_all_app_state() for "
-            "the atomic *.new -> rename guarantee."
-        )

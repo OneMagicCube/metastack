@@ -178,7 +178,6 @@
 | TestStateFileEdgeCases | test_corrupt_state_file_handled | 手动破坏 spool/app_state | slurmctld 启动不 coredump，记录错误日志 |
 | TestStateFileEdgeCases | test_missing_state_file_handled | 删除 app_state | 启动成功，使用 conf 中的 app |
 | TestStateFileEdgeCases | test_old_version_state_file | 旧版本 state 文件 | 兼容加载或安全跳过 |
-| TestStateFileEdgeCases | test_dump_atomic_on_disk_full | 模拟磁盘满（quota） | 旧文件不丢失，记录错误 |
 
 ---
 
