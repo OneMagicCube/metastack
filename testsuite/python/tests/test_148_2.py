@@ -528,6 +528,75 @@ class TestVersionErrors:
             "scontrol update app AppName=nonexistent_ver3 Version=1.0"  
         )  
         assert result["exit_code"] != 0  
+
+    def test_add_version_with_whitespace_only_token(self, cleanup_app):
+        """
+        Verify Version+= with a whitespace-only token is safely handled.
+
+        Regression target:
+        - _rebuild_combined_hash_for_app()
+        - _version_in_list()
+        Defensive guards must skip blank tokens after whitespace trimming,
+        and must not crash slurmctld.
+        """
+        cleanup_app("verrws1")
+        _create_app("verrws1", Version="1.0")
+
+        result = _update_app_raw(
+            'scontrol update app AppName=verrws1 "Version+=2.0,   ,3.0"'
+        )
+        assert result["exit_code"] == 0, (
+            f"Version+= with whitespace token should succeed: {result}"
+        )
+
+        versions = _version_set("verrws1")
+        assert versions == {"1.0", "2.0", "3.0"}, (
+            f"Whitespace token must be ignored, got versions={versions}"
+        )
+
+        ping = atf.run_command("scontrol ping", quiet=True)
+        assert "is UP" in ping.get("stdout", ""), (
+            "slurmctld must remain UP after whitespace-token Version+="
+        )
+
+    def test_remove_version_with_whitespace_only_token(self, cleanup_app):
+        """
+        Verify Version-= works when existing version list contains a
+        whitespace-only token.
+
+        Regression target:
+        - _remove_combined_hash_for_app()
+        - _remove_version_from_list()
+        - _version_in_list()
+        All token loops must safely skip blank tokens and not crash.
+        """
+        cleanup_app("verrws2")
+        _create_app("verrws2", Version="1.0,2.0,3.0")
+
+        # Inject a whitespace-only token into stored version list.
+        set_result = _update_app_raw(
+            'scontrol update app AppName=verrws2 "Version=1.0,   ,2.0,3.0"'
+        )
+        assert set_result["exit_code"] == 0, (
+            f"Failed to set version list containing whitespace token: {set_result}"
+        )
+
+        result = _update_app_raw(
+            "scontrol update app AppName=verrws2 Version-=2.0"
+        )
+        assert result["exit_code"] == 0, (
+            f"Version-= with whitespace token present should succeed: {result}"
+        )
+
+        versions = _version_set("verrws2")
+        assert versions == {"1.0", "3.0"}, (
+            f"Version 2.0 should be removed, got versions={versions}"
+        )
+
+        ping = atf.run_command("scontrol ping", quiet=True)
+        assert "is UP" in ping.get("stdout", ""), (
+            "slurmctld must remain UP after whitespace-token Version-="
+        )
   
   
 # ===========================================================================  

@@ -61,6 +61,8 @@
 | TestVersionErrors | test_version_update_nonexistent_app | 对不存在的应用 Version+= | 失败 |
 | TestVersionErrors | test_version_remove_nonexistent_app | 对不存在的应用 Version-= | 失败 |
 | TestVersionErrors | test_version_replace_nonexistent_app | 对不存在的应用 Version= | 失败 |
+| TestVersionErrors | test_add_version_with_whitespace_only_token | Version+= 包含空白 token（如 `2.0,   ,3.0`） | 空白 token 被忽略，版本正常更新，slurmctld 保持可用 |
+| TestVersionErrors | test_remove_version_with_whitespace_only_token | Version-= 作用于包含空白 token 的版本串 | 目标版本正常删除，空白 token 被忽略，slurmctld 保持可用 |
 | TestVersionWithProperties | test_add_version_and_update_description | Version+= 和 Description= 组合 | 两者都生效 |
 | TestVersionWithProperties | test_remove_version_and_change_default | Version-= 和 Default= 组合 | 两者都生效 |
 | TestVersionWithProperties | test_replace_version_and_update_description | Version= 和 Description= 组合 | 两者都生效 |
@@ -182,6 +184,7 @@
 | TestReconfigWithKeepAppInfo | test_dynamic_app_version_preserved | 动态应用的版本保留 | 更新的版本仍存在 |
 | TestReconfigWithKeepAppInfo | test_config_and_dynamic_apps_coexist | 配置和动态共存 | 两者都存在 |
 | TestReconfigFlagsEdgeCases | test_state_file_overwritten_on_reconfigure_without_keep | reconfigure 后状态文件被覆盖 | 后续 slurmctld -R 也无法恢复动态 app |
+| TestConfigParseDefensive | test_reconfigure_ignores_empty_appname_line | slurm.conf 含 `AppName=` 空值行后 reconfigure | 空名记录被忽略，slurmctld 保持 UP，app 列表无匿名条目 |
 
 ---
 

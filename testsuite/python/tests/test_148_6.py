@@ -570,3 +570,68 @@ class TestReconfigFlagsEdgeCases:
         assert "statelost1" not in show_all["stdout"], (  
             "Dynamic app should not appear in any app listing"  
         )
+
+
+# ---------------------------------------------------------------------------
+# TestConfigParseDefensive
+# ---------------------------------------------------------------------------
+
+class TestConfigParseDefensive:
+
+    def test_reconfigure_ignores_empty_appname_line(self):
+        """
+        Verify that an empty AppName line in slurm.conf is ignored safely.
+
+        Regression target:
+        common/read_config.c _parse_app_name() now rejects empty value
+        (`!value || !value[0]`) instead of only NULL.
+
+        Expected behavior:
+        1) scontrol reconfigure succeeds and slurmctld stays UP
+        2) no anonymous app record ("AppName=") appears in app listing
+        """
+        conf = _get_conf_file()
+        marker = "test_148_6_empty_appname"
+
+        try:
+            atf.run_command(
+                f"echo 'AppName= # {marker}' >> {conf}",
+                user=_slurm_user(),
+                fatal=True,
+            )
+
+            result = atf.run_command(
+                "scontrol reconfigure",
+                user=_slurm_user(),
+                fatal=False,
+            )
+            assert result["exit_code"] == 0, (
+                f"reconfigure should not fail on empty AppName line: {result}"
+            )
+            time.sleep(3)
+
+            ping = atf.run_command("scontrol ping", quiet=True)
+            assert "is UP" in ping.get("stdout", ""), (
+                "slurmctld must remain UP after parsing empty AppName line"
+            )
+
+            show_all = atf.run_command(
+                "scontrol show app",
+                user=_slurm_user(),
+            )
+            assert re.search(r"AppName=(\s|$)", show_all["stdout"]) is None, (
+                "Empty AppName record should be ignored and must not appear "
+                f"in output:\n{show_all['stdout']}"
+            )
+        finally:
+            atf.run_command(
+                f"sed -i '/{marker}/d' {conf}",
+                user=_slurm_user(),
+                fatal=True,
+            )
+            atf.run_command(
+                "scontrol reconfigure",
+                user=_slurm_user(),
+                quiet=True,
+                fatal=False,
+            )
