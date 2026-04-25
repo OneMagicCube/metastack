@@ -250,7 +250,11 @@ typedef struct {
 - **最小化锁持有时间**：锁保护范围仅限于实际需要的数据访问，不包含文件 I/O 操作
 - **锁分离**：`lock_slurmctld()` 保护内存数据，`lock_state_files()` 保护文件操作，两者独立
 
-### 4.5.2 异步保存调度
+### 4.5.2 锁断言对齐
+
+`load_all_app_state()` 添加了 `xassert(verify_lock(CONF_LOCK, READ_LOCK));` 防御性断言，对齐 Slurm 原生 `load_all_part_state()` 的锁验证模式，确保在正确的锁上下文中执行状态加载。
+
+### 4.5.3 异步保存调度
 
 通过 `schedule_app_save()` 实现异步保存，减少锁竞争：
 

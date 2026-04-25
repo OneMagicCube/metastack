@@ -23,6 +23,7 @@
 - **存量修改**：若是为了支持新功能而修改已有代码，也请尽量使用宏定义隔离，或在注释中明确标出。
 - **注释** ： 足够的注释，应该至少占据百分之20
 - **架构溯源与兼容原则**：在对代码进行任何改进或优化前，必须首先深入分析并对齐 Slurm 原生的设计哲学。优先考虑如何利用或扩展 Slurm 现有的设计模式，而非通过引入碎片化的新增逻辑来解决问题。确保所有变更在逻辑演进上与 Slurm 原生架构保持高度的一致性和连贯性。
+
 ## 4. 技术优化记录规范 (Technical Design)
 - 记录内容：
     1. 优化背景：解决的问题（如：降低 CPU ticks、减少内存 RSS 占用、优化 Slurm 扫描延迟等）。
@@ -40,3 +41,17 @@
     - 是否所有新增逻辑都已闭合在 __METASTACK_OPT_APP 宏之内？
     - 如果涉及优化，是否已询问并准备好同步 doc/technical_design.md？
     - 如果涉及 API 或核心流程改动，是否已同步 doc/design.md？
+
+## 7. 提交规范 (Commit Message Requirement)
+- **强制要求**：每次涉及代码修改的任务完成后，必须在回复的最后提供一个符合 Git 规范的 Commit Message 文本。
+- **格式要求**：
+  - **Header**: `type(scope): subject` (例如 `feat(slurm): add app recognition logic`)
+  - **Body**: 必须包含本次修改是否涉及 `__METASTACK_OPT_APP` 宏，以及是否同步更新了 `docs/` 下的文档。
+- **示例格式**：
+    ```text
+    feat/fix/refactor: 简要描述变更内容
+    
+    - 实现细节描述
+    - 宏定义检查: 已包裹在 __METASTACK_OPT_APP 宏内
+    - 文档状态: 已同步更新 docs/design.md 或 technical_design.md
+    ```

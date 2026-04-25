@@ -1808,8 +1808,10 @@ extern int load_all_app_state(uint16_t reconfig_flags)
 	char *state_file, *ver_str = NULL;  
 	time_t now;  
 	int error_code = 0;  
-	buf_t *buffer;  
+	buf_t *buffer;
 	uint16_t protocol_version = NO_VAL16;  
+
+	xassert(verify_lock(CONF_LOCK, READ_LOCK));  
 	app_record_t tmp_app;  
 	int app_count = 0;  
   
