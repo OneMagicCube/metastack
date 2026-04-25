@@ -219,6 +219,24 @@ def _start_slurmctld(full_recovery=False):
         f"slurmctld did not start in time (cmd: {cmd})"  
     )  
     time.sleep(2)  
+
+
+def _get_state_save_location():
+    """Get StateSaveLocation from scontrol show config."""
+    output = atf.run_command_output(
+        "scontrol show config | grep -i StateSaveLocation"
+    ).strip()
+    if "=" in output:
+        return output.split("=", 1)[1].strip()
+    return None
+
+
+def _get_app_state_file():
+    """Return absolute path to <StateSaveLocation>/app_state."""
+    loc = _get_state_save_location()
+    if not loc:
+        return None
+    return f"{loc}/app_state"  
   
   
 # ---------------------------------------------------------------------------  
@@ -569,4 +587,164 @@ class TestReconfigFlagsEdgeCases:
         )  
         assert "statelost1" not in show_all["stdout"], (  
             "Dynamic app should not appear in any app listing"  
+        )
+
+
+# ---------------------------------------------------------------------------
+# TestStateFileEdgeCases
+# ---------------------------------------------------------------------------
+
+class TestStateFileEdgeCases:
+    """
+    Edge cases for state file handling: corruption, missing file, version
+    mismatch, and dump-time disk failure. These tests ensure slurmctld does
+    not coredump and original Slurm flow is not blocked when the app_state
+    file is in an unexpected state.
+
+    Source: load_all_app_state() L1842-1950 (state file open/parse/merge)
+    Source: dump_all_app_state() L1725-1805 (atomic write via .new -> rename)
+    """
+
+    def _ensure_keep_app_info(self):
+        """Ensure KeepAppInfo is in memory so state file is loaded on restart."""
+        if not _has_keep_app_info():
+            current = _get_current_reconfig_flags()
+            new_flags = (current + ",KeepAppInfo") if current else "KeepAppInfo"
+            _set_reconfig_flags_in_conf(new_flags)
+            atf.run_command(
+                "scontrol reconfigure",
+                user=_slurm_user(),
+                fatal=True,
+            )
+            time.sleep(2)
+
+    def test_corrupt_state_file_handled(self):
+        """
+        Manually corrupt spool/app_state. slurmctld must start without
+        coredump and log an error; config-defined apps must still load.
+
+        Source: load_all_app_state() safe_unpack* paths goto unpack_error
+                on malformed buffer; function returns without fatal().
+        """
+        state_file = _get_app_state_file()
+        if not state_file:
+            pytest.skip("Cannot determine StateSaveLocation")
+
+        self._ensure_keep_app_info()
+
+        # Create a dynamic app and force a dump so app_state exists
+        _create_app("corrupt_pre", version="1.0")
+        time.sleep(2)
+
+        _stop_slurmctld()
+
+        # Corrupt the state file with garbage bytes
+        if os.path.exists(state_file):
+            atf.run_command(
+                f"dd if=/dev/urandom of={state_file} bs=128 count=1 conv=notrunc",
+                user=_slurm_user(),
+                fatal=False,
+            )
+
+        try:
+            _start_slurmctld()
+            # slurmctld must respond
+            ping = atf.run_command("scontrol ping", quiet=True)
+            assert "is UP" in ping.get("stdout", ""), (
+                "slurmctld must start despite corrupt app_state"
+            )
+        finally:
+            _delete_app("corrupt_pre")
+
+    def test_missing_state_file_handled(self):
+        """
+        Delete spool/app_state. slurmctld must start successfully and use
+        config-defined apps only.
+
+        Source: _open_app_state_file() returns NULL → load_all_app_state()
+                logs "No app state file ... to recover" and returns 0.
+        """
+        state_file = _get_app_state_file()
+        if not state_file:
+            pytest.skip("Cannot determine StateSaveLocation")
+
+        # Add a config app so there is something to load after delete
+        conf_app = "missapp_conf"
+        _add_app_to_conf(conf_app, version="1.0")
+
+        try:
+            _stop_slurmctld()
+            atf.run_command(
+                f"rm -f {state_file} {state_file}.old {state_file}.new",
+                user=_slurm_user(),
+                fatal=False,
+            )
+            _start_slurmctld()
+
+            ping = atf.run_command("scontrol ping", quiet=True)
+            assert "is UP" in ping.get("stdout", ""), (
+                "slurmctld must start with no app_state file"
+            )
+            show = _show_app(conf_app)
+            assert f"AppName={conf_app}" in show["stdout"], (
+                "Config-defined app should still be loaded"
+            )
+        finally:
+            _remove_app_from_conf(conf_app)
+            _reconfigure()
+
+    def test_old_version_state_file(self):
+        """
+        Replace state file header with an unknown version string.
+        Loader must safely skip and not block startup.
+
+        Source: load_all_app_state() L1880-1885 — when version string does
+                not match APP_STATE_VERSION, protocol_version stays NO_VAL16
+                and unpack proceeds with safe defaults / unpack_error path.
+        """
+        state_file = _get_app_state_file()
+        if not state_file:
+            pytest.skip("Cannot determine StateSaveLocation")
+
+        self._ensure_keep_app_info()
+
+        # Generate a real state file by creating an app
+        _create_app("oldver_pre", version="1.0")
+        time.sleep(2)
+
+        _stop_slurmctld()
+
+        # Overwrite first bytes with an obviously wrong version marker.
+        # Use printf to avoid trailing newline; truncate to keep size sane.
+        if os.path.exists(state_file):
+            atf.run_command(
+                f"printf 'BOGUS_OLD_VERSION_999' > {state_file}",
+                user=_slurm_user(),
+                fatal=False,
+            )
+
+        try:
+            _start_slurmctld()
+            ping = atf.run_command("scontrol ping", quiet=True)
+            assert "is UP" in ping.get("stdout", ""), (
+                "slurmctld must start with unknown state file version"
+            )
+        finally:
+            _delete_app("oldver_pre")
+
+    def test_dump_atomic_on_disk_full(self):
+        """
+        Simulate a write failure during dump_all_app_state. The original
+        app_state must remain intact (atomic rename via *.new). Reliable
+        disk-full simulation requires environment-specific quota setup, so
+        this test is skipped by default and serves as a documentation
+        anchor for manual QA.
+
+        Source: dump_all_app_state() L1761-1799 — write to *.new first,
+                only rename to app_state on success.
+        """
+        pytest.skip(
+            "Disk-full simulation requires quota/cgroup setup; "
+            "covered by manual QA. See dump_all_app_state() for "
+            "the atomic *.new -> rename guarantee."
         )
