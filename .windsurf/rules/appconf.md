@@ -26,7 +26,7 @@
     1. 优化背景：解决的问题（如：降低 CPU ticks、减少内存 RSS 占用、优化 Slurm 扫描延迟等）。
     2. 技术方案：具体的实现思路、数据结构选择、核心算法逻辑。
     3. 影响范围：涉及的模块及是否有性能损耗预期。
-- 维护要求：保持 docs/technical_design.md 按时间或功能模块倒序排列，确保格式整齐。
+- 维护要求：保持 doc/technical_design.md 按时间或功能模块倒序排列，确保格式整齐。
 
 ## 5. 维护规范 (Maintenance)
 - 禁止私自删减：除非明确要求，否则在更新文档时，禁止删除已有的核心业务逻辑或背景描述。
@@ -36,5 +36,5 @@
 ## 6. 检查清单 (Definition Audit)
 - 提交前自检：在 Cascade 提交代码修改建议前，请自检：
     - 是否所有新增逻辑都已闭合在 __METASTACK_OPT_APP 宏之内？
-    - 如果涉及优化，是否已询问并准备好同步 docs/technical_design.md？
-    - 如果涉及 API 或核心流程改动，是否已同步 docs/design.md？
+    - 如果涉及优化，是否已询问并准备好同步 doc/technical_design.md？
+    - 如果涉及 API 或核心流程改动，是否已同步 doc/design.md？
