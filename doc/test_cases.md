@@ -184,7 +184,7 @@
 | TestReconfigWithKeepAppInfo | test_dynamic_app_version_preserved | 动态应用的版本保留 | 更新的版本仍存在 |
 | TestReconfigWithKeepAppInfo | test_config_and_dynamic_apps_coexist | 配置和动态共存 | 两者都存在 |
 | TestReconfigFlagsEdgeCases | test_state_file_overwritten_on_reconfigure_without_keep | reconfigure 后状态文件被覆盖 | 后续 slurmctld -R 也无法恢复动态 app |
-| TestConfigParseDefensive | test_reconfigure_ignores_empty_appname_line | slurm.conf 含 `AppName=` 空值行后 reconfigure | 空名记录被忽略，slurmctld 保持 UP，app 列表无匿名条目 |
+| TestConfigParseDefensive | test_reconfigure_ignores_empty_appname_line | slurm.conf 含 `AppName=""` 空值行后 reconfigure | 空名记录被忽略，slurmctld 保持 UP，app 列表无匿名条目 |
 
 ---
 

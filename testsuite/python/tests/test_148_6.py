@@ -580,7 +580,7 @@ class TestConfigParseDefensive:
 
     def test_reconfigure_ignores_empty_appname_line(self):
         """
-        Verify that an empty AppName line in slurm.conf is ignored safely.
+        Verify that an empty AppName value in slurm.conf is ignored safely.
 
         Regression target:
         common/read_config.c _parse_app_name() now rejects empty value
@@ -595,7 +595,7 @@ class TestConfigParseDefensive:
 
         try:
             atf.run_command(
-                f"echo 'AppName= # {marker}' >> {conf}",
+                f"echo 'AppName=\"\" # {marker}' >> {conf}",
                 user=_slurm_user(),
                 fatal=True,
             )
