@@ -1118,18 +1118,21 @@ static void _app_combined_entry_free(void *item)
  * _rebuild_combined_hash_for_app - Build secondary hash entries for one app.    
  * If versions is NULL (no version restriction), creates a single entry    
  * with key = app_name. Otherwise creates one entry per version.    
+ * This hash enables O(1) lookup by combined name (e.g., "vasp-5.7.1").    
+ * IN app_ptr - app record to rebuild hash for    
  */    
 static void _rebuild_combined_hash_for_app(app_record_t *app_ptr)  
 {  
 	if (!app_ptr || !app_ptr->app_name)  
 		return;  
-  
+
 	if (!app_ptr->versions || !app_ptr->versions[0]) {  
 		/* No version restriction: key = app_name itself */  
 		app_combined_entry_t *existing;  
 		existing = (app_combined_entry_t *)xhash_get_str(  
 				app_combined_hash, app_ptr->app_name);  
 		if (existing) {  
+			/* Hash key collision - skip this entry to avoid data corruption */  
 			error("%s: combined hash key collision: "  
 			      "app \"%s\" (no version) collides with "  
 			      "app \"%s\", key=\"%s\". Skipping.",  
@@ -1144,24 +1147,28 @@ static void _rebuild_combined_hash_for_app(app_record_t *app_ptr)
 		xhash_add(app_combined_hash, e);  
 		return;  
 	}  
-  
-	/* Iterate comma-separated versions */  
+
+	/* Iterate comma-separated versions and create hash entry for each */  
 	char *copy = xstrdup(app_ptr->versions);  
 	char *save_ptr = NULL;  
 	char *tok = strtok_r(copy, ",", &save_ptr);  
 	while (tok) {  
+		/* Trim leading whitespace */  
 		while (*tok == ' ' || *tok == '\t')  
 			tok++;  
+		/* Trim trailing whitespace */  
 		char *end = tok + strlen(tok) - 1;  
 		while (end > tok && (*end == ' ' || *end == '\t'))  
 			*end-- = '\0';  
 		if (*tok) {  
 			char *combined_key = NULL;  
 			app_combined_entry_t *existing;  
-  
+
+			/* Build combined key: "app_name-version" */  
 			xstrfmtcat(combined_key, "%s-%s",  
 				   app_ptr->app_name, tok);  
-  
+
+			/* Check for hash key collision before inserting */  
 			existing = (app_combined_entry_t *)xhash_get_str(  
 					app_combined_hash, combined_key);  
 			if (existing) {  
@@ -1174,6 +1181,7 @@ static void _rebuild_combined_hash_for_app(app_record_t *app_ptr)
 				      combined_key);  
 				xfree(combined_key);  
 			} else {  
+				/* Create and insert new hash entry */  
 				app_combined_entry_t *e =  
 					xmalloc(sizeof(*e));  
 				e->combined_name = combined_key;  
@@ -1254,6 +1262,9 @@ static bool _version_in_list(const char *versions, const char *ver)
 /*  
  * _app_versions_add - Add comma-separated versions to app's version list.  
  *   Skips duplicates. ver_copy tokens are "+"-prefixed.  
+ * IN app_ptr - app record to modify  
+ * IN ver_copy - version string with "+" prefix (e.g., "+5.9.0,+5.9.1")  
+ * IN app_name - app name for logging  
  */  
 static void _app_versions_add(app_record_t *app_ptr, char *ver_copy,  
                                const char *app_name)  
@@ -1261,17 +1272,22 @@ static void _app_versions_add(app_record_t *app_ptr, char *ver_copy,
 	char *save_ptr = NULL;  
 	char *tok = strtok_r(ver_copy, ",", &save_ptr);  
 	while (tok) {  
+		/* Skip the "+" prefix */  
 		if (*tok == '+')  
 			tok++;  
+		/* Trim leading whitespace */  
 		while (*tok == ' ' || *tok == '\t')  
 			tok++;  
 		if (*tok != '\0') {  
+			/* Check if version already exists to avoid duplicates */  
 			if (!_version_in_list(app_ptr->versions, tok)) {  
 				if (app_ptr->versions &&  
 				    app_ptr->versions[0])  
+					/* Append to existing list */  
 					xstrfmtcat(app_ptr->versions,  
 						   ",%s", tok);  
 				else {  
+					/* First version, replace entire string */  
 					xfree(app_ptr->versions);  
 					app_ptr->versions = xstrdup(tok);  
 				}  
@@ -1290,6 +1306,9 @@ static void _app_versions_add(app_record_t *app_ptr, char *ver_copy,
 /*  
  * _app_versions_remove - Remove comma-separated versions from app's  
  *   version list. ver_copy tokens are "-"-prefixed.  
+ * IN app_ptr - app record to modify  
+ * IN ver_copy - version string with "-" prefix (e.g., "-5.7.1,-3.7.1")  
+ * IN app_name - app name for logging  
  */  
 static void _app_versions_remove(app_record_t *app_ptr, char *ver_copy,  
                                   const char *app_name)  
@@ -1297,11 +1316,14 @@ static void _app_versions_remove(app_record_t *app_ptr, char *ver_copy,
 	char *save_ptr = NULL;  
 	char *tok = strtok_r(ver_copy, ",", &save_ptr);  
 	while (tok) {  
+		/* Skip the "-" prefix */  
 		if (*tok == '-')  
 			tok++;  
+		/* Trim leading whitespace */  
 		while (*tok == ' ' || *tok == '\t')  
 			tok++;  
 		if (*tok != '\0') {  
+			/* Only remove if version exists in the list */  
 			if (_version_in_list(app_ptr->versions, tok)) {  
 				_remove_version_from_list(  
 					&app_ptr->versions, tok);  
@@ -1319,10 +1341,14 @@ static void _app_versions_remove(app_record_t *app_ptr, char *ver_copy,
   
 /*  
  * _app_versions_replace - Replace app's entire version list.  
+ * Used when Version string has no +/- prefix (complete replacement).  
+ * IN app_ptr - app record to modify  
+ * IN new_versions - new version string (e.g., "5.7.1,5.7.2,5.8.0")  
  */  
 static void _app_versions_replace(app_record_t *app_ptr,  
                                    const char *new_versions)  
 {  
+	/* Free old version string and replace with new one */  
 	xfree(app_ptr->versions);  
 	app_ptr->versions = xstrdup(new_versions);  
 }
@@ -1493,36 +1519,41 @@ app_record_t *find_app_record_by_combined(const char *combined_name)
  * versions to the existing versions list, and overwrite description/    
  * watchdog/default with the latest values.    
  * If not found, create a new record.    
+ * IN app - app record from config file (may be merged into existing)    
+ * RET SLURM_SUCCESS on success    
  */    
 static int _build_single_appline_info(app_record_t *app)      
 {      
-	app_record_t *app_ptr = NULL;      
-  
+	app_record_t *app_ptr = NULL;  
+
 	/* Use primary hash for O(1) duplicate detection by app_name */      
 	app_ptr = (app_record_t *)xhash_get_str(app_hash_table,    
 						app->app_name);    
-  
+
 	if (app_ptr) {      
 		/* Same AppName already exists — merge versions, overwrite props */    
 		info("%s: AppName=%s specified more than once, merging",    
-		     __func__, app->app_name);    
-  
+		     __func__, app->app_name);  
+
 		/* Merge versions: append new versions to existing list */    
 		if (app->versions && app->versions[0]) {    
 			/* Remove old combined hash entries before changing versions */    
 			_remove_combined_hash_for_app(app_ptr);    
-  
+
 			if (app_ptr->versions && app_ptr->versions[0]) {  
 				/* Append only versions not already present */  
 				char *copy = xstrdup(app->versions);  
 				char *save_ptr = NULL;  
 				char *tok = strtok_r(copy, ",", &save_ptr);  
 				while (tok) {  
+					/* Trim leading whitespace */  
 					while (*tok == ' ' || *tok == '\t')  
 						tok++;  
+					/* Trim trailing whitespace */  
 					char *end = tok + strlen(tok) - 1;  
 					while (end > tok && (*end == ' ' || *end == '\t'))  
 						*end-- = '\0';  
+					/* Check for duplicate and append if new */  
 					if (*tok && !_version_in_list(  
 							app_ptr->versions, tok)) {  
 						xstrfmtcat(app_ptr->versions,  
@@ -1532,23 +1563,25 @@ static int _build_single_appline_info(app_record_t *app)
 				}  
 				xfree(copy);  
 			} else {  
+				/* No existing versions, replace entirely */  
 				xfree(app_ptr->versions);  
 				app_ptr->versions = xstrdup(app->versions);  
 			} 
-  
+
 			/* Rebuild combined hash entries with updated versions */    
 			_rebuild_combined_hash_for_app(app_ptr);    
 		}    
-  
+
 		/* Overwrite description if provided */    
 		if (app->description) {    
 			xfree(app_ptr->description);    
 			app_ptr->description = xstrdup(app->description);    
 		}    
-  
+
 		/* Overwrite watchdog if provided */    
 		if (app->watchdog) {    
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION      
+			/* Validate watchdog reference before setting */  
 			if (list_find_first(watch_dog_list,    
 					    &list_find_watch_dog,    
 					    app->watchdog)) {      
@@ -1564,7 +1597,7 @@ static int _build_single_appline_info(app_record_t *app)
 			app_ptr->watchdog = xstrdup(app->watchdog);    
 #endif      
 		}    
-  
+
 		/* Handle default flag — clear old default if changing */    
 		if (app->default_flag) {    
 			if (default_app_name &&    
@@ -1576,21 +1609,23 @@ static int _build_single_appline_info(app_record_t *app)
 			}    
 			app_ptr->default_flag = true;    
 			xfree(default_app_name);    
-			default_app_name = xstrdup(app->app_name);    
+			default_app_name = xstrdup(app_ptr->app_name);    
 			default_app_loc = app_ptr;    
-		}    
-  
+		}      
+
 		return 0;    
 	}    
-  
+
 	/* New AppName — create record */    
 	app_ptr = create_app_record(app->app_name, app->versions);      
-  
+
+	/* Set optional metadata fields */  
 	if (app->description)      
 		app_ptr->description = xstrdup(app->description);      
-  
+
 	if (app->watchdog) {      
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION      
+		/* Validate watchdog reference before setting */  
 		if (list_find_first(watch_dog_list, &list_find_watch_dog,      
 				    app->watchdog)) {      
 			app_ptr->watchdog = xstrdup(app->watchdog);      
@@ -1603,9 +1638,10 @@ static int _build_single_appline_info(app_record_t *app)
 		app_ptr->watchdog = xstrdup(app->watchdog);    
 #endif      
 	}      
-  
+
 	app_ptr->default_flag = app->default_flag;      
-  
+
+	/* Handle default flag for new app */  
 	if (app->default_flag) {    
 		if (default_app_name &&    
 		    xstrcmp(default_app_loc->app_name, app->app_name)) {    
@@ -1618,7 +1654,7 @@ static int _build_single_appline_info(app_record_t *app)
 		default_app_name = xstrdup(app->app_name);    
 		default_app_loc = app_ptr;    
 	}      
-  
+
 	return 0;      
 }  
   
