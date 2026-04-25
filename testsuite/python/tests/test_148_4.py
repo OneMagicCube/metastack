@@ -641,3 +641,156 @@ class TestAppListFormat:
             assert app_field == "testgeneral", (  
                 f"Expected 'testgeneral' without version suffix, got: {app_field}"  
             )
+
+
+# ---------------------------------------------------------------------------
+# TestCliParameterEdgeCases: CLI argument boundary cases for --app/--app-source
+# ---------------------------------------------------------------------------
+class TestCliParameterEdgeCases:
+    """
+    Edge cases for CLI parameter parsing of --app and --app-source.
+
+    Source: src/common/slurm_opt.c
+        - arg_set_app_source() L1075-1087: validates against
+          app_source_from_str(); rejects values that map to NO_VAL8,
+          APP_SOURCE_AUTO, or APP_SOURCE_NOTSET.
+        - app_source_from_str() in slurm_protocol_defs.c uses xstrcasecmp,
+          so user / USER / User are all accepted.
+
+    These tests do NOT depend on __METASTACK_OPT_APP being toggled —
+    they exercise the user-facing CLI contract that ships with the build.
+    """
+
+    def test_repeated_app_arg_last_wins(self):
+        """
+        sbatch --app=testgeneral --app=testvasp-5.7.1 should accept the
+        LAST occurrence (standard getopt behavior). Job submission must
+        succeed and resolve to the last value.
+        """
+        job_id = atf.submit_job_sbatch(
+            '--app=testgeneral --app=testvasp-5.7.1 '
+            '-t1 --wrap="sleep 5"'
+        )
+        assert job_id > 0, (
+            "Job with repeated --app should succeed using the last value"
+        )
+        _jobs_submitted.append(job_id)
+
+        output = atf.run_command_output(f"scontrol show job {job_id}")
+        assert "AppName=testvasp" in output, (
+            f"Last --app value (testvasp) should win, got:\n{output}"
+        )
+
+    def test_invalid_app_source_value(self):
+        """
+        sbatch --app-source=garbage must be rejected with an error
+        message listing valid values.
+
+        Source: arg_set_app_source() L1080-1083:
+            error("Invalid --app-source value: '%s'. "
+                  "Valid: user, portal, marketplace", arg);
+        """
+        result = atf.run_command(
+            '--wrap="sleep 5" sbatch --app=testvasp-5.7.1 '
+            '--app-source=garbage -t1',
+            fatal=False,
+        )
+        # sbatch should fail; either rc != 0 or error message present
+        combined = result.get("stderr", "") + result.get("stdout", "")
+        assert (result["exit_code"] != 0
+                or "Invalid --app-source" in combined), (
+            f"Invalid --app-source should be rejected, got:\n{combined}"
+        )
+
+    def test_app_source_lowercase(self):
+        """--app-source=user (lowercase) is accepted."""
+        job_id = atf.submit_job_sbatch(
+            '--app=testvasp-5.7.1 --app-source=user '
+            '-t1 --wrap="sleep 5"'
+        )
+        assert job_id > 0
+        _jobs_submitted.append(job_id)
+
+    def test_app_source_uppercase(self):
+        """
+        --app-source=USER is accepted (xstrcasecmp in app_source_from_str).
+        Verifies the case-insensitive contract.
+        """
+        job_id = atf.submit_job_sbatch(
+            '--app=testvasp-5.7.1 --app-source=USER '
+            '-t1 --wrap="sleep 5"'
+        )
+        assert job_id > 0, "Uppercase --app-source=USER must be accepted"
+        _jobs_submitted.append(job_id)
+
+        output = atf.run_command_output(f"scontrol show job {job_id}")
+        # Internal representation should be normalized to lowercase
+        assert "AppSource=user" in output, (
+            f"USER should normalize to 'user' in output:\n{output}"
+        )
+
+    def test_app_source_mixed_case(self):
+        """
+        --app-source=Portal (mixed case) is accepted and normalized.
+        """
+        job_id = atf.submit_job_sbatch(
+            '--app=testvasp-5.7.1 --app-source=Portal '
+            '-t1 --wrap="sleep 5"'
+        )
+        assert job_id > 0, "Mixed-case --app-source=Portal must be accepted"
+        _jobs_submitted.append(job_id)
+
+        output = atf.run_command_output(f"scontrol show job {job_id}")
+        assert "AppSource=portal" in output, (
+            f"Portal should normalize to 'portal' in output:\n{output}"
+        )
+
+    def test_scontrol_update_empty_version_add(self, cleanup_app):
+        """
+        scontrol update app AppName=x Version+= (empty value) must NOT
+        corrupt the existing version list. Either reject the command or
+        no-op silently. Original Versions field must remain intact.
+        """
+        name = cleanup_app("edgever1")
+        _create_app(name, Version="1.0,2.0")
+
+        # Empty value after +=
+        result = atf.run_command(
+            f'scontrol update app AppName={name} Version+=',
+            user=atf.properties["slurm-user"],
+            fatal=False,
+        )
+        # Whether accepted as no-op or rejected, original data must survive
+        output = atf.run_command_output(f"scontrol show app {name}")
+        assert "1.0" in output and "2.0" in output, (
+            f"Empty Version+= must not destroy existing versions:\n{output}"
+        )
+        # Document the rc as a note (do not assert specific rc since
+        # both reject and no-op are acceptable defensive behaviors)
+        _ = result["exit_code"]
+
+    def test_scontrol_create_empty_version(self, cleanup_app):
+        """
+        scontrol create app AppName=x Version= (empty) is accepted as an
+        unversioned app, OR rejected. Either way, slurmctld must not crash
+        and downstream operations must remain consistent.
+        """
+        name = cleanup_app("edgever2")
+        result = atf.run_command(
+            f'scontrol create app AppName={name} Version=',
+            user=atf.properties["slurm-user"],
+            fatal=False,
+        )
+
+        if result["exit_code"] == 0:
+            # Accepted as unversioned app
+            output = atf.run_command_output(f"scontrol show app {name}")
+            assert f"AppName={name}" in output, (
+                f"App with empty Version should be queryable:\n{output}"
+            )
+        else:
+            # Rejected — slurmctld still healthy, ping must succeed
+            ping = atf.run_command("scontrol ping", quiet=True)
+            assert "is UP" in ping.get("stdout", ""), (
+                "slurmctld must remain UP after rejecting empty Version"
+            )

@@ -132,6 +132,13 @@
 | TestSqueueAppFormat | test_squeue_app_column | squeue --Format=App | 显示 app-version 或 app |
 | TestSqueueAppFormat | test_squeue_appsource_column | squeue --Format=AppSource | 显示 app_source 字符串 |
 | TestSqueueAppFormat | test_squeue_filter_by_app | squeue --app-name 过滤 | 只显示匹配作业 |
+| TestCliParameterEdgeCases | test_repeated_app_arg_last_wins | sbatch --app=foo --app=bar 重复参数 | 后者覆盖（getopt 标准行为） |
+| TestCliParameterEdgeCases | test_invalid_app_source_value | sbatch --app-source=garbage 非法值 | 拒绝并提示 user/portal/marketplace |
+| TestCliParameterEdgeCases | test_app_source_lowercase | --app-source=user | 接受（xstrcasecmp 大小写不敏感）|
+| TestCliParameterEdgeCases | test_app_source_uppercase | --app-source=USER | 接受（xstrcasecmp）|
+| TestCliParameterEdgeCases | test_app_source_mixed_case | --app-source=Portal | 接受并规范化为 portal |
+| TestCliParameterEdgeCases | test_scontrol_update_empty_version_add | scontrol update Version+= 空值 | 拒绝或忽略，不破坏现有数据 |
+| TestCliParameterEdgeCases | test_scontrol_create_empty_version | scontrol create AppName=x Version= 空值 | 等同于无版本应用或拒绝 |
 
 ---
 
