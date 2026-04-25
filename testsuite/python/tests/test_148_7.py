@@ -398,6 +398,7 @@ class TestSacctOutputFormat:
         The header line and each data line must both end with '|'.
         """
         jid = _submit_and_wait('--app=sacctapp-1.0 -t1 --wrap="hostname"')
+        time.sleep(ACCOUNTING_DELAY)
         cmd = (
             f"sacct -p -X --starttime=now-1hour -j {jid} "
             "--format=JobID,AppName,AppVersion,AppSource"
@@ -422,6 +423,7 @@ class TestSacctOutputFormat:
         Field count per line must equal field count in header.
         """
         jid = _submit_and_wait('--app=sacctapp-2.0 -t1 --wrap="hostname"')
+        time.sleep(ACCOUNTING_DELAY)
         cmd = (
             f"sacct -P -X --starttime=now-1hour -j {jid} "
             "--format=JobID,AppName,AppVersion,AppSource"
@@ -451,6 +453,7 @@ class TestSacctOutputFormat:
         Source: parse_format() honors %WIDTH suffix per field.
         """
         jid = _submit_and_wait('--app=sacctapp-1.0 -t1 --wrap="hostname"')
+        time.sleep(ACCOUNTING_DELAY)
         cmd = (
             f"sacct -X --starttime=now-1hour -j {jid} "
             "--format=AppName%30"
@@ -476,6 +479,7 @@ class TestSacctOutputFormat:
         First line of output must be data, not 'JobID  AppName ...'.
         """
         jid = _submit_and_wait('--app=sacctapp-1.0 -t1 --wrap="hostname"')
+        time.sleep(ACCOUNTING_DELAY)
         cmd = (
             f"sacct -X --noheader --starttime=now-1hour -j {jid} "
             "--format=JobID,AppName"
@@ -494,6 +498,7 @@ class TestSacctOutputFormat:
         and app name filter correctly.
         """
         jid = _submit_and_wait('--app=sacctapp-1.0 -t1 --wrap="hostname"')
+        time.sleep(ACCOUNTING_DELAY)
         cmd = (
             "sacct -X -P --noheader --starttime=now-1hour "
             "--appname=sacctapp --format=JobID"
@@ -511,6 +516,7 @@ class TestSacctOutputFormat:
           - empty when JOBID's app != X
         """
         jid = _submit_and_wait('--app=sacctapp-1.0 -t1 --wrap="hostname"')
+        time.sleep(ACCOUNTING_DELAY)
 
         # Matching case
         match_cmd = (
@@ -540,6 +546,7 @@ class TestSacctOutputFormat:
         support --json (no data_parser plugin), skip the test.
         """
         jid = _submit_and_wait('--app=sacctapp-1.0 -t1 --wrap="hostname"')
+        time.sleep(ACCOUNTING_DELAY)
         cmd = f"sacct -j {jid} --json"
         result = atf.run_command(cmd, fatal=False)
 
