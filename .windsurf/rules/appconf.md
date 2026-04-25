@@ -1,14 +1,14 @@
 # Metastack-3.2 开发与设计同步规范
 
 ## 1. 核心原则 (Core Principles)
-- **设计优先**：`docs/design.md` 是本项目的“唯一事实来源 (Single Source of Truth)”。在编写代码前，必须先阅读并理解该文档。
-- **技术决策记录**：所有关于代码重构、性能优化、算法改进的具体设计细节，必须记录在 `docs/technical_design.md` 中。
+- **设计优先**：`doc/design.md` 是本项目的“唯一事实来源 (Single Source of Truth)”。在编写代码前，必须先阅读并理解该文档。
+- **技术决策记录**：所有关于代码重构、性能优化、算法改进的具体设计细节，必须记录在 `doc/technical_design.md` 中。
 - **一致性检查**：在执行任何代码修改任务前，必须检查修改内容是否与上述设计文档中的逻辑冲突。
 
 ## 2. 文档更新机制 (Bidirectional Sync)
 - **代码驱动更新**：如果代码实现逻辑超出了当前文档范围，或我确认了逻辑变更，请在完成代码修改后，**主动提示并自动更新**对应的文档：
-    - 业务逻辑变更 -> 更新 `docs/design.md`
-    - 性能优化/重构细节 -> 更新 `docs/technical_design.md`
+    - 业务逻辑变更 -> 更新 `doc/design.md`
+    - 性能优化/重构细节 -> 更新 `doc/technical_design.md`
 - **文档驱动开发**：如果我直接修改了文档，请在要求“同步项目”时，扫描文档变更并提出代码实现或重构建议。
 
 ## 3. 代码实现规范 (Macro Definition)
