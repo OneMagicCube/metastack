@@ -9,7 +9,7 @@
 | TestCreateApp | test_create_app_no_version | 创建不带版本的应用 | 创建成功，版本可选 |
 | TestCreateApp | test_create_app_with_description | 创建带描述的应用 | Description 字段被正确存储 |
 | TestCreateApp | test_create_app_with_default_yes | 创建 Default=YES 的应用 | Default=YES 显示在输出中 |
-| TestCreateApp | test_create_default_is_no_by_default | 不指定 Default 时默认为 NO | Default=NO 显示在输出中 |
+| TestCreateApp | test_create_app_default_is_no_by_default | 不指定 Default 时默认为 NO | Default=NO 显示在输出中 |
 | TestCreateApp | test_create_duplicate_app | 创建重复应用名 | 失败，输出错误信息 |
 | TestCreateApp | test_create_app_missing_name | 缺少 AppName 参数 | 失败，输出 "AppName must be given" |
 | TestCreateApp | test_create_app_no_params | 无参数创建应用 | 失败 |
@@ -119,6 +119,9 @@
 | TestAppList | test_srun_app_list | srun --app=list | 列出所有应用并退出 |
 | TestAppList | test_app_list_shows_description | --app=list 显示 Description | Description 字段显示 |
 | TestAppList | test_app_list_versioned_expanded | 版本化应用展开 | 每个版本显示一行 |
+| TestAppListFormat | test_sbatch_app_list | sbatch --app=list 输出格式 | 列出可用应用并退出 |
+| TestAppListFormat | test_app_list_versioned_format | 版本化应用列表格式 | 显示为 "name-version" |
+| TestAppListFormat | test_app_list_unversioned_format | 无版本应用列表格式 | 显示为单独的 "name" |
 | TestJobAppFields | test_scontrol_show_job_app_fields | scontrol show job 显示 App 字段 | Name, Version, Source 都显示 |
 | TestJobAppFields | test_scontrol_show_job_unversioned_app | 无版本作业的 AppVersion | AppVersion 为空 |
 | TestJobAppFields | test_scontrol_show_job_no_app | 无 --app 的作业 | App 字段不存在 |
@@ -140,15 +143,24 @@
 | TestBatchEnvVars | test_env_versioned_app_user_source | 版本化作业变量注入 | NAME, VERSION, SOURCE 正确 |
 | TestBatchEnvVars | test_env_unversioned_app | 无版本作业变量 | VERSION=UNSET |
 | TestBatchEnvVars | test_env_no_app_submitted | 无 --app 作业变量 | 所有为 UNSET |
+| TestBatchEnvVars | test_env_portal_source_preserved | --app-source=portal 时变量注入 | SLURM_JOB_APP_SOURCE=portal |
 | TestSqueueAppSourceFilter | test_filter_by_app_source_user | squeue --app-source=user | 只显示 user 作业 |
 | TestSqueueAppSourceFilter | test_filter_by_app_source_portal | squeue --app-source=portal | 只显示 portal 作业 |
-| TestSqueueColumn | test_app_column_headers | squeue 头部显示 | 显示 "APP" |
-| TestSqueueColumn | test_appsource_column_headers | squeue 头部显示 | 显示 "APPSOURCE" |
-| TestSqueueColumn | test_app_column_versioned | 版本化作业显示 | 显示 "name-version" |
-| TestSqueueColumn | test_app_column_unversioned | 无版本作业显示 | 显示 "name" |
+| TestSqueueAppSourceFilter | test_combined_app_name_and_source_filter | --app-name 和 --app-source 组合 | 同时匹配两条件的作业 |
+| TestSqueueColumns | test_app_column_header | squeue 头部显示 | 显示 "APP" |
+| TestSqueueColumns | test_appsource_column_header | squeue 头部显示 | 显示 "APPSOURCE" |
+| TestSqueueColumns | test_app_column_versioned | 版本化作业显示 | 显示 "name-version" |
+| TestSqueueColumns | test_app_column_unversioned | 无版本作业显示 | 显示 "name" |
+| TestSqueueColumns | test_app_column_empty_for_no_app_job | 无 app 作业的 App 列 | 空字段 |
+| TestSqueueColumns | test_appsource_column_empty_for_no_app_job | 无 app 作业的 AppSource 列 | 空字段 |
+| TestSqueueColumns | test_appsource_shows_user | --app 默认 source | 显示 "user" |
+| TestSqueueColumns | test_appsource_shows_portal | --app-source=portal | 显示 "portal" |
+| TestSqueueColumns | test_squeue_filter_by_app_name | squeue --app-name 过滤 | 只显示匹配 app_name 的作业 |
+| TestSqueueColumns | test_squeue_filter_by_app_source | squeue --app-source 过滤 | 只显示匹配 app_source 的作业 |
 | TestScontrolShowJobApp | test_show_job_app_name | scontrol 记录验证 | AppName 字段显示 |
 | TestScontrolShowJobApp | test_show_job_app_version | scontrol 记录验证 | AppVersion 字段显示 |
 | TestScontrolShowJobApp | test_show_job_app_source | scontrol 记录验证 | AppSource 字段显示 |
+| TestScontrolShowJobApp | test_show_job_no_app | 无 --app 作业 scontrol 输出 | App 字段不存在或为空 |
 
 ---
 
@@ -158,10 +170,11 @@
 | 测试类 | 测试用例 | 测试内容 | 预期结果 |
 | :--- | :--- | :--- | :--- |
 | TestReconfigWithoutKeepAppInfo | test_dynamic_app_lost_on_reconfigure | 无 KeepAppInfo 标志 | 动态应用在 reconfigure 后消失 |
-| TestReconfigWithoutKeepAppInfo | test_config_app_survives_reconfigure | 配置文件定义的应用 | reconfigure 后仍存在 |
-| TestReconfigWithKeepAppInfo | test_dynamic_app_preserved | 有 KeepAppInfo 标志 | 动态应用在 reconfigure 后保留 |
+| TestReconfigWithoutKeepAppInfo | test_config_app_survives_reconfigure_without_keep | 配置文件定义的应用 | reconfigure 后仍存在（即使无 KeepAppInfo）|
+| TestReconfigWithKeepAppInfo | test_dynamic_app_preserved_on_reconfigure | 有 KeepAppInfo 标志 | 动态应用在 reconfigure 后保留 |
 | TestReconfigWithKeepAppInfo | test_dynamic_app_version_preserved | 动态应用的版本保留 | 更新的版本仍存在 |
 | TestReconfigWithKeepAppInfo | test_config_and_dynamic_apps_coexist | 配置和动态共存 | 两者都存在 |
+| TestReconfigFlagsEdgeCases | test_state_file_overwritten_on_reconfigure_without_keep | reconfigure 后状态文件被覆盖 | 后续 slurmctld -R 也无法恢复动态 app |
 
 ---
 
@@ -171,8 +184,12 @@
 | 测试类 | 测试用例 | 测试内容 | 预期结果 |
 | :--- | :--- | :--- | :--- |
 | TestSacctAppFields | test_sacct_versioned_app_fields | 版本化作业 sacct 记录 | AppName, Version, Source 正确 |
+| TestSacctAppFields | test_sacct_second_version | 第二个版本作业 sacct 记录 | AppVersion=2.0 正确显示 |
 | TestSacctAppFields | test_sacct_unversioned_app | 无版本作业 sacct 记录 | AppName 存在，Version 为空 |
+| TestSacctAppFields | test_sacct_no_app_job | 无 --app 作业 sacct 记录 | App 字段全部为空 |
 | TestSacctAppFilter | test_filter_by_appname | sacct --appname 过滤 | 只返回匹配作业 |
 | TestSacctAppFilter | test_filter_by_appversion | sacct --appversion 过滤 | 只返回匹配作业 |
 | TestSacctAppFilter | test_filter_by_appsource | sacct --appsource 过滤 | 只返回匹配作业 |
+| TestSacctAppFilter | test_filter_combined_appname_and_version | --appname 和 --appversion 组合 | 同时匹配两条件的作业 |
+| TestSacctAppFilter | test_filter_appname_no_match | --appname 不匹配任何作业 | 返回空结果 |
 | TestSacctAppHelpformat | test_helpformat_lists_app_fields | sacct -e 列表查询 | AppName, Version, Source 在字段列表中 |
