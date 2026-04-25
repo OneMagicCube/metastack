@@ -1910,8 +1910,6 @@ extern int load_all_app_state(uint16_t reconfig_flags)
 #ifdef __META_PROTOCOL    
 		if (protocol_version >= META_3_2_PROTOCOL_VERSION) {    
 			safe_unpackstr(&tmp_app.app_name, buffer);    
-			if (tmp_app.app_name == NULL)    
-				tmp_app.app_name = xmalloc(1);    
 			safe_unpackstr(&tmp_app.versions, buffer);    
 			safe_unpackstr(&tmp_app.description, buffer);    
 			safe_unpackstr(&tmp_app.watchdog, buffer);    
@@ -1922,6 +1920,18 @@ extern int load_all_app_state(uint16_t reconfig_flags)
 #else    
 		goto unpack_error;    
 #endif    
+
+		/* Defensive: skip records with empty AppName to avoid    
+		 * polluting app_list with anonymous entries. */    
+		if (!tmp_app.app_name || !tmp_app.app_name[0]) {    
+			error("%s: skipping state record with empty AppName",    
+			      __func__);    
+			xfree(tmp_app.app_name);    
+			xfree(tmp_app.versions);    
+			xfree(tmp_app.description);    
+			xfree(tmp_app.watchdog);    
+			continue;    
+		}    
       
 		/* Find existing record or create new one */      
 		app_record_t *app_ptr = find_app_record(tmp_app.app_name);      

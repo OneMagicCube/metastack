@@ -5315,6 +5315,11 @@ static int _purge_hash_table(mysql_conn_t *mysql_conn, char *cluster_name,
 /* 
  * Static flag to track if job_app archive failed.
  * Used to skip purge and preserve unarchived data.
+ *
+ * Threading assumption: slurmdbd runs archive/purge in a single
+ * background thread per cluster context, so this flag does not need
+ * a mutex today. If concurrent archive threads are ever introduced,
+ * this flag MUST be promoted to atomic_bool or guarded by a lock.
  */
 static bool _app_archive_failed = false;
 #endif

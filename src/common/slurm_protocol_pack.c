@@ -6782,7 +6782,7 @@ static int _unpack_app_info_members(app_record_t *app, buf_t *buffer,
 	if (protocol_version >= META_3_2_PROTOCOL_VERSION) {    
 		safe_unpackstr(&app->app_name, buffer);    
 		if (app->app_name == NULL)    
-			app->app_name = xmalloc(1);    
+			app->app_name = xmalloc(1);/* app->app_name = "" implicit */    
 		safe_unpackstr(&app->versions, buffer);    
 		safe_unpackstr(&app->description, buffer);    
 		safe_unpackstr(&app->watchdog, buffer);    
