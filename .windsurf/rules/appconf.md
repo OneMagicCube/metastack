@@ -83,3 +83,20 @@
         - 长时压力（1000+ app、长时间运行）
         - 跨版本升降级
     - **判定原则**：若自动化脚本环境耦合性强、稳定性差，应主动迁移到人工 QA 章节，不要靠 `pytest.skip` 占位。
+- **测试性能优化 — sacct 类测试**：
+    - **问题**：sacct 测试依赖 slurmdbd 异步提交数据，每测试 `time.sleep(ACCOUNTING_DELAY=15)` 会让 N 个测试浪费 (N-1)×15 秒。
+    - **解决**：使用 `@pytest.fixture(scope="class")` 预提交共享作业，只 sleep 一次：
+        ```python
+        class TestXxx:
+            @pytest.fixture(scope="class")
+            def shared_jobs(self):
+                jids = {"v1": _submit_and_wait('--app=foo-1.0 -t1 --wrap="hostname"')}
+                time.sleep(ACCOUNTING_DELAY)
+                return jids
+            def test_foo(self, shared_jobs):
+                jid = shared_jobs["v1"]
+                # 直接查询，无需再 sleep
+        ```
+    - **适用**：多测试只读取 sacct 字段、无写冲突、无作业状态依赖。
+    - **不适用**：测试需要 scancel / scontrol update job / 重启 slurmctld 的场景。
+    - **铁律**：不重构已通过的稳定测试，只优化新增或明确慢的类。

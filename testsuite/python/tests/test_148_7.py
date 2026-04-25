@@ -390,15 +390,36 @@ class TestSacctOutputFormat:
     Verify sacct's output formatting options (-p / -P / --format=%WIDTH /
     --noheader / time and jobid filters / --json) all work consistently
     with the new AppName, AppVersion, AppSource fields.
+
+    Performance note: Each test only needs a sacct record; the actual app
+    field values are deterministic per submission. We pre-submit shared
+    jobs ONCE in a class-scoped fixture and wait ACCOUNTING_DELAY ONCE,
+    saving ~6 × 15s vs per-test submission.
     """
 
-    def test_sacct_parsable_pipe_format(self):
+    @pytest.fixture(scope="class")
+    def shared_jobs(self):
+        """
+        Pre-submit a small set of jobs reused by every test in this class.
+        Returns dict {"v1": jobid_for_sacctapp-1.0,
+                      "v2": jobid_for_sacctapp-2.0}.
+        """
+        jids = {
+            "v1": _submit_and_wait(
+                '--app=sacctapp-1.0 -t1 --wrap="hostname"'),
+            "v2": _submit_and_wait(
+                '--app=sacctapp-2.0 -t1 --wrap="hostname"'),
+        }
+        # Single accounting delay covers both jobs
+        time.sleep(ACCOUNTING_DELAY)
+        return jids
+
+    def test_sacct_parsable_pipe_format(self, shared_jobs):
         """
         sacct -p produces pipe-separated output with a TRAILING '|'.
         The header line and each data line must both end with '|'.
         """
-        jid = _submit_and_wait('--app=sacctapp-1.0 -t1 --wrap="hostname"')
-        time.sleep(ACCOUNTING_DELAY)
+        jid = shared_jobs["v1"]
         cmd = (
             f"sacct -p -X --starttime=now-1hour -j {jid} "
             "--format=JobID,AppName,AppVersion,AppSource"
@@ -417,13 +438,12 @@ class TestSacctOutputFormat:
             f"Expected JobID|sacctapp|1.0|user| in sacct -p output:\n{output}"
         )
 
-    def test_sacct_parsable2_no_trailing_delim(self):
+    def test_sacct_parsable2_no_trailing_delim(self, shared_jobs):
         """
         sacct -P produces pipe-separated output with NO trailing '|'.
         Field count per line must equal field count in header.
         """
-        jid = _submit_and_wait('--app=sacctapp-2.0 -t1 --wrap="hostname"')
-        time.sleep(ACCOUNTING_DELAY)
+        jid = shared_jobs["v2"]
         cmd = (
             f"sacct -P -X --starttime=now-1hour -j {jid} "
             "--format=JobID,AppName,AppVersion,AppSource"
@@ -445,15 +465,14 @@ class TestSacctOutputFormat:
                 f"data line has {len(data_fields)}: {data_line!r}"
             )
 
-    def test_sacct_format_width_appname(self):
+    def test_sacct_format_width_appname(self, shared_jobs):
         """
         sacct --format=AppName%30 controls the column width.
         AppName column width must be 30 characters.
 
         Source: parse_format() honors %WIDTH suffix per field.
         """
-        jid = _submit_and_wait('--app=sacctapp-1.0 -t1 --wrap="hostname"')
-        time.sleep(ACCOUNTING_DELAY)
+        jid = shared_jobs["v1"]
         cmd = (
             f"sacct -X --starttime=now-1hour -j {jid} "
             "--format=AppName%30"
@@ -473,13 +492,12 @@ class TestSacctOutputFormat:
             f"header length={len(header)}: {header!r}"
         )
 
-    def test_sacct_noheader_omits_header(self):
+    def test_sacct_noheader_omits_header(self, shared_jobs):
         """
         sacct --noheader must NOT print the column header line.
         First line of output must be data, not 'JobID  AppName ...'.
         """
-        jid = _submit_and_wait('--app=sacctapp-1.0 -t1 --wrap="hostname"')
-        time.sleep(ACCOUNTING_DELAY)
+        jid = shared_jobs["v1"]
         cmd = (
             f"sacct -X --noheader --starttime=now-1hour -j {jid} "
             "--format=JobID,AppName"
@@ -492,13 +510,12 @@ class TestSacctOutputFormat:
                 f"header, got: {first!r}"
             )
 
-    def test_sacct_starttime_with_appname(self):
+    def test_sacct_starttime_with_appname(self, shared_jobs):
         """
         sacct -S now-1hour --appname=sacctapp must combine time window
         and app name filter correctly.
         """
-        jid = _submit_and_wait('--app=sacctapp-1.0 -t1 --wrap="hostname"')
-        time.sleep(ACCOUNTING_DELAY)
+        jid = shared_jobs["v1"]
         cmd = (
             "sacct -X -P --noheader --starttime=now-1hour "
             "--appname=sacctapp --format=JobID"
@@ -509,14 +526,13 @@ class TestSacctOutputFormat:
             f"{output}"
         )
 
-    def test_sacct_jobid_with_appname_filter(self):
+    def test_sacct_jobid_with_appname_filter(self, shared_jobs):
         """
         sacct -j JOBID --appname=X must intersect:
           - matches when JOBID's app == X
           - empty when JOBID's app != X
         """
-        jid = _submit_and_wait('--app=sacctapp-1.0 -t1 --wrap="hostname"')
-        time.sleep(ACCOUNTING_DELAY)
+        jid = shared_jobs["v1"]
 
         # Matching case
         match_cmd = (
@@ -540,13 +556,12 @@ class TestSacctOutputFormat:
             f"{nomatch}"
         )
 
-    def test_sacct_json_output_contains_app(self):
+    def test_sacct_json_output_contains_app(self, shared_jobs):
         """
         sacct --json output must include app fields. If the build does not
         support --json (no data_parser plugin), skip the test.
         """
-        jid = _submit_and_wait('--app=sacctapp-1.0 -t1 --wrap="hostname"')
-        time.sleep(ACCOUNTING_DELAY)
+        jid = shared_jobs["v1"]
         cmd = f"sacct -j {jid} --json"
         result = atf.run_command(cmd, fatal=False)
 
