@@ -17,7 +17,7 @@
 各层级流程如下
 1. 用户交互层
   1. sbatch、srun 负责指定作业应用类型
-  2. scontrol show jobs、squeue 查询实时作业应用类型信息
+  2. scontrol show job、squeue 查询实时作业应用类型信息
   3. scontrol update/create/delete 管理slurmctld内存中的作业应用类型配置
   4. sacct 查询历史作业应用类型信息
 2. SLURMCTLD
