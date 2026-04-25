@@ -447,7 +447,7 @@ $ squeue -o "%.8i %.9P %.10j %.8u %.2t %.6M %.5D %.6C %b"
    10002     batch lammps.sh      bob  R   2:11     2    32 lammps-2025r1   user  
    10003     batch unknown.sh  charlie  R   0:45     1    8                 unknown 
 $ squeue --app-source=portal -O JobId,App,AppSource  
-2. scontrol show jobs
+2. scontrol show job
 $ scontrol show job 10001  
 JobId=10001 JobName=vasp.sh  
    UserId=alice(1001) GroupId=hpc(100)  
