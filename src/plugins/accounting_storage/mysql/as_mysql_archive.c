@@ -5308,8 +5308,16 @@ static int _purge_hash_table(mysql_conn_t *mysql_conn, char *cluster_name,
 	} else if (mysql_db_commit(mysql_conn)) {
 		error("Couldn't commit cluster (%s) purge", cluster_name);
 	}
-	return SLURM_SUCCESS;
+	return SLURM_SUCCESS;  
 }
+
+#ifdef __METASTACK_OPT_APP
+/* 
+ * Static flag to track if job_app archive failed.
+ * Used to skip purge and preserve unarchived data.
+ */
+static bool _app_archive_failed = false;
+#endif
 
 /* Archive and purge a table.
  *
@@ -5327,6 +5335,11 @@ static int _archive_purge_table(purge_type_t purge_type, uint32_t usage_info,
 	char    *query = NULL, *sql_table = NULL,
 		*col_name = NULL;
 	uint32_t tmp_archive_period;
+
+#ifdef __METASTACK_OPT_APP
+	/* Reset flag at the start of each archive operation */
+	_app_archive_failed = false;
+#endif
 
 	switch (purge_type) {
 	case PURGE_EVENT:
@@ -5496,19 +5509,27 @@ static int _archive_purge_table(purge_type_t purge_type, uint32_t usage_info,
 						    usage_info);
 				if (rc == SLURM_ERROR)
 					return rc;
-#ifdef __METASTACK_OPT_APP  
-				rc = _archive_table(PURGE_JOB_APP,  
-						    mysql_conn, cluster_name,  
-						    col_name, &start, tmp_end,  
-						    arch_cond->archive_dir,  
-						    tmp_archive_period,  
-						    job_app_table,  
-						    usage_info);  
-				if (rc == SLURM_ERROR) {  
-					error("Failed to archive job app table for cluster %s, continuing",  
-					      cluster_name);  
-					rc = SLURM_SUCCESS;  
-				}  
+#ifdef __METASTACK_OPT_APP
+				/*
+				 * Archive job_app_table alongside job_table.
+				 * If archive fails, set flag to skip purge and preserve
+				 * unarchived data in database for manual recovery.
+				 */
+				rc = _archive_table(PURGE_JOB_APP,
+						    mysql_conn, cluster_name,
+						    col_name, &start, tmp_end,
+						    arch_cond->archive_dir,
+						    tmp_archive_period,
+						    job_app_table,
+						    usage_info);
+				if (rc == SLURM_ERROR) {
+					error("%s: Failed to archive job app table for cluster %s. "
+					      "App data will be preserved in database for manual recovery. "
+					      "Purge of orphaned app records will be skipped.",
+					      __func__, cluster_name);
+					_app_archive_failed = true;
+					rc = SLURM_SUCCESS;
+				}
 #endif
 			}
 		}
@@ -5654,10 +5675,19 @@ static int _execute_archive(mysql_conn_t *mysql_conn,
 					    "env_hash_inx")))
 			return rc;
 #ifdef __METASTACK_OPT_APP
-		/* Purge orphaned app records */  
-		if ((rc = _purge_app_table(mysql_conn, cluster_name,  
-					       job_app_table, job_table)))  
-			return rc;  
+		/*
+		 * Purge orphaned app records only if archive succeeded.
+		 * If archive failed, skip purge to preserve unarchived data.
+		 */
+		if (!_app_archive_failed) {
+			if ((rc = _purge_app_table(mysql_conn, cluster_name,
+						   job_app_table, job_table)))
+				return rc;
+		} else {
+			info("%s: Skipping purge of orphaned app records for cluster %s "
+			     "due to archive failure. App data preserved in database.",
+			     __func__, cluster_name);
+		}
 #endif
 	}
 
@@ -5681,19 +5711,19 @@ static int _execute_archive(mysql_conn_t *mysql_conn,
 				     PURGE_USAGE,
 				     usage_info + DBD_GOT_ASSOC_USAGE,
 				     mysql_conn, cluster_name, arch_cond)))
-			return rc;
+				return rc;
 
 			if ((rc = _archive_purge_table(
 				     PURGE_USAGE,
 				     usage_info + DBD_GOT_WCKEY_USAGE,
 				     mysql_conn, cluster_name, arch_cond)))
-			return rc;
+				return rc;
 
 			if ((rc = _archive_purge_table(
 				     PURGE_CLUSTER_USAGE,
 				     usage_info + DBD_GOT_CLUSTER_USAGE,
 				     mysql_conn, cluster_name, arch_cond)))
-			return rc;
+				return rc;
 		}
 	}
 
