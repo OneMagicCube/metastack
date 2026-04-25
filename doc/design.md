@@ -37,7 +37,7 @@
 | --- | --- | --- |
 | `sbatch` | `--app` / `--app-source` | 支持 `--app=list` 列出预置应用 |
 | `srun` | `--app` / `--app-source` | 支持 `--app=list` |
-| `salloc` | `--app` | 支持 `--app=list` |
+| `salloc` | `--app` / `--app-source` | 支持 `--app=list` |
 | `squeue` | `App`/`AppSource` 打印与过滤 | 新增 `--app-name`、`--app-source` 过滤 |
 | `scontrol show job` | 展示 App 详情 | 当 `app_name` 非空时展示 `App/AppName/AppVersion/AppSource` |
 | `sacct` | 打印与过滤 | 新增 `AppName/AppVersion/AppSource` 字段与 `--appname/--appversion/--appsource` |
