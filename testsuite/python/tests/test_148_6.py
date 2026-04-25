@@ -209,15 +209,23 @@ def _stop_slurmctld():
     time.sleep(2)  
   
   
-def _start_slurmctld(full_recovery=False):  
-    """Start slurmctld. full_recovery=True uses -R flag (recover>1)."""  
-    cmd = f"{_sbin_dir()}/slurmctld"  
-    if full_recovery:  
-        cmd += " -R"  
-    atf.run_command(cmd, user=_slurm_user())  
-    assert _wait_for_slurmctld_up(), (  
-        f"slurmctld did not start in time (cmd: {cmd})"  
-    )  
+def _start_slurmctld(full_recovery=False, ignore_state_errors=False):
+    """Start slurmctld.
+
+    full_recovery=True       -> add -R (recover > 1)
+    ignore_state_errors=True -> add -i (skip fatal on corrupt state files,
+                                consistent with native Slurm behavior for
+                                load_all_{part,node,job}_state).
+    """
+    cmd = f"{_sbin_dir()}/slurmctld"
+    if full_recovery:
+        cmd += " -R"
+    if ignore_state_errors:
+        cmd += " -i"
+    atf.run_command(cmd, user=_slurm_user())
+    assert _wait_for_slurmctld_up(), (
+        f"slurmctld did not start in time (cmd: {cmd})"
+    )
     time.sleep(2)  
 
 
@@ -620,11 +628,12 @@ class TestStateFileEdgeCases:
 
     def test_corrupt_state_file_handled(self):
         """
-        Manually corrupt spool/app_state. slurmctld must start without
-        coredump and log an error; config-defined apps must still load.
+        Manually corrupt spool/app_state. With slurmctld -i, the controller
+        must start (no coredump) and degrade gracefully.
 
-        Source: load_all_app_state() safe_unpack* paths goto unpack_error
-                on malformed buffer; function returns without fatal().
+        Native Slurm behavior: load_all_{part,node,job}_state all call
+        fatal() on version mismatch unless ignore_state_errors (-i) is set.
+        load_all_app_state() follows the same pattern at L1883-1894.
         """
         state_file = _get_app_state_file()
         if not state_file:
@@ -647,11 +656,11 @@ class TestStateFileEdgeCases:
             )
 
         try:
-            _start_slurmctld()
-            # slurmctld must respond
+            # Use -i to bypass fatal on corrupt state (Slurm native behavior)
+            _start_slurmctld(ignore_state_errors=True)
             ping = atf.run_command("scontrol ping", quiet=True)
             assert "is UP" in ping.get("stdout", ""), (
-                "slurmctld must start despite corrupt app_state"
+                "slurmctld must start with -i despite corrupt app_state"
             )
         finally:
             _delete_app("corrupt_pre")
@@ -724,10 +733,11 @@ class TestStateFileEdgeCases:
             )
 
         try:
-            _start_slurmctld()
+            # Use -i to bypass fatal on version mismatch (Slurm native behavior)
+            _start_slurmctld(ignore_state_errors=True)
             ping = atf.run_command("scontrol ping", quiet=True)
             assert "is UP" in ping.get("stdout", ""), (
-                "slurmctld must start with unknown state file version"
+                "slurmctld must start with -i on unknown state file version"
             )
         finally:
             _delete_app("oldver_pre")

@@ -175,9 +175,9 @@
 | TestReconfigWithKeepAppInfo | test_dynamic_app_version_preserved | 动态应用的版本保留 | 更新的版本仍存在 |
 | TestReconfigWithKeepAppInfo | test_config_and_dynamic_apps_coexist | 配置和动态共存 | 两者都存在 |
 | TestReconfigFlagsEdgeCases | test_state_file_overwritten_on_reconfigure_without_keep | reconfigure 后状态文件被覆盖 | 后续 slurmctld -R 也无法恢复动态 app |
-| TestStateFileEdgeCases | test_corrupt_state_file_handled | 手动破坏 spool/app_state | slurmctld 启动不 coredump，记录错误日志 |
+| TestStateFileEdgeCases | test_corrupt_state_file_handled | 手动破坏 spool/app_state，用 `slurmctld -i` 启动 | 启动成功不 coredump，记录错误日志（与 Slurm 原生 load_all_*_state 模式一致）|
 | TestStateFileEdgeCases | test_missing_state_file_handled | 删除 app_state | 启动成功，使用 conf 中的 app |
-| TestStateFileEdgeCases | test_old_version_state_file | 旧版本 state 文件 | 兼容加载或安全跳过 |
+| TestStateFileEdgeCases | test_old_version_state_file | 写入未知 version header，用 `slurmctld -i` 启动 | 启动成功，跳过加载并记录错误（与 Slurm 原生模式一致）|
 
 ---
 
