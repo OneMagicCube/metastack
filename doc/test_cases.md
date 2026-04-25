@@ -175,9 +175,6 @@
 | TestReconfigWithKeepAppInfo | test_dynamic_app_version_preserved | 动态应用的版本保留 | 更新的版本仍存在 |
 | TestReconfigWithKeepAppInfo | test_config_and_dynamic_apps_coexist | 配置和动态共存 | 两者都存在 |
 | TestReconfigFlagsEdgeCases | test_state_file_overwritten_on_reconfigure_without_keep | reconfigure 后状态文件被覆盖 | 后续 slurmctld -R 也无法恢复动态 app |
-| TestStateFileEdgeCases | test_corrupt_state_file_handled | 手动破坏 spool/app_state，用 `slurmctld -i` 启动 | 启动成功不 coredump，记录错误日志（与 Slurm 原生 load_all_*_state 模式一致）|
-| TestStateFileEdgeCases | test_missing_state_file_handled | 删除 app_state | 启动成功，使用 conf 中的 app |
-| TestStateFileEdgeCases | test_old_version_state_file | 写入未知 version header，用 `slurmctld -i` 启动 | 启动成功，跳过加载并记录错误（与 Slurm 原生模式一致）|
 
 ---
 
@@ -196,3 +193,47 @@
 | TestSacctAppFilter | test_filter_combined_appname_and_version | --appname 和 --appversion 组合 | 同时匹配两条件的作业 |
 | TestSacctAppFilter | test_filter_appname_no_match | --appname 不匹配任何作业 | 返回空结果 |
 | TestSacctAppHelpformat | test_helpformat_lists_app_fields | sacct -e 列表查询 | AppName, Version, Source 在字段列表中 |
+
+---
+
+## 8. 人工 QA 场景 (Manual QA)
+**描述**：以下场景因环境耦合性强、依赖故障注入或破坏性操作，不适合自动化 CI，由人工 QA 在专用测试环境中执行。每个场景标注源码位置以便复核。
+
+> **执行规范**：
+> - 必须在专用测试集群执行，不可在生产环境运行。
+> - 每次执行前备份 `StateSaveLocation` 和 slurm.conf。
+> - 完成后必须验证 slurmctld 正常启动且可调度作业。
+
+### 8.1 状态文件异常路径
+
+| 场景 | 操作步骤 | 预期结果 | 源码位置 |
+| :--- | :--- | :--- | :--- |
+| **app_state 损坏** | 1. `scontrol create app foo`<br/>2. `systemctl stop slurmctld`<br/>3. `dd if=/dev/urandom of=$StateSaveLocation/app_state bs=128 count=1 conv=notrunc`<br/>4. `systemctl start slurmctld`（默认）<br/>5. `slurmctld -i`（容错） | 默认：fatal 退出，提示用户用 `-i`<br/>`-i`：启动成功，记录 error，degraded mode | `read_config.c:1978-1989` (unpack_error 分支) |
+| **app_state version 不匹配** | 1. 创建 app 后 stop slurmctld<br/>2. `printf 'BOGUS_VERSION' > $StateSaveLocation/app_state`<br/>3. start slurmctld（默认 vs `-i`） | 默认：fatal "data version incompatible"<br/>`-i`：error + 重新 schedule_app_save 用新格式覆盖 | `read_config.c:1883-1894` |
+| **app_state 缺失** | 1. stop slurmctld<br/>2. `rm -f $StateSaveLocation/app_state*`<br/>3. start slurmctld | 启动成功，info "No app state file"，conf 中的 app 正常加载 | `read_config.c:1868-1874` |
+| **磁盘满时 dump** | 1. 配置 quota 让 StateSaveLocation 即将写满<br/>2. 创建多个 app 触发 dump_all_app_state<br/>3. 检查 app_state、app_state.new、app_state.old | `app_state` 保持上次成功的状态<br/>`app_state.new` 残留可清理<br/>slurmctld 不 fatal | `read_config.c:1761-1799` (.new 临时文件 + atomic rename) |
+
+### 8.2 MySQL 归档与恢复
+
+| 场景 | 操作步骤 | 预期结果 | 源码位置 |
+| :--- | :--- | :--- | :--- |
+| **归档 dump 正常流** | 1. 提交带 `--app=foo` 的作业并完成<br/>2. `sacctmgr archive dump Cluster=xxx Directory=/tmp/arch`<br/>3. 检查生成的 SQL 文件 | SQL 文件包含 job_app_table 数据，字段完整 | `as_mysql_archive.c` `_archive_table(PURGE_JOB_APP)` |
+| **归档失败保护** | 1. `chmod 555` 设置 archive_dir 只读<br/>2. 触发 PurgeJobAfter 归档<br/>3. 检查 slurmdbd.log 与 job_app_table | 日志：`Failed to archive job app table ...`<br/>日志：`Skipping purge of orphaned app records ...`<br/>job_app_table 数据**保留**未删除 | `as_mysql_archive.c:5525-5532, 5678-5686` |
+| **修复后恢复** | 1. 在归档失败状态后<br/>2. `chmod 755` 修复 archive_dir<br/>3. 再次触发归档 | 归档与 purge 恢复正常，`_app_archive_failed` 重置 | `as_mysql_archive.c:5339-5342` (flag reset) |
+| **archive load 恢复** | 1. dump 后清空 job_app_table<br/>2. `sacctmgr archive load file=...`<br/>3. `sacct --appname=foo` | 历史作业 app 字段恢复，sacct 可查询 | `as_mysql_archive.c` `_unpack_local_job_app` |
+| **load 幂等性** | 重复执行 archive load 同一文件 | ON DUPLICATE KEY UPDATE 不报错，无重复记录 | MySQL upsert 语句 |
+
+### 8.3 边界与并发
+
+| 场景 | 操作步骤 | 预期结果 | 源码位置 |
+| :--- | :--- | :--- | :--- |
+| **组合哈希冲突** | slurm.conf 中同时配置 `AppName=foo Version=1.0` 与 `AppName=foo-1.0 Version=1.0` | 日志含 "combined hash key collision"<br/>slurmctld 启动成功，作业可提交 | `read_config.c` `_rebuild_combined_hash_for_app` |
+| **大量 app 性能** | 创建 1000+ 个 app 并 reconfigure | reconfigure 时间 < 5s，无内存泄漏 | `dump_all_app_state` / `load_all_app_state` |
+| **并发 update** | 多客户端并发执行 `scontrol update app` | 写锁互斥，最终状态一致，无死锁 | `update_app` RPC handler |
+
+### 8.4 升级与兼容
+
+| 场景 | 操作步骤 | 预期结果 | 源码位置 |
+| :--- | :--- | :--- | :--- |
+| **跨版本升级** | 旧版本（无 app_state）升级到新版本 | 启动时 info "No app state file"，conf 加载正常 | `_open_app_state_file` |
+| **降级风险** | 新版本写出的 app_state 文件被旧版本读取 | 旧版本应识别 unknown 字段并安全跳过（如不支持，文档说明） | 协议版本兼容性 |
