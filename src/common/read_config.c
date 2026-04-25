@@ -2083,8 +2083,8 @@ static int _parse_app_name(void **dest, slurm_parser_enum_t type,
 	app_record_t *p = _create_conf_app();  
 
 	/* AppName value (the key after "AppName=") is mandatory */
-	if (value == NULL) {    
-		error("AppName line missing name value, ignoring");  
+	if (!value || !value[0]) {
+		error("AppName line missing or empty name value, ignoring");
 		_destroy_app_name(p);    
 		s_p_hashtbl_destroy(tbl);    
 		return 0;    

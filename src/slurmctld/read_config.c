@@ -1152,14 +1152,19 @@ static void _rebuild_combined_hash_for_app(app_record_t *app_ptr)
 	char *copy = xstrdup(app_ptr->versions);  
 	char *save_ptr = NULL;  
 	char *tok = strtok_r(copy, ",", &save_ptr);  
-	while (tok) {  
-		/* Trim leading whitespace */  
-		while (*tok == ' ' || *tok == '\t')  
-			tok++;  
-		/* Trim trailing whitespace */  
-		char *end = tok + strlen(tok) - 1;  
-		while (end > tok && (*end == ' ' || *end == '\t'))  
-			*end-- = '\0';  
+	while (tok) {
+		/* Trim leading whitespace */
+		while (*tok == ' ' || *tok == '\t')
+			tok++;
+		if (*tok == '\0') {
+			tok = strtok_r(NULL, ",", &save_ptr);
+			continue;
+		}
+		/* Trim trailing whitespace */
+		char *end = tok + strlen(tok) - 1;
+		while (end > tok && (*end == ' ' || *end == '\t'))
+			*end-- = '\0';
+  
 		if (*tok) {  
 			char *combined_key = NULL;  
 			app_combined_entry_t *existing;  
@@ -1210,13 +1215,17 @@ static void _remove_version_from_list(char **versions_ptr, const char *ver)
   
 	versions = *versions_ptr;      
 	copy = xstrdup(versions);      
-	tok = strtok_r(copy, ",", &save_ptr);      
-	while (tok) {      
-		while (*tok == ' ' || *tok == '\t')      
-			tok++;      
-		char *end = tok + strlen(tok) - 1;  
-		while (end > tok && (*end == ' ' || *end == '\t'))  
-			*end-- = '\0';  
+	tok = strtok_r(copy, ",", &save_ptr);
+	while (tok) {
+		while (*tok == ' ' || *tok == '\t')
+			tok++;
+		if (*tok == '\0') {
+			tok = strtok_r(NULL, ",", &save_ptr);
+			continue;
+		}
+		char *end = tok + strlen(tok) - 1;
+		while (end > tok && (*end == ' ' || *end == '\t'))
+			*end-- = '\0';
 		if (xstrcmp(tok, ver) != 0) {      
 			if (new_versions)      
 				xstrfmtcat(new_versions, ",%s", tok);      
@@ -1242,13 +1251,17 @@ static bool _version_in_list(const char *versions, const char *ver)
 		return false;    
 	char *copy = xstrdup(versions);    
 	char *save_ptr = NULL;    
-	char *tok = strtok_r(copy, ",", &save_ptr);    
-	while (tok) {    
-		while (*tok == ' ' || *tok == '\t')    
-			tok++;    
-		char *end = tok + strlen(tok) - 1;    
-		while (end > tok && (*end == ' ' || *end == '\t'))    
-			*end-- = '\0';    
+	char *tok = strtok_r(copy, ",", &save_ptr);
+	while (tok) {
+		while (*tok == ' ' || *tok == '\t')
+			tok++;
+		if (*tok == '\0') {
+			tok = strtok_r(NULL, ",", &save_ptr);
+			continue;
+		}
+		char *end = tok + strlen(tok) - 1;
+		while (end > tok && (*end == ' ' || *end == '\t'))
+			*end-- = '\0';
 		if (!xstrcmp(tok, ver)) {    
 			xfree(copy);    
 			return true;    
@@ -1368,13 +1381,17 @@ static void _remove_combined_hash_for_app(app_record_t *app_ptr)
   
 	char *copy = xstrdup(app_ptr->versions);    
 	char *save_ptr = NULL;    
-	char *tok = strtok_r(copy, ",", &save_ptr);    
-	while (tok) {    
-		while (*tok == ' ' || *tok == '\t')    
-			tok++;    
-		char *end = tok + strlen(tok) - 1;    
-		while (end > tok && (*end == ' ' || *end == '\t'))    
-			*end-- = '\0';    
+	char *tok = strtok_r(copy, ",", &save_ptr);
+	while (tok) {
+		while (*tok == ' ' || *tok == '\t')
+			tok++;
+		if (*tok == '\0') {
+			tok = strtok_r(NULL, ",", &save_ptr);
+			continue;
+		}
+		char *end = tok + strlen(tok) - 1;
+		while (end > tok && (*end == ' ' || *end == '\t'))
+			*end-- = '\0';
 		if (*tok) {    
 			char *buf = NULL;    
 			xstrfmtcat(buf, "%s-%s", app_ptr->app_name, tok);    
@@ -1544,15 +1561,20 @@ static int _build_single_appline_info(app_record_t *app)
 				/* Append only versions not already present */  
 				char *copy = xstrdup(app->versions);  
 				char *save_ptr = NULL;  
-				char *tok = strtok_r(copy, ",", &save_ptr);  
-				while (tok) {  
-					/* Trim leading whitespace */  
-					while (*tok == ' ' || *tok == '\t')  
-						tok++;  
-					/* Trim trailing whitespace */  
-					char *end = tok + strlen(tok) - 1;  
-					while (end > tok && (*end == ' ' || *end == '\t'))  
-						*end-- = '\0';  
+				char *tok = strtok_r(copy, ",", &save_ptr);
+				while (tok) {
+					/* Trim leading whitespace */
+					while (*tok == ' ' || *tok == '\t')
+						tok++;
+					if (*tok == '\0') {
+						tok = strtok_r(NULL, ",", &save_ptr);
+						continue;
+					}
+					/* Trim trailing whitespace */
+					char *end = tok + strlen(tok) - 1;
+					while (end > tok && (*end == ' ' || *end == '\t'))
+						*end-- = '\0';
+  
 					/* Check for duplicate and append if new */  
 					if (*tok && !_version_in_list(  
 							app_ptr->versions, tok)) {  
