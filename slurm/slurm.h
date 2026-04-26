@@ -133,6 +133,10 @@ typedef struct sbcast_cred sbcast_cred_t;		/* opaque data type */
 #define __METASTACK_QOS_HASH
 #endif
 
+#ifndef __METASTACK_OPT_QOS
+#define __METASTACK_OPT_QOS
+#endif
+
 /* slurmd -C can obtain the corresponding computing node topology based on configuration */
 #ifndef __METASTACK_OPT_NODE_SOCKET_TOPOLOGY
 #define __METASTACK_OPT_NODE_SOCKET_TOPOLOGY

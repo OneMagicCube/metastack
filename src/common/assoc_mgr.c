@@ -93,6 +93,19 @@ List assoc_mgr_wckey_list = NULL;
 qos_hash_t *assoc_mgr_qos_hash = NULL;
 #endif
 
+#ifdef __METASTACK_OPT_QOS
+static bool _qos_id_visible(bitstr_t *visible_qos, slurmdb_qos_rec_t *qos_rec)
+{
+	if (!visible_qos || !qos_rec)
+		return false;
+
+	if (qos_rec->id >= bit_size(visible_qos))
+		return false;
+
+	return bit_test(visible_qos, qos_rec->id);
+}
+#endif /* __METASTACK_OPT_QOS */
+
 #ifdef __METASTACK_ASSOC_HASH
 pthread_mutex_t uid_save_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t  uid_save_cond = PTHREAD_COND_INITIALIZER;
@@ -4680,8 +4693,21 @@ extern buf_t *assoc_mgr_info_get_pack_msg(
 	void *object;
 	uint32_t flags = 0;
 
+#ifdef __METASTACK_OPT_QOS
+	bitstr_t *visible_qos = NULL;
+	bool filter_qos = false;
+	bool user_requested = true;
+	list_itr_t *user_assoc_itr = NULL;
+#endif /* __METASTACK_OPT_QOS */
+
+#ifdef __METASTACK_OPT_QOS
+	assoc_mgr_lock_t locks = { .assoc = READ_LOCK, .qos = READ_LOCK,
+				   .res = READ_LOCK, .tres = READ_LOCK,
+				   .user = READ_LOCK };
+#else
 	assoc_mgr_lock_t locks = { .assoc = READ_LOCK, .res = READ_LOCK,
 				   .tres = READ_LOCK, .user = READ_LOCK };
+#endif /* __METASTACK_OPT_QOS */
 	buf_t *buffer = NULL;
 
 	if (msg) {
@@ -4728,6 +4754,54 @@ extern buf_t *assoc_mgr_info_get_pack_msg(
 	ret_list = list_create(NULL);
 
 	assoc_mgr_lock(&locks);
+
+#ifdef __METASTACK_OPT_QOS
+	if ((flags & ASSOC_MGR_INFO_FLAG_QOS) && !is_admin &&
+	    (slurm_conf.private_data &
+	     (PRIVATE_DATA_USAGE | PRIVATE_DATA_USERS)) &&
+	    (init_setup.enforce & ACCOUNTING_ENFORCE_QOS) &&
+	    (g_qos_count > 0)) {
+		filter_qos = true;
+		visible_qos = bit_alloc(g_qos_count);
+
+		if (user_itr) {
+			user_requested = false;
+			while ((tmp_char = list_next(user_itr))) {
+				if (!xstrcasecmp(tmp_char, user.name)) {
+					user_requested = true;
+					break;
+				}
+			}
+			list_iterator_reset(user_itr);
+		}
+
+		if (user_requested && user.assoc_list) {
+			user_assoc_itr = list_iterator_create(user.assoc_list);
+			while ((assoc_rec = list_next(user_assoc_itr))) {
+				if (acct_itr) {
+					while ((tmp_char = list_next(acct_itr))) {
+						if (!xstrcasecmp(tmp_char,
+								 assoc_rec->acct))
+							break;
+					}
+					list_iterator_reset(acct_itr);
+					if (!tmp_char)
+						continue;
+				}
+				if (!assoc_rec->usage ||
+				    !assoc_rec->usage->valid_qos)
+					continue;
+				if (bit_size(assoc_rec->usage->valid_qos) !=
+				    bit_size(visible_qos))
+					continue;
+				bit_or(visible_qos,
+				       assoc_rec->usage->valid_qos);
+			}
+			list_iterator_destroy(user_assoc_itr);
+			user_assoc_itr = NULL;
+		}
+	}
+#endif /* __METASTACK_OPT_QOS */
 
 	if (!(flags & ASSOC_MGR_INFO_FLAG_ASSOC))
 		goto no_assocs;
@@ -4813,6 +4887,28 @@ no_assocs:
 		goto no_qos;
 	}
 
+#ifdef __METASTACK_OPT_QOS
+	if (filter_qos) {
+		if (qos_itr) {
+			while ((tmp_char = list_next(qos_itr))) {
+				qos_rec = list_find_first(
+					assoc_mgr_qos_list,
+					slurmdb_find_qos_in_list_by_name,
+					tmp_char);
+				if (_qos_id_visible(visible_qos, qos_rec))
+					list_append(ret_list, qos_rec);
+			}
+		} else if (assoc_mgr_qos_list) {
+			itr = list_iterator_create(assoc_mgr_qos_list);
+			while ((qos_rec = list_next(itr))) {
+				if (_qos_id_visible(visible_qos, qos_rec))
+					list_append(ret_list, qos_rec);
+			}
+			list_iterator_destroy(itr);
+		}
+		tmp_list = ret_list;
+	} else {
+#endif /* __METASTACK_OPT_QOS */
 	/* now filter out the qos */
 	if (qos_itr) {
 		while ((tmp_char = list_next(qos_itr)))
@@ -4824,6 +4920,9 @@ no_assocs:
 		tmp_list = ret_list;
 	} else
 		tmp_list = assoc_mgr_qos_list;
+#ifdef __METASTACK_OPT_QOS
+	}
+#endif /* __METASTACK_OPT_QOS */
 
 no_qos:
 	/* pack the qos requested */
@@ -4839,6 +4938,10 @@ no_qos:
 
 	if (qos_itr)
 		list_flush(ret_list);
+#ifdef __METASTACK_OPT_QOS
+	else if (filter_qos)
+		list_flush(ret_list);
+#endif /* __METASTACK_OPT_QOS */
 
 	if (!(flags & ASSOC_MGR_INFO_FLAG_USERS) || !assoc_mgr_user_list)
 		goto no_users;
@@ -4885,6 +4988,11 @@ end_it:
 		list_iterator_destroy(acct_itr);
 	if (qos_itr)
 		list_iterator_destroy(qos_itr);
+#ifdef __METASTACK_OPT_QOS
+	if (user_assoc_itr)
+		list_iterator_destroy(user_assoc_itr);
+	FREE_NULL_BITMAP(visible_qos);
+#endif /* __METASTACK_OPT_QOS */
 
 	return buffer;
 }

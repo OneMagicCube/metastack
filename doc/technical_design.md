@@ -32,28 +32,47 @@
 
 - **推荐**：在 `src/common/assoc_mgr.c:assoc_mgr_info_get_pack_msg()` 的服务端组包阶段处理。
   - 该函数已持有 `auth_uid`，能判断 `is_admin`。
-  - 该函数已遍历 association 并形成 `ret_list`（已经过 `PrivateData` 过滤）。
+  - 该函数已经通过 `assoc_mgr_fill_in_user()` 得到当前用户缓存记录，其中包含现有 `user.assoc_list`（指向该用户的 association 列表）。
   - QoS 打包也在同一函数内完成，可在打包前求出“允许展示的 QoS 位图”。
 - **不推荐客户端处理**：`scontrol` 只拿到响应后的对象，缺少完整 association 可用 QoS 语义；客户端过滤也无法防止 RPC 响应中已包含全量 QoS。
 - **不推荐查 slurmdbd/数据库**：`assoc_mgr` 缓存已经持有所需数据；增加 DB 查询会引入延迟、失败面和一致性问题。
 
-### 建议算法（待编码）
+### 方案对比与最终选择
+
+| 方案 | 优点 | 缺点 | 结论 |
+| --- | --- | --- | --- |
+| A. 客户端默认不请求 QoS | 改动小、几乎无计算 | 不满足“只显示关联 QoS”，显式 `flags=qos` 仍可探测；安全边界在客户端 | 不采用 |
+| B1. 服务端扫描全量 assoc 后汇总 `valid_qos` | 语义直接，复用已有位图 | 对 `flags=qos` 等请求会新增全量 assoc 扫描；10 万用户规模下不够克制 | 不采用 |
+| **B2. 服务端复用当前用户 `user.assoc_list` 汇总 `valid_qos`** | 不查库、不新增索引、不扫全量用户；只遍历当前用户已有 association；与提交校验语义一致 | 依赖 assoc_mgr 已有 user→assoc 关系缓存；需注意锁与位图边界 | **采用** |
+| C. 新增 user→QoS 常驻缓存 | 单次查询最快 | 10 万用户下新增常驻内存和更新复杂度 | 不采用 |
+| D. 实时查 slurmdbd/数据库 | 语义可由 DB 精确计算 | 慢、失败面大、重复缓存已有数据 | 不采用 |
+
+### 落地算法
 
 1. 仅在以下条件下启用收缩：
    - `!is_admin`
    - `slurm_conf.private_data` 含 `PRIVATE_DATA_USAGE` 或 `PRIVATE_DATA_USERS`
    - `init_setup.enforce` 含 `ACCOUNTING_ENFORCE_QOS`（与复现配置和提交校验语义对齐）
    - 请求包含 `ASSOC_MGR_INFO_FLAG_QOS`
-2. 在现有 association 过滤循环中，**只对已经通过当前 `PrivateData` 判断、原本就会返回给该用户的 user association**，取 `assoc_rec->usage->valid_qos`，用 `bit_or()` 汇总到临时 `visible_qos` 位图；不得额外扫描所有用户或所有未返回的 association。
+2. 在服务端持有 assoc/qos 读锁后，遍历 `user.assoc_list`，只对当前用户已有的 association 取 `assoc_rec->usage->valid_qos`，用 `bit_or()` 汇总到临时 `visible_qos` 位图；不得额外扫描所有用户或全量 association。
 3. QoS 打包时：
    - 若请求显式带 `qos=...`，在原有名称过滤结果上再与 `visible_qos` 求交；
    - 若请求未带 `qos=...`，遍历 `assoc_mgr_qos_list`，仅打包 `qos_rec->id` 在 `visible_qos` 中置位的 QoS。
 4. 宏关闭、管理员用户、或未启用 QoS enforce 时保持现有上游行为。
 
+### 首版实现位置
+
+- `slurm/slurm.h`：启用 `__METASTACK_OPT_QOS`。
+- `src/common/assoc_mgr.c`：
+  - 新增 `_qos_id_visible()`，只按 QoS id 与临时 `visible_qos` 位图判断是否可见，并做 id 越界保护；
+  - `assoc_mgr_info_get_pack_msg()` 在 `__METASTACK_OPT_QOS` 下补 `.qos = READ_LOCK`；
+  - 对非管理员、`PrivateData` 命中且 `ACCOUNTING_ENFORCE_QOS` 启用的 QoS 请求，遍历当前用户 `user.assoc_list` 汇总 `visible_qos`；
+  - QoS 打包时，无论是否显式 `qos=...`，均与 `visible_qos` 求交。
+
 ### 性能影响
 
 - **时间复杂度**：
-  - association 过滤：现有逻辑已遍历 association 列表，汇总 `valid_qos` 只是在**已允许返回的少量 association** 上做位图 OR；不增加新的全量用户扫描；
+  - QoS 位图汇总：只遍历当前用户的 `user.assoc_list`，复杂度为 `O(user_assoc_count * bitset_words)`；不新增全量用户或全量 association 扫描；
   - QoS 打包：现有逻辑已遍历/打包 QoS 列表；过滤后仍最多遍历一次 `assoc_mgr_qos_list`，且打包数量通常更少。
 - **内存开销**：一个临时 `bitstr_t`，大小约为 `g_qos_count` bits；即使 10k QoS 也约 1.25 KiB 级别。
 - **锁影响**：该路径是 `REQUEST_ASSOC_MGR_INFO` 管理查询。实现时建议在现有 `assoc_mgr_lock_t` 中补齐 `.qos = READ_LOCK`（当前函数已读 `assoc_mgr_qos_list`），避免在 QoS 刷新并发时读未保护列表。锁顺序由 `assoc_mgr_lock()` 固定，使用 READ_LOCK 不引入新的写锁等待链。
@@ -61,7 +80,7 @@
 
 ### 边界点
 
-- 多 account / partition association：仅对当前用户**已可见/已返回**的 user association 做 QoS 并集。
+- 多 account / partition association：对当前用户 `user.assoc_list` 中的多个 association 做 QoS 并集。
 - coordinator 场景：需要产品确认“执行用户关联的 QoS”是否包含其协调账户下的 QoS；默认建议先按**本人 user association**语义实现，避免扩大可见范围。
 - 防御性检查：使用 `qos_rec->id` 前需判断 `qos_rec->id < bit_size(visible_qos)`，避免异常数据导致越界或断言。
 
