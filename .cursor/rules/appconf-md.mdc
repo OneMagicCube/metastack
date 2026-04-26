@@ -5,12 +5,13 @@ alwaysApply: true
 # Metastack-3.2 开发与设计同步规范
 
 ## 1. 核心原则 (Core Principles)
-- **设计优先**：`doc/design.md` 是本项目的“唯一事实来源 (Single Source of Truth)”。在编写代码前，必须先阅读并理解该文档。
+- **设计优先**：`doc/design.md` 是当前功能线的“唯一事实来源 (Single Source of Truth)”。在编写代码前，必须先阅读并理解该文档。
 - **技术决策记录**：所有关于代码重构、性能优化、算法改进的具体设计细节，必须记录在 `doc/technical_design.md` 中。
 - **一致性检查**：在执行任何代码修改任务前，必须检查修改内容是否与上述设计文档中的逻辑冲突。
 - **最小改动原则 (Minimal Invasive)**：
     - **非必要不改动**：禁止随意修改 Slurm 原生函数的定义、函数名及参数列表。
-    - **优先扩展而非修改**：如果原生函数无法满足需求，优先考虑通过 Hook、新增辅助函数或在宏定义包裹下进行最小化侵入，严禁大范围重构原生底层 API。
+    - **优先扩展而非修改**：如果原生函数无法满足需求，优先考虑通过 Hook、新增辅助函数或在**对应特性宏**包裹下进行最小化侵入，严禁大范围重构原生底层 API。
+
 ## 2. 文档更新机制 (Bidirectional Sync)
 - **代码驱动更新**：在完成代码修改后，必须扫描变更影响，并**主动提示并自动更新**对应的文档：
     - **业务逻辑变更** -> 更新 `doc/design.md`
@@ -19,88 +20,83 @@ alwaysApply: true
 - **文档驱动开发**：
     - 如果我修改了 `doc/design.md`，请扫描变更并提出代码实现建议。
     - 如果我修改了 `doc/test_cases.md`，请扫描变更并更新或生成对应的自动化测试脚本。
+- **项目/功能线切换与文档重置**：经维护者**明确要求**（例如切换至新分支、新开 `dev-*` 功能线、或历史设计文档与当前目标无关）时，允许将 `doc/design.md`、`doc/technical_design.md`、`doc/test_cases.md` **清空后重写**为仅适用于当前线的新文档。重置后，旧内容不再作为事实来源，除非从版本控制历史恢复。
 
-## 3. 代码实现规范 (Macro Definition)
-- **版本归属**：本项目当前处于 `metastack-3.2` 版本开发阶段。
-- **宏定义包裹**：所有因新需求或优化而新增的代码（包括函数、变量声明、逻辑分支、头文件引入等），**必须**使用宏定义 `__METASTACK_OPT_APP` 进行包裹。
-- **书写格式**：
-  ```cpp
-  #ifdef __METASTACK_OPT_APP
-  // 新增功能或优化逻辑
-  #endif // __METASTACK_OPT_APP
+## 3. 代码实现规范 (Feature Macros)
 
-- **存量修改**：若是为了支持新功能而修改已有代码，也请尽量使用宏定义隔离，或在注释中明确标出。
-- **注释** ： 足够的注释，应该至少占据百分之30，注释必须是英文。
-- **架构溯源与兼容原则**：在对代码进行任何改进或优化前，必须首先深入分析并对齐 Slurm 原生的设计哲学。优先考虑如何利用或扩展 Slurm 现有的设计模式，而非通过引入碎片化的新增逻辑来解决问题。确保所有变更在逻辑演进上与 Slurm 原生架构保持高度的一致性和连贯性。
+### 3.1 多特性宏模型
+
+Metastack 在 Slurm 上游之上按**特性线**组织可选编译：每条特性有**独立**的 C/C++ 预处理宏。新增或修改的代码**必须**落在**与当前工作对应的特性宏**内，而不是默认全部塞进某一固定宏名。
+
+- **命名约定**：`__METASTACK_OPT_<FEATURE>`，全大写，与分支/设计文档中的功能名一致（例如 `APP`、`QOS`）。
+- **已存在或常见的示例**（非穷举，以 `configure` / `slurm` 头文件与合并请求为准）：
+  - `__METASTACK_OPT_APP`：应用（App）预置与作业应用元数据相关。
+  - `__METASTACK_OPT_QOS`：本仓库 **3.2.0/dev-qos** 线，用于 **scontrol 关联与 QoS 展示/可见性**等 Metastack 行为（在首次落地代码时启用并贯穿新增逻辑）。
+- **规则**：实现哪条功能线，就使用哪条宏；**禁止**在 App 线代码里用 QoS 宏，反之亦然，除非有明确设计说明两条线合并编译时的交互。
+
+### 3.2 包裹范围
+
+- 所有因**该特性**而新增或显著改动的代码（含函数、变量、分支、头文件引入、结构体成员扩展的声明处等）均应用**对应该特性的** `#ifdef` 包裹。
+- **同一提交**中若涉及两个特性，应分别用两个宏块或嵌套在清晰的层级中，避免“一个大宏塞所有不相关 diff”。
+
+### 3.3 书写格式
+
+```cpp
+#ifdef __METASTACK_OPT_QOS
+/* New or changed logic for the QoS / association feature line. */
+#endif /* __METASTACK_OPT_QOS */
+```
+
+- **存量修改**：为支持新功能而触及的既有代码，尽量用特性宏或注释标出“Metastack 修改点 / scope”。
+
+### 3.4 注释
+
+- 与 Slurm 风格一致；Metastack 新增逻辑**建议**保持足够英文注释，便于与上游 diff 审查（具体比例不强制到数值，以可读、可审为准）。
+
+### 3.5 架构溯源与兼容原则
+
+- 在改动前应对齐 Slurm 原生设计（数据流、权限、RPC、插件边界）。优先复用与扩展现有模式，避免与上游无关的碎片化逻辑树。
 
 ## 4. 技术优化记录规范 (Technical Design)
 - 记录内容：
-    1. 优化背景：解决的问题（如：降低 CPU ticks、减少内存 RSS 占用、优化 Slurm 扫描延迟等）。
-    2. 技术方案：具体的实现思路、数据结构选择、核心算法逻辑。
-    3. 影响范围：涉及的模块及是否有性能损耗预期。
-- 维护要求：保持 doc/technical_design.md 按时间或功能模块倒序排列，确保格式整齐。
+    1. 优化背景：解决的问题（如：降低 CPU ticks、减少内存 RSS 占用、修正错误暴露范围等）。
+    2. 技术方案：具体实现、数据结构、核心算法与边界条件。
+    3. 影响范围：涉及模块、性能与安全影响预期。
+- 维护要求：保持 `doc/technical_design.md` 按时间或功能模块倒序排列，格式整齐；若文档已因功能线切换重置，从第一条记录起重新累积。
 
 ## 5. 维护规范 (Maintenance)
-- 禁止私自删减：除非明确要求，否则在更新文档时，禁止删除已有的核心业务逻辑或背景描述。
-
-- 格式保持：保持 Markdown 层级结构、技术术语和宏定义命名的一致性。
+- **在活跃开发周期内**：无维护者要求时，不得无故删除已写入的设计要点与测试用例；修改应以“更正、补充、迁移章节”为主。
+- **经明确要求的全量替换**：同第 2 节“项目/功能线切换与文档重置”。
+- **格式保持**：保持 Markdown 层级、术语与**特性宏**命名在 `doc/` 与代码中一致。
 
 ## 6. 检查清单 (Definition Audit)
-- 提交前自检：在 Cascade 提交代码修改建议前，请自检：
-    - 是否所有新增逻辑都已闭合在 __METASTACK_OPT_APP 宏之内？
-    - 如果涉及优化，是否已询问并准备好同步 doc/technical_design.md？
-    - 如果涉及 API 或核心流程改动，是否已同步 doc/design.md？
+- 提交前自检（在 Cascade 或提交前自审）：
+    - 新增或修改的 Metastack 逻辑是否落在**正确**的 `__METASTACK_OPT_*` 宏内（当前 dev-qos 线以 `__METASTACK_OPT_QOS` 为默认）？
+    - 若涉及实现细节/优化，是否已或准备同步 `doc/technical_design.md`？
+    - 若涉及行为或 API 变化，是否已或准备同步 `doc/design.md`？
 
 ## 7. 提交规范 (Commit Message Requirement)
-- **强制要求**：每次涉及代码修改的任务完成后，必须在回复的最后提供一个符合 Git 规范的 Commit Message 文本。
-- **格式要求**：
-  - **Header**: `type(scope): subject` (例如 `feat(slurm): add app recognition logic`)
-  - **Body**: 必须包含本次修改是否涉及 `__METASTACK_OPT_APP` 宏，以及是否同步更新了 `doc/` 下的文档。
-- **示例格式**：
-    ```text
-    feat/fix/refactor: 简要描述变更内容
-    
-    - 实现细节描述
-    - 宏定义检查: 已包裹在 __METASTACK_OPT_APP 宏内
-    - 文档状态: 已同步更新 doc/design.md 或 technical_design.md
-    ```
+- **强制要求**：每次涉及代码修改的任务完成后，在回复末尾提供符合约定的一条 Commit Message。
+- **Header**：`type(scope): subject`（例：`fix(slurm): limit scontrol show assoc QOS to user associations`）
+- **Body** 应说明：
+  - 本次是否引入或依赖 **`__METASTACK_OPT_QOS`**（或其它列出的特性宏）；
+  - 是否已同步 `doc/` 下相应文件。
+
+**示例**：
+
+```text
+fix(slurm): limit assoc QOS listing for unprivileged users
+
+- Describe behavior and files touched
+- 宏定义检查: 已包裹在 __METASTACK_OPT_QOS 内
+- 文档状态: 已更新 doc/design.md 与 test_cases.md
+```
 
 ## 8. 测试驱动与用例同步规范 (Test-Driven Sync)
 
-- **核心地位**：`doc/test_cases.md` 是本项目测试逻辑的唯一事实来源。所有自动化测试脚本（如 `testsuite/python/tests/test_148*`）必须基于该文档生成的用例编写。
-- **强制同步逻辑**：
-    - **修改代码后**：Cascade 在完成代码修改后，必须扫描修改点是否影响了现有的测试逻辑（例如：新增了参数、改动了输出格式或引入了新宏）。
-    - **自动触发询问**：如果代码变动涉及业务逻辑或 API，AI 必须主动询问：“检测到功能变更，是否需要我更新 `doc/test_cases.md` 中的对应测试项或新增测试用例？”
-- **更新规范**：
-    - **结构对齐**：新增用例必须严格遵循 `test_148_x.py` 系列的表格结构，包括：测试类、测试用例、测试内容、预期结果。
-    - **覆盖率要求**：新功能必须至少包含一个正向用例（Success Case）和一个异常用例（Edge/Error Case）。
-    - **宏定义声明**：在“测试内容”中必须明确标注该测试是否依赖 `__METASTACK_OPT_APP` 宏。
-- **测试脚本生成流**：
-    - 禁止 AI 在没有更新 `doc/test_cases.md` 的情况下直接修改 `testsuite/python` 下的脚本。
-    - 流程必须是：`修改代码` -> `更新 test_cases.md` -> `根据文档重构/生成 .py 测试文件`。
-- **自动化 vs 人工 QA 分类**：
-    - **自动化测试**：可在 CI 环境稳定复现的场景，写入 `test_148_*.py`，对应 `test_cases.md` 第 1~7 章。
-    - **人工 QA**：满足以下任一条件即归入 `test_cases.md` 第 8 章 "人工 QA 场景"，不写入自动化脚本：
-        - 依赖故障注入（磁盘满、quota、cgroup）
-        - 依赖直接拉起 slurmctld 绕过 atf 框架
-        - 破坏性操作（损坏 state 文件、kill -9）
-        - 长时压力（1000+ app、长时间运行）
-        - 跨版本升降级
-    - **判定原则**：若自动化脚本环境耦合性强、稳定性差，应主动迁移到人工 QA 章节，不要靠 `pytest.skip` 占位。
-- **测试性能优化 — sacct 类测试**：
-    - **问题**：sacct 测试依赖 slurmdbd 异步提交数据，每测试 `time.sleep(ACCOUNTING_DELAY=15)` 会让 N 个测试浪费 (N-1)×15 秒。
-    - **解决**：使用 `@pytest.fixture(scope="class")` 预提交共享作业，只 sleep 一次：
-        ```python
-        class TestXxx:
-            @pytest.fixture(scope="class")
-            def shared_jobs(self):
-                jids = {"v1": _submit_and_wait('--app=foo-1.0 -t1 --wrap="hostname"')}
-                time.sleep(ACCOUNTING_DELAY)
-                return jids
-            def test_foo(self, shared_jobs):
-                jid = shared_jobs["v1"]
-                # 直接查询，无需再 sleep
-        ```
-    - **适用**：多测试只读取 sacct 字段、无写冲突、无作业状态依赖。
-    - **不适用**：测试需要 scancel / scontrol update job / 重启 slurmctld 的场景。
-    - **铁律**：不重构已通过的稳定测试，只优化新增或明确慢的类。
+- **核心地位**：`doc/test_cases.md` 是自动化与手工测试描述的事实来源；脚本（如 `testsuite/python/tests/test_148*` 或后续编号）应与其对齐。
+- **修改代码后**：扫描是否影响用例、输出或宏；涉及行为变更时应提示更新 `test_cases.md`。
+- **结构**：新增用例应包含测试类/名称/步骤/预期；若依赖某特性宏，在“测试内容”中注明（例如 依赖 `__METASTACK_OPT_QOS`）。
+- **流程**：`更新设计或约定` → `更新 test_cases.md` → `再改/加 .py`（避免无文档只改脚本）。
+- **自动化 vs 人工 QA**：环境强耦合、需故障注入/破坏性操作的场景，写入 `test_cases.md` 人工章节，不过度依赖 `pytest.skip` 伪装覆盖。
+- **sacct 等异步记账**：在适用时可用 class 级 `fixture` 与单次 `ACCOUNTING_DELAY` 减少重复等待；不擅自重构已稳定通过的用例，仅对新增/明确慢的类优化。
