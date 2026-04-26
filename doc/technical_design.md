@@ -4,6 +4,69 @@
 
 ---
 
+## 2026-04-26 — 高效修复路径评估：复用 association 的 `valid_qos` 位图
+
+- **背景**：需要判断 `scontrol show assoc` 下 QoS 可见性收缩是否会引入昂贵查询或影响提交路径。当前 bug 出现在 `assoc_mgr_info_get_pack_msg()` 的 RPC 组包路径，属于低频管理查询，不在作业提交热路径。
+- **结论**：在当前 Slurm 架构下可以**高效处理，但必须严格限于复用现有内存结构**。`slurmdb_assoc_rec_t` 已经在内存中保存 `usage->valid_qos` 位图，该位图由 association 的 `qos_list` 派生，作业提交校验也通过它判断某个 association 是否有权使用指定 QoS。因此修复不需要新增数据库查询，也不需要在提交路径增加额外成本。
+
+### 大规模集群约束
+
+目标集群可能存在 **10 万级用户**，且每个用户都有 QoS 配置。本线实现必须满足：
+
+- **禁止新增全局 user→QoS 常驻索引**：不额外维护每用户 QoS map/缓存，避免内存随用户数线性膨胀。
+- **禁止每次查询扫描全量用户或做 users×qos 级别计算**。
+- **禁止查询 slurmdbd/数据库**：本路径只使用 `assoc_mgr` 已有内存缓存。
+- **禁止进入作业提交热路径**：不得在 `sbatch/srun/salloc` 提交校验链路增加任何新计算。
+- 若发现无法仅靠现有 `assoc_mgr` 数据完成过滤，应优先**不改行为**，而不是引入新缓存或重型查询。
+
+### 可复用的现有结构
+
+| 结构/路径 | 作用 |
+| --- | --- |
+| `slurmdb_assoc_rec_t.qos_list` | association 上配置的 QoS 列表（`List` of `char *`，通常为 QoS id 字符串）。 |
+| `slurmdb_assoc_usage_t.valid_qos` | 从 `qos_list` 派生的 `bitstr_t`，表示该 association 可用 QoS 集合；定义见 `slurm/slurmdb.h`。 |
+| `_post_assoc()` | 为 user association 构建/刷新 `usage->valid_qos`，并校验默认 QoS 是否在集合内。 |
+| `_determine_and_validate_qos()` | 作业提交/调度侧已有校验：`ACCOUNTING_ENFORCE_QOS` 下，`bit_test(assoc_ptr->usage->valid_qos, qos_rec->id)` 不通过则拒绝该 QoS。 |
+
+### 推荐实现位置
+
+- **推荐**：在 `src/common/assoc_mgr.c:assoc_mgr_info_get_pack_msg()` 的服务端组包阶段处理。
+  - 该函数已持有 `auth_uid`，能判断 `is_admin`。
+  - 该函数已遍历 association 并形成 `ret_list`（已经过 `PrivateData` 过滤）。
+  - QoS 打包也在同一函数内完成，可在打包前求出“允许展示的 QoS 位图”。
+- **不推荐客户端处理**：`scontrol` 只拿到响应后的对象，缺少完整 association 可用 QoS 语义；客户端过滤也无法防止 RPC 响应中已包含全量 QoS。
+- **不推荐查 slurmdbd/数据库**：`assoc_mgr` 缓存已经持有所需数据；增加 DB 查询会引入延迟、失败面和一致性问题。
+
+### 建议算法（待编码）
+
+1. 仅在以下条件下启用收缩：
+   - `!is_admin`
+   - `slurm_conf.private_data` 含 `PRIVATE_DATA_USAGE` 或 `PRIVATE_DATA_USERS`
+   - `init_setup.enforce` 含 `ACCOUNTING_ENFORCE_QOS`（与复现配置和提交校验语义对齐）
+   - 请求包含 `ASSOC_MGR_INFO_FLAG_QOS`
+2. 在现有 association 过滤循环中，**只对已经通过当前 `PrivateData` 判断、原本就会返回给该用户的 user association**，取 `assoc_rec->usage->valid_qos`，用 `bit_or()` 汇总到临时 `visible_qos` 位图；不得额外扫描所有用户或所有未返回的 association。
+3. QoS 打包时：
+   - 若请求显式带 `qos=...`，在原有名称过滤结果上再与 `visible_qos` 求交；
+   - 若请求未带 `qos=...`，遍历 `assoc_mgr_qos_list`，仅打包 `qos_rec->id` 在 `visible_qos` 中置位的 QoS。
+4. 宏关闭、管理员用户、或未启用 QoS enforce 时保持现有上游行为。
+
+### 性能影响
+
+- **时间复杂度**：
+  - association 过滤：现有逻辑已遍历 association 列表，汇总 `valid_qos` 只是在**已允许返回的少量 association** 上做位图 OR；不增加新的全量用户扫描；
+  - QoS 打包：现有逻辑已遍历/打包 QoS 列表；过滤后仍最多遍历一次 `assoc_mgr_qos_list`，且打包数量通常更少。
+- **内存开销**：一个临时 `bitstr_t`，大小约为 `g_qos_count` bits；即使 10k QoS 也约 1.25 KiB 级别。
+- **锁影响**：该路径是 `REQUEST_ASSOC_MGR_INFO` 管理查询。实现时建议在现有 `assoc_mgr_lock_t` 中补齐 `.qos = READ_LOCK`（当前函数已读 `assoc_mgr_qos_list`），避免在 QoS 刷新并发时读未保护列表。锁顺序由 `assoc_mgr_lock()` 固定，使用 READ_LOCK 不引入新的写锁等待链。
+- **热路径影响**：不影响 `sbatch/srun/salloc` 提交效率；不会改变作业提交校验，只复用已存在的 `valid_qos` 数据。
+
+### 边界点
+
+- 多 account / partition association：仅对当前用户**已可见/已返回**的 user association 做 QoS 并集。
+- coordinator 场景：需要产品确认“执行用户关联的 QoS”是否包含其协调账户下的 QoS；默认建议先按**本人 user association**语义实现，避免扩大可见范围。
+- 防御性检查：使用 `qos_rec->id` 前需判断 `qos_rec->id < bit_size(visible_qos)`，避免异常数据导致越界或断言。
+
+---
+
 ## 2026-04-26 — `scontrol show assoc` 下 QoS 全量展示：根因与代码位置
 
 - **背景**：在 `PrivateData` 含 `usage` 与/或 `users` 时，普通用户执行无参数的 `scontrol show assoc`（同 `show assoc_mgr`），期望仅看到与自身关联的 QoS；而实际在 QoS 区段可看到**与本人无关联的** QoS 记录。需确认是否为实现疏漏。  
