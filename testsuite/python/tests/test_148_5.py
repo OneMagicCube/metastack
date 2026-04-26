@@ -375,6 +375,117 @@ class TestSqueueAppSourceFilter:
         assert str(job_diff_name) not in output, (  
             f"Job {job_diff_name} (envbare) should NOT match --app-name=envapp"  
         )  
+
+    def test_filter_by_app_source_multi(self):
+        """
+        squeue --app-source=portal,marketplace should show jobs whose
+        app_source is in {PORTAL, MARKETPLACE}, and exclude jobs with
+        other sources (e.g. USER).
+
+        Verifies the query-side multi-value semantics:
+          - Submission side: --app-source accepts a single value only
+            (slurm_opt.c arg_set_app_source uses uint8_t).
+          - Query side: squeue --app-source accepts a comma-separated
+            list (squeue/opts.c OPT_LONG_APP_SOURCE walks strtok_r and
+            populates params.app_source_list).
+
+        Source: src/squeue/print.c — for each job, walks
+                params.app_source_list and matches any element.
+        """
+        job_portal = atf.submit_job_sbatch(
+            '--app=envapp-1.0 --app-source=portal '
+            '-t1 --hold --wrap="sleep 60"'
+        )
+        assert job_portal > 0
+        _jobs_created.append(job_portal)
+
+        job_market = atf.submit_job_sbatch(
+            '--app=envapp-2.0 --app-source=marketplace '
+            '-t1 --hold --wrap="sleep 60"'
+        )
+        assert job_market > 0
+        _jobs_created.append(job_market)
+
+        job_user = atf.submit_job_sbatch(
+            '--app=envapp-1.0 -t1 --hold --wrap="sleep 60"'
+        )
+        assert job_user > 0
+        _jobs_created.append(job_user)
+
+        atf.wait_for_job_state(job_portal, "PENDING", fatal=True)
+        atf.wait_for_job_state(job_market, "PENDING", fatal=True)
+        atf.wait_for_job_state(job_user, "PENDING", fatal=True)
+
+        output = atf.run_command_output(
+            "squeue --app-source=portal,marketplace "
+            "--noheader --Format=JobID"
+        ).strip()
+
+        assert str(job_portal) in output, (
+            f"Job {job_portal} (portal) should appear in "
+            f"--app-source=portal,marketplace output: {output}"
+        )
+        assert str(job_market) in output, (
+            f"Job {job_market} (marketplace) should appear in "
+            f"--app-source=portal,marketplace output: {output}"
+        )
+        assert str(job_user) not in output, (
+            f"Job {job_user} (user) should NOT appear in "
+            f"--app-source=portal,marketplace output: {output}"
+        )
+
+    def test_filter_by_app_name_multi(self):
+        """
+        squeue --app-name=envapp,envbare should show jobs whose
+        app_name is in {envapp, envbare}, and exclude jobs with no app.
+
+        Verifies that --app-name on the query side accepts comma-
+        separated multi-value (consistent with --app-source).
+
+        Source: src/squeue/opts.c OPT_LONG_APP_NAME — uses
+                slurm_addto_char_list to split comma-separated tokens
+                into params.app_name_list.
+        """
+        job_envapp = atf.submit_job_sbatch(
+            '--app=envapp-1.0 -t1 --hold --wrap="sleep 60"'
+        )
+        assert job_envapp > 0
+        _jobs_created.append(job_envapp)
+
+        job_envbare = atf.submit_job_sbatch(
+            '--app=envbare -t1 --hold --wrap="sleep 60"'
+        )
+        assert job_envbare > 0
+        _jobs_created.append(job_envbare)
+
+        job_no_app = atf.submit_job_sbatch(
+            '-t1 --hold --wrap="sleep 60"'
+        )
+        assert job_no_app > 0
+        _jobs_created.append(job_no_app)
+
+        atf.wait_for_job_state(job_envapp, "PENDING", fatal=True)
+        atf.wait_for_job_state(job_envbare, "PENDING", fatal=True)
+        atf.wait_for_job_state(job_no_app, "PENDING", fatal=True)
+
+        output = atf.run_command_output(
+            "squeue --app-name=envapp,envbare "
+            "--noheader --Format=JobID"
+        ).strip()
+
+        assert str(job_envapp) in output, (
+            f"Job {job_envapp} (envapp) should appear in "
+            f"--app-name=envapp,envbare output: {output}"
+        )
+        assert str(job_envbare) in output, (
+            f"Job {job_envbare} (envbare) should appear in "
+            f"--app-name=envapp,envbare output: {output}"
+        )
+        assert str(job_no_app) not in output, (
+            f"Job {job_no_app} (no app) should NOT appear in "
+            f"--app-name=envapp,envbare output: {output}"
+        )
+
   
   
 # ---------------------------------------------------------------------------  

@@ -350,7 +350,94 @@ class TestSacctAppFilter:
         )  
         assert output == "", (  
             f"Expected empty output for nonexistent app name, got: {output}"  
-        )  
+        )
+
+    # -----------------------------------------------------------------
+    # Multi-value filter tests for query-side --appname / --appsource
+    #
+    # Per appconf-md.mdc §8 sacct performance guidance, share a single
+    # ACCOUNTING_DELAY across the multi-value tests by using a class-
+    # scoped fixture: pre-submit four jobs (two app names x two
+    # sources) once, then run multiple read-only sacct queries.
+    # -----------------------------------------------------------------
+    @pytest.fixture(scope="class")
+    def multi_jobs(self):
+        """
+        Submit one job per (app_name, app_source) combination, wait
+        once for slurmdbd to ingest accounting data, and expose the
+        job IDs to the multi-value tests.
+        """
+        jids = {
+            # name-axis jobs (both default to app_source=user)
+            "name_app": _submit_and_wait(
+                '--app=sacctapp-1.0 -t1 --wrap="hostname"'
+            ),
+            "name_other": _submit_and_wait(
+                '--app=sacctother-3.0 -t1 --wrap="hostname"'
+            ),
+            # source-axis jobs (use sacctapp to keep app_name stable)
+            "src_portal": _submit_and_wait(
+                '--app=sacctapp-1.0 --app-source=portal '
+                '-t1 --wrap="hostname"'
+            ),
+            "src_market": _submit_and_wait(
+                '--app=sacctapp-2.0 --app-source=marketplace '
+                '-t1 --wrap="hostname"'
+            ),
+        }
+        time.sleep(ACCOUNTING_DELAY)
+        return jids
+
+    def test_filter_by_appname_multi(self, multi_jobs):
+        """
+        sacct --appname=sacctapp,sacctother should return jobs whose
+        app_name is in the comma-separated list, mirroring the
+        --states=PD,R style of Slurm's native multi-value filters.
+
+        Source: as_mysql_jobacct_process.c — appname_list expands to
+            (t5.app_name='sacctapp' OR t5.app_name='sacctother').
+        """
+        output = _sacct_filter(
+            "--appname=sacctapp,sacctother",
+            fmt="JobID,AppName"
+        )
+        assert str(multi_jobs["name_app"]) in output, (
+            f"sacctapp job {multi_jobs['name_app']} should appear in "
+            f"--appname=sacctapp,sacctother output: {output}"
+        )
+        assert str(multi_jobs["name_other"]) in output, (
+            f"sacctother job {multi_jobs['name_other']} should appear "
+            f"in --appname=sacctapp,sacctother output: {output}"
+        )
+
+    def test_filter_by_appsource_multi(self, multi_jobs):
+        """
+        sacct --appsource=portal,marketplace should return jobs whose
+        app_source is in {PORTAL, MARKETPLACE}, and exclude jobs with
+        other sources (e.g. USER).
+
+        Source: as_mysql_jobacct_process.c — appsource_list expands to
+            (t5.app_source=3 OR t5.app_source=4).
+        """
+        output = _sacct_filter(
+            "--appsource=portal,marketplace",
+            fmt="JobID,AppSource"
+        )
+        assert str(multi_jobs["src_portal"]) in output, (
+            f"portal job {multi_jobs['src_portal']} should appear in "
+            f"--appsource=portal,marketplace output: {output}"
+        )
+        assert str(multi_jobs["src_market"]) in output, (
+            f"marketplace job {multi_jobs['src_market']} should appear "
+            f"in --appsource=portal,marketplace output: {output}"
+        )
+        # name_app was submitted with default user source — it must be
+        # excluded by an explicit portal,marketplace multi-filter.
+        assert str(multi_jobs["name_app"]) not in output, (
+            f"user job {multi_jobs['name_app']} should NOT appear in "
+            f"--appsource=portal,marketplace output: {output}"
+        )
+
   
   
 # ---------------------------------------------------------------------------  
