@@ -38,7 +38,7 @@
 | `sbatch` | `--app` / `--app-source` | 支持 `--app=list` 列出预置应用 |
 | `srun` | `--app` / `--app-source` | 支持 `--app=list` |
 | `salloc` | `--app` / `--app-source` | 支持 `--app=list` |
-| `squeue` | `App`/`AppSource` 打印与过滤 | 新增 `--app-name`、`--app-source` 过滤 |
+| `squeue` | `App`/`AppSource` 打印与过滤 | 新增 `--app-name`、`--app-source` 过滤（查询侧，逗号分隔多值） |
 | `scontrol show job` | 展示 App 详情 | 当 `app_name` 非空时展示 `App/AppName/AppVersion/AppSource` |
 | `sacct` | 打印与过滤 | 新增 `AppName/AppVersion/AppSource` 字段与 `--appname/--appversion/--appsource` |
 新增--app参数接口设计
@@ -53,9 +53,16 @@ char *app_name;      /* parsed app name, e.g. "vasp" */
 char *app_version;   /* parsed app version, e.g. "5.7.1" */    
 uint8_t app_source;
 新增 --app-source 参数接口设计
-| 参数 | 是否必填 | 合法值 | 约束 |
-| --- | --- | --- | --- |
-| `--app-source` | 否 | `user` / `portal` / `marketplace` | 必须与 `--app` 同时使用；`auto` 与 `notset` 不允许用户手动指定 |
+
+`--app-source` 在“提交侧”与“查询侧”的语义不同，需要分开理解：
+
+| 命令 | 用途 | 取值数量 | 合法值 | 约束 |
+| --- | --- | --- | --- | --- |
+| `sbatch/srun/salloc --app-source` | 提交侧：声明本次作业的来源 | **单值** | `user` / `portal` / `marketplace` | 必须与 `--app` 同时使用；`auto` 与 `notset` 不允许用户手动指定 |
+| `squeue --app-source` | 查询侧：按作业来源过滤 | **多值（逗号分隔）** | `user` / `auto` / `portal` / `marketplace` / `notset` | 任意值可单独使用；不依赖 `--app-name` |
+| `sacct --appsource` | 查询侧：按历史作业来源过滤 | **多值（逗号分隔）** | `user` / `auto` / `portal` / `marketplace` / `notset` | 任意值可单独使用；不依赖 `--appname` |
+
+> 设计原则：作业本身只能归属一个来源，所以**提交侧只支持单值**；过滤场景需要支持“一次看多个来源”，所以**查询侧支持多值**，与 `sacct --states=PD,R` 等 Slurm 原生过滤选项的风格一致。
 app_source 取值定义
 | 枚举值 | 数值 | 字符串 | 说明 |
 | --- | --- | --- | --- |
@@ -415,7 +422,7 @@ scontrol show job 新增默认打印项
 | --- | --- | --- |
 | `App` | 合并应用名 | 有版本显示 `name-version`，无版本显示 `name`，无 app 显示空 |
 | `AppSource` | 应用来源 | `app_source_to_str()` 转换为字符串，仅有 app 时展示 |
-  - squeue 新增 --app-source 过滤参数，支持按来源筛选作业。
+  - squeue 新增 --app-name、--app-source 过滤参数，按 app 名称或来源筛选作业；两者均支持逗号分隔的多值（与 sacct `--appname/--appsource` 语义一致），便于一次性查看多个 app 或多个来源的作业。
   - squeue 打印实现：_print_job_app() 合并 app_name-app_version 显示，无版本时仅显示 app_name，无 app 时显示空。_print_job_app_source() 通过 app_source_to_str() 转换显示。
 
 
@@ -446,7 +453,10 @@ $ squeue -o "%.8i %.9P %.10j %.8u %.2t %.6M %.5D %.6C %b"
    10001     batch   vasp.sh    alice  R   5:23     4    64 vasp-5.7.1      user  
    10002     batch lammps.sh      bob  R   2:11     2    32 lammps-2025r1   user  
    10003     batch unknown.sh  charlie  R   0:45     1    8                 unknown 
-$ squeue --app-source=portal -O JobId,App,AppSource  
+$ squeue --app-source=portal -O JobId,App,AppSource
+
+# 多值过滤：一次性查看 portal 与 marketplace 来源的作业
+$ squeue --app-source=portal,marketplace -O JobId,App,AppSource
 2. scontrol show job
 $ scontrol show job 10001  
 JobId=10001 JobName=vasp.sh  

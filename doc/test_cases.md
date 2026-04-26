@@ -155,6 +155,8 @@
 | TestBatchEnvVars | test_env_portal_source_preserved | --app-source=portal 时变量注入 | SLURM_JOB_APP_SOURCE=portal |
 | TestSqueueAppSourceFilter | test_filter_by_app_source_user | squeue --app-source=user | 只显示 user 作业 |
 | TestSqueueAppSourceFilter | test_filter_by_app_source_portal | squeue --app-source=portal | 只显示 portal 作业 |
+| TestSqueueAppSourceFilter | test_filter_by_app_source_multi | squeue --app-source=portal,marketplace 多值过滤（查询侧多值） | 同时显示 portal 与 marketplace 作业，不返回其他来源 |
+| TestSqueueAppSourceFilter | test_filter_by_app_name_multi | squeue --app-name=vasp,lammps 多值过滤（查询侧多值） | 同时显示 vasp 与 lammps 作业 |
 | TestSqueueAppSourceFilter | test_combined_app_name_and_source_filter | --app-name 和 --app-source 组合 | 同时匹配两条件的作业 |
 | TestSqueueColumns | test_app_column_header | squeue 头部显示 | 显示 "APP" |
 | TestSqueueColumns | test_appsource_column_header | squeue 头部显示 | 显示 "APPSOURCE" |
@@ -198,8 +200,10 @@
 | TestSacctAppFields | test_sacct_unversioned_app | 无版本作业 sacct 记录 | AppName 存在，Version 为空 |
 | TestSacctAppFields | test_sacct_no_app_job | 无 --app 作业 sacct 记录 | App 字段全部为空 |
 | TestSacctAppFilter | test_filter_by_appname | sacct --appname 过滤 | 只返回匹配作业 |
+| TestSacctAppFilter | test_filter_by_appname_multi | sacct --appname=vasp,lammps 多值过滤（查询侧多值） | 同时返回两类应用作业 |
 | TestSacctAppFilter | test_filter_by_appversion | sacct --appversion 过滤 | 只返回匹配作业 |
 | TestSacctAppFilter | test_filter_by_appsource | sacct --appsource 过滤 | 只返回匹配作业 |
+| TestSacctAppFilter | test_filter_by_appsource_multi | sacct --appsource=portal,marketplace 多值过滤（查询侧多值） | 同时返回 portal 与 marketplace 作业 |
 | TestSacctAppFilter | test_filter_combined_appname_and_version | --appname 和 --appversion 组合 | 同时匹配两条件的作业 |
 | TestSacctAppFilter | test_filter_appname_no_match | --appname 不匹配任何作业 | 返回空结果 |
 | TestSacctAppHelpformat | test_helpformat_lists_app_fields | sacct -e 列表查询 | AppName, Version, Source 在字段列表中 |
