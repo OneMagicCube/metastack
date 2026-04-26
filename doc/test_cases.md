@@ -83,6 +83,8 @@ scontrol reconfigure
 sudo -u qos_user scontrol show assoc
 ```
 
+> 现场注意：若系统的 `sudo` 默认安全路径未包含 `scontrol`（出现 `sudo: scontrol: command not found`），可改用 `su - qos_user` 后执行，或直接写 `scontrol` 的绝对路径（例如 `/opt/.../bin/scontrol`），以避免 PATH 差异影响用例结论。
+
 2. 检查输出中的 QoS 区段（通常在 `QOS Records` / QoS 记录段落中）。
 
 **预期**

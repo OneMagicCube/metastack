@@ -117,16 +117,16 @@
 - 文件：`src/slurmctld/proc_req.c`，`_slurm_rpc_assoc_mgr_info()`。  
 - 调用 `assoc_mgr_info_get_pack_msg(msg->data, msg->auth_uid, acct_db_conn, protocol_version)`，注释称 *Security is handled in the assoc_mgr*。
 
-### 3. 核心：assoc / user 过滤 vs QoS 无对等过滤
+### 3. 核心：assoc / user 过滤 vs QoS 无对等过滤（上游语义）
 
 - 文件：`src/common/assoc_mgr.c`，函数 `assoc_mgr_info_get_pack_msg()`。
 
 | 数据 | 非管理员 + PrivateData 时的行为（摘要） |
 | --- | --- |
-| `assoc` 列表 | 在 `PRIVATE_DATA_USAGE` 下，对非 `is_admin` 仅保留**与请求用户相关**的 association（本人用户名匹配或协调账户等），见约 **4759–4792** 行附近的 `is_user` / `bad_user` 逻辑。 |
-| `user` 列表 | 在 `PRIVATE_DATA_USERS` 下，对非 `is_admin` 跳过非本请求用户名的 `user_rec`（约 **4849–4852** 行）。 |
-| `qos` 列表 | 若请求中**有** `qos_list` 迭代器，则只加入名称匹配的条目；**否则** `tmp_list = assoc_mgr_qos_list`（**全量**），约 **4816–4826** 行。**此处没有**对 `!is_admin` 再与“用户可关联的 QoS”求交。 |
-| 打包 | QoS 随后按 `tmp_list` 全量 `slurmdb_pack_qos_rec_with_usage`（约 **4828–4838** 行）。 |
+| `assoc` 列表 | 在 `PRIVATE_DATA_USAGE` 下，对非 `is_admin` 仅保留**与请求用户相关**的 association（本人用户名匹配或协调账户等），见 `assoc_mgr_info_get_pack_msg()` 中 `is_user` / `bad_user` 分支。 |
+| `user` 列表 | 在 `PRIVATE_DATA_USERS` 下，对非 `is_admin` 跳过非本请求用户名的 `user_rec`。 |
+| `qos` 列表 | 若请求中**有** `qos_list`，则只加入名称匹配的条目；**否则**走 `tmp_list = assoc_mgr_qos_list`（**全量**）。上游路径在此处**没有**对 `!is_admin` 与“用户可关联的 QoS”做交集。 |
+| 打包 | QoS 随后按 `tmp_list` 逐条 `slurmdb_pack_qos_rec_with_usage()` 打包返回。 |
 
 - **`AccountingStorageEnforce`**：上述组包不依赖其具体枚举值才发生；配置 `associations,qos` 主要保证记账与 QoS 数据存在，**不是** “全量 QoS 泄露” 的独立开关。  
 - **Metastack 相关宏**：`__METASTACK_OPT_READ_ONLY_ADMIN` 仅影响**管理员等级门槛**（`read_only` 等）判定，**不改变**上述 QoS 分支的“全量 vs 请求过滤”结构。
