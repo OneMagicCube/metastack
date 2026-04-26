@@ -76,7 +76,9 @@
 - **可高效处理**：Slurm association 缓存中已有 `usage->valid_qos` 位图，作业提交校验也复用它判断 association 是否可使用某 QoS；本线无需新增数据库查询或持久结构。
 - **推荐处理点**：在 `assoc_mgr_info_get_pack_msg()` 服务端组包阶段，根据当前用户已允许返回的 association 记录汇总可见 QoS 位图，再过滤 QoS 打包列表。
 - **规模约束**：目标集群可能存在 **10 万级用户**，且每个用户都有 QoS；实现不得新增全局 user→QoS 常驻索引，不得每次查询扫描全量用户，也不得引入 slurmdbd/数据库查询。
-- **最终选型**：采用服务端 B2 方案：复用 `assoc_mgr_fill_in_user()` 得到的当前用户 `user.assoc_list`，对其中 association 已有的 `usage->valid_qos` 做临时并集，再过滤 QoS 打包；不采用客户端隐藏、全量 assoc 扫描、全局 user→QoS 缓存或数据库查询。
+- **最终选型**：采用服务端 B2 方案，**双路径**汇总 `usage->valid_qos`：
+  - **快速路径**：`user.assoc_list` 已填充时直接迭代，与未修复前的 RPC 组包路径**等价、无额外分配**；
+  - **回退路径**：仅在 `user.assoc_list` 为 NULL/空时（Slurm 上游 `_get_assoc_mgr_user_list()` 默认 `with_coords` 而不带 `with_assocs`，缓存中常见此情形），按 `uid` 调用既有 `assoc_mgr_get_user_assocs()` 在**已有** `assoc_mgr_assoc_list` 中收集同用户的 association 指针；不采用客户端隐藏、全量用户扫描、全局 user→QoS 缓存或数据库查询，不改 `_get_assoc_mgr_user_list()` 加载策略。
 - **性能原则**：仅影响 `scontrol show assoc` 这类管理查询路径，不进入作业提交热路径；额外开销只能限定为一次临时 QoS 位图和遍历**当前执行用户自己的 association 列表**。
 - **语义原则**：宏关闭时保留上游行为；宏开启且非管理员、`PrivateData` 与 `AccountingStorageEnforce=qos` 生效时，QoS 可见性与 association 可用集合对齐。
 - **停止条件**：如果后续编码验证发现无法仅复用 `assoc_mgr` 已有的 `usage->valid_qos` 完成过滤，则本线应优先放弃行为修改，而不是新增高成本过滤机制。

@@ -4698,12 +4698,17 @@ extern buf_t *assoc_mgr_info_get_pack_msg(
 	bool filter_qos = false;
 	bool user_requested = true;
 	list_itr_t *user_assoc_itr = NULL;
+	List tmp_assoc_list = NULL;
 #endif /* __METASTACK_OPT_QOS */
 
 #ifdef __METASTACK_OPT_QOS
 	assoc_mgr_lock_t locks = { .assoc = READ_LOCK, .qos = READ_LOCK,
 				   .res = READ_LOCK, .tres = READ_LOCK,
-				   .user = READ_LOCK };
+				   .user = READ_LOCK,
+#ifdef __METASTACK_ASSOC_HASH
+				   .uid = READ_LOCK,
+#endif
+	};
 #else
 	assoc_mgr_lock_t locks = { .assoc = READ_LOCK, .res = READ_LOCK,
 				   .tres = READ_LOCK, .user = READ_LOCK };
@@ -4775,28 +4780,51 @@ extern buf_t *assoc_mgr_info_get_pack_msg(
 			list_iterator_reset(user_itr);
 		}
 
-		if (user_requested && user.assoc_list) {
-			user_assoc_itr = list_iterator_create(user.assoc_list);
-			while ((assoc_rec = list_next(user_assoc_itr))) {
-				if (acct_itr) {
-					while ((tmp_char = list_next(acct_itr))) {
-						if (!xstrcasecmp(tmp_char,
-								 assoc_rec->acct))
-							break;
-					}
-					list_iterator_reset(acct_itr);
-					if (!tmp_char)
-						continue;
+		/*
+		 * Fast path: user cache already has assoc_list filled in.
+		 * No extra allocation, identical cost to the unpatched code.
+		 *
+		 * Fallback: _get_assoc_mgr_user_list() loads users with
+		 * with_coords only, so user.assoc_list can be NULL.  Use the
+		 * existing assoc_mgr_get_user_assocs() to gather the same
+		 * in-memory assoc pointers by uid: O(user's own assoc count),
+		 * no DB lookup, hash-backed when __METASTACK_ASSOC_HASH is on.
+		 */
+		if (user_requested && user.assoc_list &&
+		    list_count(user.assoc_list)) {
+			user_assoc_itr =
+				list_iterator_create(user.assoc_list);
+		} else if (user_requested && (user.uid != NO_VAL)) {
+			slurmdb_assoc_rec_t uid_lookup = { .uid = user.uid };
+
+			tmp_assoc_list = list_create(NULL);
+			(void) assoc_mgr_get_user_assocs(
+				db_conn, &uid_lookup, 0, tmp_assoc_list);
+			if (list_count(tmp_assoc_list))
+				user_assoc_itr = list_iterator_create(
+					tmp_assoc_list);
+		}
+		while (user_assoc_itr &&
+		       (assoc_rec = list_next(user_assoc_itr))) {
+			if (acct_itr) {
+				while ((tmp_char = list_next(acct_itr))) {
+					if (!xstrcasecmp(tmp_char,
+							 assoc_rec->acct))
+						break;
 				}
-				if (!assoc_rec->usage ||
-				    !assoc_rec->usage->valid_qos)
+				list_iterator_reset(acct_itr);
+				if (!tmp_char)
 					continue;
-				if (bit_size(assoc_rec->usage->valid_qos) !=
-				    bit_size(visible_qos))
-					continue;
-				bit_or(visible_qos,
-				       assoc_rec->usage->valid_qos);
 			}
+			if (!assoc_rec->usage ||
+			    !assoc_rec->usage->valid_qos)
+				continue;
+			if (bit_size(assoc_rec->usage->valid_qos) !=
+			    bit_size(visible_qos))
+				continue;
+			bit_or(visible_qos, assoc_rec->usage->valid_qos);
+		}
+		if (user_assoc_itr) {
 			list_iterator_destroy(user_assoc_itr);
 			user_assoc_itr = NULL;
 		}
@@ -4991,6 +5019,7 @@ end_it:
 #ifdef __METASTACK_OPT_QOS
 	if (user_assoc_itr)
 		list_iterator_destroy(user_assoc_itr);
+	FREE_NULL_LIST(tmp_assoc_list);
 	FREE_NULL_BITMAP(visible_qos);
 #endif /* __METASTACK_OPT_QOS */
 

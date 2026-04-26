@@ -4,6 +4,20 @@
 
 ---
 
+## 2026-04-26 — `user.assoc_list` 为空时 QoS 可见位图的 uid 回退（性能保持）
+
+- **现象**：普通用户 `scontrol show assoc` 在启用 QoS 过滤时出现 **“No QOS currently cached in Slurm.”**，而 root/显式 `flags=qos` 能查到 QoS；`sacctmgr` 中该用户有合法 QoS。
+- **根因**：`src/common/assoc_mgr.c` 中 `_get_assoc_mgr_user_list()` 调用账管时仅设置 `with_coords`，不设置 `with_assocs`（见 `user_q` 初始化），`assoc_mgr` 缓存里大量用户 **没有** 填充 `assoc_list` 指针。首版过滤仅 `bit_or` 来自 `user.assoc_list` 的 `valid_qos`，在 `NULL`/空列表下 `visible_qos` 恒为全 0，把全部 QoS 滤掉 —— 客户端打印 “not cached”。
+- **实现（双路径，原行为零开销）**：
+  - **快速路径（首版语义）**：当 `user.assoc_list` 非空时，直接 `list_iterator_create(user.assoc_list)`，**无任何额外分配**，与未修复前一致。
+  - **回退路径**：仅当 `user.assoc_list` 为 NULL/空时，按 `uid` 调用既有 `assoc_mgr_get_user_assocs(db_conn, {.uid}, enforce=0, list)`，临时 `List` 用 `list_create(NULL)`，元素仍是 `assoc_mgr` 中**同一指针**（不复制关联结构）。在 `__METASTACK_ASSOC_HASH` 下走 `assoc_mgr_user_assoc_hash` + `list_append_list`，复杂度 `O(该 uid 的关联数)`，**不扫全局** `assoc_mgr_assoc_list`，**不查 slurmdbd**。
+- **锁**：本函数 `assoc_mgr_lock_t` 在 `__METASTACK_OPT_QOS` 块原已读锁 `assoc/qos/res/tres/user`；为兼容 `assoc_mgr_get_user_assocs()` 在 `__METASTACK_ASSOC_HASH` 下的 `verify_assoc_lock(UID_LOCK, READ_LOCK)`，新增 `.uid = READ_LOCK`（仅在 `__METASTACK_ASSOC_HASH` 下）。锁顺序由 `assoc_mgr_lock()` 固定，仍为 READ_LOCK，不引入新写锁等待。
+- **不影响的路径**：
+  - 管理员、不带 `ASSOC_MGR_INFO_FLAG_QOS`、未配 `PRIVATE_DATA_USAGE/USERS`、未配 `AccountingStorageEnforce=qos` 时，**完全不进**新增逻辑，与上游一致。
+  - `sbatch/srun/salloc` 提交校验、调度、记账等路径**完全不经过**本函数，无任何性能影响。
+  - 不改 `_get_assoc_mgr_user_list()` 的加载策略，避免为所有用户全量 `with_assocs` 引入额外账管/内存成本（10 万用户量级不可接受）。
+- **内存与释放**：函数末尾增加 `FREE_NULL_LIST(tmp_assoc_list)`；临时 `List` 由 `list_create(NULL)` 创建，不释放元素，不会双重释放 `assoc_mgr` 拥有的 association。
+
 ## 2026-04-26 — 高效修复路径评估：复用 association 的 `valid_qos` 位图
 
 - **背景**：需要判断 `scontrol show assoc` 下 QoS 可见性收缩是否会引入昂贵查询或影响提交路径。当前 bug 出现在 `assoc_mgr_info_get_pack_msg()` 的 RPC 组包路径，属于低频管理查询，不在作业提交热路径。

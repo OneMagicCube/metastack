@@ -15,7 +15,9 @@
 | TestScontrolAssocQos | test_admin_qos_view_unchanged | root / SlurmUser 执行 `scontrol show assoc flags=qos` 或显式 `qos=…` | 管理视角仍可看到请求范围内的 QoS，不受非管理员过滤影响 |
 | TestScontrolAssocQos | test_assoc_user_filtered_under_private_data | 同场景下 association / user 区段不泄露其他用户敏感信息 | 与 `assoc_mgr_info_get_pack_msg` 既有过滤行为一致（回归） |
 
-*说明：首版实现已采用 `__METASTACK_OPT_QOS` + `user.assoc_list` / `usage->valid_qos` 临时位图方案；自动化脚本落地时应避免新增全量用户扫描或环境强耦合步骤。*
+*说明：首版实现采用 `__METASTACK_OPT_QOS` 双路径汇总 `usage->valid_qos` 临时位图：*
+*1) **快速路径**：缓存已带 `user.assoc_list` 时直接迭代，**与未修复前等价、无额外分配**；*
+*2) **回退路径**：仅当 `user.assoc_list` 为空时，按 `uid` 通过既有 `assoc_mgr_get_user_assocs()` 取**同缓存内**指针，复杂度仍为 `O(该用户关联数)`，不查库、不扫全量用户。自动化脚本落地时应避免新增全量用户扫描或环境强耦合步骤。*
 
 ---
 
