@@ -118,13 +118,3 @@ AppName=matlab Version=R2024a,R2023b,R2023a             Description="MATLAB - nu
 AppName=julia  Version=1.10.4,1.9.4                     Description="Julia - high-performance dynamic language for technical computing"
 AppName=R      Version=4.4.0,4.3.3,4.2.3                Description="The R Project for Statistical Computing"
 AppName=python Version=3.11,3.10,3.9                    Description="CPython interpreter, paired with site-managed conda/pip environments"
-
-# ---------------------------------------------------------------------------
-# Compilers / MPI / numerical libraries (commonly selected via --app for
-# accounting & resource policy purposes; not strictly an "application")
-# ---------------------------------------------------------------------------
-AppName=gcc     Version=13.2.0,12.3.0,11.4.0            Description="GNU Compiler Collection (gcc/g++/gfortran)"
-AppName=intel   Version=2024.1,2023.2.1                 Description="Intel oneAPI Base + HPC Toolkit (icx/icpx/ifx, MKL, MPI)"
-AppName=nvhpc   Version=24.5,23.11                      Description="NVIDIA HPC SDK (nvc/nvc++/nvfortran, NCCL, cuBLAS, cuFFT)"
-AppName=openmpi Version=5.0.3,4.1.6                     Description="Open MPI - MPI implementation, UCX/CUDA-aware build"
-AppName=mpich   Version=4.2.1,4.1.2                     Description="MPICH - MPI implementation, ch4:ofi netmod"
