@@ -527,6 +527,13 @@ static bool _opt_verify(void)
 
 	validate_options_salloc_sbatch_srun(&opt);
 
+#ifdef __METASTACK_OPT_APP
+	if (opt.app_source != APP_SOURCE_NOTSET && (!opt.app || !opt.app[0])) {
+		error("--app-source option requires --app specification");
+		verified = false;
+	}
+#endif
+
 	if (opt.quiet && opt.verbose) {
 		error ("don't specify both --verbose (-v) and --quiet (-Q)");
 		verified = false;

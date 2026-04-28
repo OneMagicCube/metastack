@@ -1138,6 +1138,13 @@ static bool _opt_verify(void)
 
 	validate_options_salloc_sbatch_srun(&opt);
 
+#ifdef __METASTACK_OPT_APP
+	if (opt.app_source != APP_SOURCE_NOTSET && (!opt.app || !opt.app[0])) {
+		error("--app-source option requires --app specification");
+		exit(error_exit);
+	}
+#endif
+
 	/*
 	 * If they are requesting block without 'nopack' and the system
 	 * is setup to pack nodes set it here.
