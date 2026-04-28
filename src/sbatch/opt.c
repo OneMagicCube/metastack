@@ -818,7 +818,7 @@ static bool _opt_verify(void)
 	validate_options_salloc_sbatch_srun(&opt);
 
 #ifdef __METASTACK_OPT_APP
-	if (opt.app_source != APP_SOURCE_NOTSET && (!opt.app || !opt.app[0])) {
+	if (opt.app_source_set && (!opt.app || !opt.app[0])) {
 		error("--app-source option requires --app specification");
 		verified = false;
 	}
