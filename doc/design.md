@@ -474,7 +474,7 @@ JobId=10004 JobName=run_vasp.sh
    ...  
    App=vasp AppName=vasp AppVersion= AppSource=auto  
 4.1.2.7 作业环境变量注入
-作业运行时自动注入应用相关环境变量，覆盖 sbatch（batch launch）、salloc（resource allocation response）、srun（step setup）三种场景，以及 watchdog 脚本执行环境和 Prolog/Epilog 脚本执行环境。
+作业运行时自动注入应用相关环境变量，覆盖 sbatch（batch launch）、salloc（resource allocation response）、srun（step setup）三种场景，以及 watchdog 脚本执行环境、Prolog/Epilog 和 PrologSlurmctld/EpilogSlurmctld 脚本执行环境。
 - 新增环境变量
 | 环境变量 | 注入条件 | 示例值 |
 | --- | --- | --- |
@@ -488,6 +488,7 @@ JobId=10004 JobName=run_vasp.sh
 | `salloc/srun` 资源分配响应 | `env_array_for_job()`、`srun_job.c` | 支持 het-job offset 维度注入 |
 | watchdog 执行环境 | `interfaces/jobacct_gather.c` | watchdog 脚本可直接读取 app 元数据 |
 | Prolog/Epilog | `prep_script_slurmd.c` | 传递到运维脚本执行环境 |
+| PrologSlurmctld/EpilogSlurmctld | `job_common_env_vars()` | 传递到 slurmctld 侧脚本执行环境 |
 
 细节
 1. 仅当 app_name 非空时才注入 SLURM_JOB_APP_NAME 和 SLURM_JOB_APP_SOURCE；仅当 app_version 非空时才注入 SLURM_JOB_APP_VERSION。

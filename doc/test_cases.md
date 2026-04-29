@@ -153,6 +153,8 @@
 | TestBatchEnvVars | test_env_unversioned_app | 无版本作业变量 | VERSION=UNSET |
 | TestBatchEnvVars | test_env_no_app_submitted | 无 --app 作业变量 | 所有为 UNSET |
 | TestBatchEnvVars | test_env_portal_source_preserved | --app-source=portal 时变量注入 | SLURM_JOB_APP_SOURCE=portal |
+| TestSlurmctldScriptEnvVars | test_prolog_slurmctld_env_vars_with_app | PrologSlurmctld 中读取 app 变量 | NAME/SOURCE 正确，VERSION 按是否带版本判断 |
+| TestSlurmctldScriptEnvVars | test_epilog_slurmctld_env_vars_with_app | EpilogSlurmctld 中读取 app 变量 | NAME/SOURCE 正确，VERSION 按是否带版本判断 |
 | TestSqueueAppSourceFilter | test_filter_by_app_source_user | squeue --app-source=user | 只显示 user 作业 |
 | TestSqueueAppSourceFilter | test_filter_by_app_source_portal | squeue --app-source=portal | 只显示 portal 作业 |
 | TestSqueueAppSourceFilter | test_filter_by_app_source_multi | squeue --app-source=portal,marketplace 多值过滤（查询侧多值） | 同时显示 portal 与 marketplace 作业，不返回其他来源 |

@@ -282,6 +282,7 @@ typedef struct {
 | step / 资源分配返回 | `src/common/env.c`（通过 `env_array_overwrite_het_fmt`） |
 | watchdog 执行环境 | `src/interfaces/jobacct_gather.c` |
 | Prolog/Epilog | `src/plugins/prep/script/prep_script_slurmd.c` |
+| PrologSlurmctld/EpilogSlurmctld | `src/slurmctld/job_mgr.c`（`job_common_env_vars()`） |
 
 ### 4.6.3 Het-job 支持
 
