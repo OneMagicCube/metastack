@@ -175,11 +175,31 @@ typedef struct {
 
 ### 4.3.5 加载策略
 
-`load_all_app_state()` 使用 merge 策略：
+`load_all_app_state()` 使用与 `load_all_part_state()` 一致的 merge 策略：
 
-- state 有、配置有：覆盖可变字段
-- state 有、配置无：恢复动态创建记录
+- state 有、配置有：覆盖可变字段（指针转移，非 xstrdup+xfree）
+- state 有、配置无：恢复动态创建记录（仅 `RECONFIG_KEEP_APP_INFO` 置位时）
 - 配置有、state 无：保留配置项
+
+#### 加载时机（与 partition 完全对齐）
+
+| recover 值 | 场景 | 是否加载 app state |
+| --- | --- | --- |
+| 0 | reconfig（`scontrol reconfig`） | 仅当 `ReconfigFlags=KeepAppInfo` |
+| 1 | 正常启动（`slurmctld`） | 仅当 `ReconfigFlags=KeepAppInfo` |
+| >1 | 全量恢复（`slurmctld -R`） | 始终加载（代码强制置位） |
+
+`RECONFIG_KEEP_APP_INFO` 仅在 `recover > 1` 时由代码强制添加到 `reconfig_flags`，
+其余场景取决于 `slurm_conf.reconfig_flags`（即用户是否在 `slurm.conf` 中配置了
+`ReconfigFlags=KeepAppInfo`）。这与 `RECONFIG_KEEP_PART_INFO` 的行为完全一致。
+
+#### 防御性设计
+
+- 使用独立局部指针变量（`app_name`、`versions`、`description`、`watchdog`）
+  而非栈上结构体，每轮循环开头显式置 NULL，避免解包失败后残留野指针
+- 字段覆盖采用指针转移（`app_ptr->field = local_var; local_var = NULL;`），
+  与 `load_all_part_state()` 的模式一致
+- 解包后进行合法性校验（空 AppName 检查），校验失败时 break 退出循环并记录错误
 
 ### 4.3.6 备份文件回退机制
 
@@ -192,10 +212,15 @@ typedef struct {
 
 ### 4.3.7 Reconfig 行为
 
-| 配置 | 行为 |
-| --- | --- |
-| `ReconfigFlags=KeepAppInfo` | reconfig 时保留动态变更（加载 state） |
-| 未设置 `KeepAppInfo` | 以配置文件为准，丢弃动态变更 |
+与 Partition 的 `KeepPartInfo` 行为对齐：
+
+| 配置 | reconfig (recover=0) | 正常启动 (recover=1) | 全量恢复 (recover>1) |
+| --- | --- | --- | --- |
+| `ReconfigFlags=KeepAppInfo` | 保留动态变更 | 保留动态变更 | 保留动态变更 |
+| 未设置 `KeepAppInfo` | 以配置文件为准 | 以配置文件为准 | 保留动态变更（强制） |
+
+代码位置：`read_slurm_conf()` 中 `RECONFIG_KEEP_APP_INFO` 与 `RECONFIG_KEEP_PART_INFO`
+在同一 `recover > 1` 分支内置位，`load_all_app_state()` 紧跟 `load_all_part_state()` 调用。
 
 ### 4.3.8 版本兼容性检查与错误恢复
 
@@ -203,9 +228,8 @@ typedef struct {
 
 - **版本标识**：状态文件头部包含 `APP_STATE_VERSION` 和 `SLURM_PROTOCOL_VERSION`
 - **兼容性验证**：加载时检查版本标识，不兼容时根据 `ignore_state_errors` 决定行为
-- **严格模式**：`ignore_state_errors=false` 时，版本不兼容直接 `fatal()` 终止
-- **宽松模式**：`ignore_state_errors=true` 时，记录错误并继续运行，触发新格式保存
-- **自动修复**：版本不兼容时自动触发 `schedule_app_save()` 以新格式保存
+- **严格模式**：`ignore_state_errors=false` 时，版本不兼容直接 `fatal()` 终止（提示使用 `-i` 参数）
+- **宽松模式**：`ignore_state_errors=true` 时，记录错误并返回 `EFAULT`，系统继续运行
 
 ---
 

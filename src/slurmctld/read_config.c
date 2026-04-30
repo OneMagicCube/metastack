@@ -1845,180 +1845,162 @@ static buf_t *_open_app_state_file(char **state_file)
 	return create_mmap_buf(*state_file);  
 }
 
-/*    
- * load_all_app_state - Merge app state file data into config-loaded app_list.    
- *    
- * Uses merge strategy (consistent with load_all_part_state):    
- *   - For each record in state file, find matching record in app_list.    
- *   - If found: overlay state file fields onto config-loaded record.    
- *   - If not found: create new record (dynamically created app).    
- *   - Apps in slurm.conf but not in state file are preserved as-is.    
- *    
- * On reconfigure (recover==0): only loads state if RECONFIG_KEEP_APP_INFO    
- * flag is set; otherwise discards dynamic changes and uses config only.    
- *    
- * Error handling: unpack failures go to unpack_error which frees tmp_app    
- * members and buffer. With ignore_state_errors=false, incompatible versions    
- * cause fatal(); otherwise logs error and continues with partial data.    
+/*
+ * load_all_app_state - load the app state from file, recover on
+ *	slurmctld restart. execute this after loading the configuration
+ *	file data. Consistent with load_all_part_state().
+ *
+ * Note: reads dump from dump_all_app_state().
  */
-extern int load_all_app_state(uint16_t reconfig_flags) 
-{  
-	char *state_file, *ver_str = NULL;  
-	time_t now;  
-	int error_code = 0;  
+extern int load_all_app_state(uint16_t reconfig_flags)
+{
+	char *state_file = NULL, *ver_str = NULL;
+	char *app_name = NULL, *versions = NULL;
+	char *description = NULL, *watchdog = NULL;
+	bool default_flag = false;
+	time_t time;
+	int error_code = 0, app_count = 0;
 	buf_t *buffer;
-	uint16_t protocol_version = NO_VAL16;  
+	uint16_t protocol_version = NO_VAL16;
+	app_record_t *app_ptr;
 
-	xassert(verify_lock(CONF_LOCK, READ_LOCK));  
-	app_record_t tmp_app;  
-	int app_count = 0;  
-  
-	/* On reconfigure (recover == 0), only load state file if  
-	* RECONFIG_KEEP_APP_INFO is set — otherwise discard  
-	* dynamic changes and use config file only. */  
-	if (!(reconfig_flags & RECONFIG_KEEP_APP_INFO)) {  
-		debug("Restoring app state from state file disabled");  
-		schedule_app_save();
-		return SLURM_SUCCESS;  
-	}  
-	
-	/* recover > 1 (full recovery): load state file.    
-	 * recover == 0 with RECONFIG_KEEP_APP_INFO: also load state file. */
-  
-	/* read the file */  
-	lock_state_files();  
-	if (!(buffer = _open_app_state_file(&state_file))) {  
-		info("No app state file (%s) to recover",  
-		     state_file);  
-		xfree(state_file);  
-		unlock_state_files();  
-		return ENOENT;  
-	}  
-	xfree(state_file);  
-	unlock_state_files();  
-  
-	safe_unpackstr(&ver_str, buffer);  
-	debug3("Version string in app_state header is %s", ver_str);  
-	if (ver_str && !xstrcmp(ver_str, APP_STATE_VERSION))  
-		safe_unpack16(&protocol_version, buffer);  
-  
-	if (protocol_version == NO_VAL16) {  
-		if (!ignore_state_errors)  
-			fatal("Can not recover app state, data version "  
-			      "incompatible, start with '-i' to ignore this.");  
-		error("*****************************************************");  
-		error("Can not recover app state, data version incompatible");  
-		error("*****************************************************");  
-		xfree(ver_str);  
-		FREE_NULL_BUFFER(buffer);  
-		schedule_app_save();	/* Schedule save with new format */  
-		return EFAULT;  
-	}  
-	xfree(ver_str);  
-	safe_unpack_time(&now, buffer);  
-  
-	/*    
-	 * Merge state file data into config-loaded app_list.    
-	 * For each state file record:    
-	 *   - If app exists in app_list (from slurm.conf): overlay state data.    
-	 *   - If app does not exist: create new record (dynamic app).    
-	 * Apps in slurm.conf but not in state file are preserved as-is.    
-	 * This is consistent with load_all_part_state() merge strategy.    
-	 */    
-    
-	while (remaining_buf(buffer) > 0) {    
-		memset(&tmp_app, 0, sizeof(tmp_app));    
+	xassert(verify_lock(CONF_LOCK, READ_LOCK));
 
-#ifdef __META_PROTOCOL    
-		if (protocol_version >= META_3_2_PROTOCOL_VERSION) {    
-			safe_unpackstr(&tmp_app.app_name, buffer);    
-			safe_unpackstr(&tmp_app.versions, buffer);    
-			safe_unpackstr(&tmp_app.description, buffer);    
-			safe_unpackstr(&tmp_app.watchdog, buffer);    
-			safe_unpackbool(&tmp_app.default_flag, buffer);    
-		} else {    
-			goto unpack_error;    
-		}    
-#else    
-		goto unpack_error;    
-#endif    
+	if (!(reconfig_flags & RECONFIG_KEEP_APP_INFO)) {
+		debug("Restoring app state from state file disabled");
+		return SLURM_SUCCESS;
+	}
 
-		/* Defensive: skip records with empty AppName to avoid    
-		 * polluting app_list with anonymous entries. */    
-		if (!tmp_app.app_name || !tmp_app.app_name[0]) {    
-			error("%s: skipping state record with empty AppName",    
-			      __func__);    
-			xfree(tmp_app.app_name);    
-			xfree(tmp_app.versions);    
-			xfree(tmp_app.description);    
-			xfree(tmp_app.watchdog);    
-			continue;    
-		}    
-      
-		/* Find existing record or create new one */      
-		app_record_t *app_ptr = find_app_record(tmp_app.app_name);      
-      
-		if (!app_ptr) {      
-			/* Not in config — dynamically created app */      
-			info("%s: app %s missing from configuration "      
-			     "file, creating from state",      
-			     __func__, tmp_app.app_name);      
-			app_ptr = create_app_record(      
-				tmp_app.app_name, tmp_app.versions);      
-		}      
-      
-		if (app_ptr) {      
-			/* Overlay state file data onto record */      
-			if (tmp_app.versions) {    
-				/* Remove old combined hash entries */    
-				_remove_combined_hash_for_app(app_ptr);    
-				xfree(app_ptr->versions);    
-				app_ptr->versions = xstrdup(tmp_app.versions);    
-				/* Rebuild combined hash entries */    
-				_rebuild_combined_hash_for_app(app_ptr);    
-			}    
-			xfree(app_ptr->description);      
-			if (tmp_app.description)      
-				app_ptr->description =      
-					xstrdup(tmp_app.description);      
-			xfree(app_ptr->watchdog);      
-			if (tmp_app.watchdog)      
-				app_ptr->watchdog =      
-					xstrdup(tmp_app.watchdog);      
-			app_ptr->default_flag = tmp_app.default_flag;      
-      
-			if (tmp_app.default_flag) {      
-				xfree(default_app_name);      
-				default_app_name = xstrdup(app_ptr->app_name);      
-				default_app_loc = app_ptr;      
-			}      
-			app_count++;      
-		}      
-      
-		/* Free temporary strings */      
-		xfree(tmp_app.app_name);      
-		xfree(tmp_app.versions);      
-		xfree(tmp_app.description);      
-		xfree(tmp_app.watchdog);      
-	}  
-    
-	info("Recovered state of %d app records", app_count);    
-	FREE_NULL_BUFFER(buffer);    
-	last_app_update = time(NULL);    
-	return error_code;    
-    
-unpack_error:    
-	if (!ignore_state_errors)  
-		fatal("Incomplete app data checkpoint file, start with "  
-		      "'-i' to ignore this.");  
-	error("Incomplete app data checkpoint file");  
-	xfree(tmp_app.app_name);  
-	xfree(tmp_app.versions);  
-	xfree(tmp_app.description);  
-	xfree(tmp_app.watchdog);  
+	/* read the file */
+	lock_state_files();
+	if (!(buffer = _open_app_state_file(&state_file))) {
+		info("No app state file (%s) to recover",
+		     state_file);
+		xfree(state_file);
+		unlock_state_files();
+		return ENOENT;
+	}
+	xfree(state_file);
+	unlock_state_files();
+
+	safe_unpackstr(&ver_str, buffer);
+	debug3("Version string in app_state header is %s", ver_str);
+	if (ver_str && !xstrcmp(ver_str, APP_STATE_VERSION))
+		safe_unpack16(&protocol_version, buffer);
+
+	if (protocol_version == NO_VAL16) {
+		if (!ignore_state_errors)
+			fatal("Can not recover app state, data version incompatible, start with '-i' to ignore this. Warning: using -i will lose the data that can't be recovered.");
+		error("*****************************************************");
+		error("Can not recover app state, data version incompatible");
+		error("*****************************************************");
+		xfree(ver_str);
+		FREE_NULL_BUFFER(buffer);
+		return EFAULT;
+	}
+	xfree(ver_str);
+	safe_unpack_time(&time, buffer);
+
+	while (remaining_buf(buffer) > 0) {
+		app_name = NULL;
+		versions = NULL;
+		description = NULL;
+		watchdog = NULL;
+		default_flag = false;
+
+#ifdef __META_PROTOCOL
+		if (protocol_version >= META_3_2_PROTOCOL_VERSION) {
+			safe_unpackstr(&app_name, buffer);
+			safe_unpackstr(&versions, buffer);
+			safe_unpackstr(&description, buffer);
+			safe_unpackstr(&watchdog, buffer);
+			safe_unpackbool(&default_flag, buffer);
+		} else {
+			goto unpack_error;
+		}
+#else
+		goto unpack_error;
+#endif
+
+		/* validity test as possible */
+		if (!app_name || !app_name[0]) {
+			error("%s: skipping state record with empty AppName",
+			      __func__);
+			error_code = EINVAL;
+		}
+		if (error_code) {
+			error("No more app data will be processed from "
+			      "the checkpoint file");
+			xfree(app_name);
+			xfree(versions);
+			xfree(description);
+			xfree(watchdog);
+			error_code = EINVAL;
+			break;
+		}
+
+		/* find record and perform update */
+		app_ptr = find_app_record(app_name);
+		if (!app_ptr && (reconfig_flags & RECONFIG_KEEP_APP_INFO)) {
+			info("%s: app %s missing from configuration "
+			     "file, creating from state",
+			     __func__, app_name);
+			app_ptr = create_app_record(app_name, versions);
+		} else if (!app_ptr) {
+			info("%s: app %s removed from configuration "
+			     "file, skipping",
+			     __func__, app_name);
+		}
+
+		if (app_ptr) {
+			app_count++;
+
+			if (versions) {
+				_remove_combined_hash_for_app(app_ptr);
+				xfree(app_ptr->versions);
+				app_ptr->versions = versions;
+				versions = NULL;
+				_rebuild_combined_hash_for_app(app_ptr);
+			}
+
+			xfree(app_ptr->description);
+			app_ptr->description = description;
+			description = NULL;
+
+			xfree(app_ptr->watchdog);
+			app_ptr->watchdog = watchdog;
+			watchdog = NULL;
+
+			app_ptr->default_flag = default_flag;
+			if (default_flag) {
+				xfree(default_app_name);
+				default_app_name = xstrdup(app_ptr->app_name);
+				default_app_loc = app_ptr;
+			}
+		}
+
+		xfree(app_name);
+		xfree(versions);
+		xfree(description);
+		xfree(watchdog);
+	}
+
 	info("Recovered state of %d app records", app_count);
-	FREE_NULL_BUFFER(buffer);  
-	return EFAULT;  
+	FREE_NULL_BUFFER(buffer);
+	last_app_update = time(NULL);
+	return error_code;
+
+unpack_error:
+	if (!ignore_state_errors)
+		fatal("Incomplete app data checkpoint file, start with '-i' to ignore this. Warning: using -i will lose the data that can't be recovered.");
+	error("Incomplete app data checkpoint file");
+	xfree(app_name);
+	xfree(versions);
+	xfree(description);
+	xfree(watchdog);
+	info("Recovered state of %d app records", app_count);
+	FREE_NULL_BUFFER(buffer);
+	return EFAULT;
 }
 
 /*  
@@ -3508,15 +3490,7 @@ extern int read_slurm_conf(int recover)
 #endif
 
 #ifdef __METASTACK_OPT_APP  
-	if (recover > 1)  
-        reconfig_flags |= RECONFIG_KEEP_APP_INFO; 
 	_build_all_app_info();  
-  
-	/* Then optionally merge state file data into config-loaded app_list.    
-	 * On full recovery (recover > 1): merge state file data.    
-	 * On normal startup (recover == 1) or reconfigure (recover == 0):    
-	 *   use config file only, dynamic changes are discarded. */
-	(void)load_all_app_state(reconfig_flags);
 #endif
 
 	restore_front_end_state(recover);
@@ -3604,9 +3578,15 @@ extern int read_slurm_conf(int recover)
 		load_job_ret = load_all_job_state();
 	} else if (recover > 1) {	/* Load node, part & job state files */
 		reconfig_flags |= RECONFIG_KEEP_PART_INFO;
+#ifdef __METASTACK_OPT_APP
+		reconfig_flags |= RECONFIG_KEEP_APP_INFO;
+#endif
 		load_job_ret = load_all_job_state();
 	}
 	(void) load_all_part_state(reconfig_flags);
+#ifdef __METASTACK_OPT_APP
+	(void) load_all_app_state(reconfig_flags);
+#endif
 #ifdef __METASTACK_NEW_AUTO_SUPPLEMENT_AVAIL_NODES
 	(void) load_all_part_borrow_nodes(&rebuild);
 	valid_node_borrow_interval();

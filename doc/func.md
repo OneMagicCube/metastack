@@ -379,14 +379,15 @@
   - 声明：`src/slurmctld/slurmctld.h`
   - 定义：`src/slurmctld/read_config.c`
 - **宏包裹**：`__METASTACK_OPT_APP`
-- **功能描述**：从 `app_state` 读取动态 App 配置，并与配置文件加载的 App 记录合并。
+- **功能描述**：从 `app_state` 读取动态 App 配置，并与配置文件加载的 App 记录合并。逻辑与 `load_all_part_state()` 完全对齐。
 - **参数说明**：
-  - `reconfig_flags`：重配标志。只有包含 `RECONFIG_KEEP_APP_INFO` 时，reconfigure 路径才加载 state。
+  - `reconfig_flags`：重配标志。只有包含 `RECONFIG_KEEP_APP_INFO` 时才加载 state 文件。`recover > 1` 时由 `read_slurm_conf()` 强制置位；其余场景取决于 `slurm.conf` 中的 `ReconfigFlags=KeepAppInfo`。
 - **返回值**：
   - `SLURM_SUCCESS`：无需恢复或恢复成功。
   - `ENOENT`：state 文件不存在。
-  - `EFAULT` / `SLURM_ERROR`：state 文件版本不兼容或解包失败。
-- **内存所有权**：函数内部负责释放临时 buffer/string；合并后的记录归 `app_list` 所有。
+  - `EFAULT`：state 文件版本不兼容或解包失败。
+- **调用位置**：`read_slurm_conf()` 中紧跟 `load_all_part_state()` 之后，`RECONFIG_KEEP_APP_INFO` 与 `RECONFIG_KEEP_PART_INFO` 在同一 `recover > 1` 分支内置位。
+- **内存所有权**：使用独立局部指针变量解包，通过指针转移（非 xstrdup+xfree）将字段合并到 `app_list` 记录。函数内部负责释放未转移的临时指针和 buffer。
 - **变更记录**：Metastack-3.2 新增 App state 恢复函数。
 
 ### 4.11 `update_app`
