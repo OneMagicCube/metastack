@@ -1987,7 +1987,6 @@ extern int load_all_app_state(uint16_t reconfig_flags)
 
 	info("Recovered state of %d app records", app_count);
 	FREE_NULL_BUFFER(buffer);
-	last_app_update = time(NULL);
 	return error_code;
 
 unpack_error:
