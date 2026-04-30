@@ -133,6 +133,28 @@ void print_sjinfo_version(void)
 	printf("%s %s\n", PACKAGE_NAME, SJINFO_VERSION_STRING);
 }
 
+void print_available_fields(void)
+{
+	printf("Available fields for --format option:\n\n");
+	printf("Step fields (default):\n");
+	printf("  JobID, StepID, StepAVECPU, StepCPU, StepMEM, StepVMEM, StepPages,\n");
+	printf("  MaxStepCPU, MinStepCPU, MaxStepMEM, MinStepMEM, MaxStepVMEM, MinStepVMEM,\n");
+	printf("  StepDCU, StepDCUMEM, MaxStepDCU, MinStepDCU, MaxStepDCUMEM, MinStepDCUMEM\n\n");
+	printf("Event fields (with -A or -O):\n");
+	printf("  JobID, StepID, StepCPU, StepMEM, StepVMEM, StepDCU, StepDCUMEM, StepPages,\n");
+	printf("  CPUthreshold, Start, End, Type\n\n");
+	printf("Overall fields (with -O):\n");
+	printf("  JobID, StepID, Last_start, Last_end, CPU_Abnormal_CNT, PROC_Abnormal_CNT, NODE_Abnormal_CNT\n\n");
+	printf("Apptype fields (with -t):\n");
+	printf("  JobID, StepID, Username, CpuTime, Apptype_CLI, Apptype_STEP\n\n");
+	printf("Apptype job fields (with -t=job):\n");
+	printf("  JobID, Apptype, Username\n\n");
+	printf("Job summary fields (with -J):\n");
+	printf("  JobID, TotalCPU, TotalMEM, TotalVMEM, TotalPages,\n");
+	printf("  MaxCPU, MinCPU, MaxMEM, MinMEM, MaxVMEM, MinVMEM,\n");
+	printf("  TotalDCU, TotalDCUMEM, MaxDCU, MinDCU, MaxDCUMEM, MinDCUMEM\n\n");
+}
+
 /* print help */
 void print_sjinfo_help(void)
 {
@@ -164,9 +186,12 @@ void print_sjinfo_help(void)
 "        Display job step data aggregated to job level                           \n"
 "     -l, --load:                                                           \n"
 "        Displays load information during job run time          \n"
+"     -n, --noheader:                                                       \n"
+"        Do not print table headers and section banners.                   \n"
+"     -f, --helpformat:                                                    \n"
+"        List all available fields for the --format option.                \n"
 "     -o, --format:                                                        \n"
-"        Print a list of fields that can be specified with the            \n"
-"        '--format' option                                                 \n"
+"        Specify the fields to display.                                    \n"
 "        '--format='    JobID,StepID,StepCPU,StepAVECPU,StepMEM,StepVMEM,         \n"
 "                       StepPages,MaxStepCPU,MinStepCPU,MaxStepMEM,            \n"
 "                       MinStepMEM,MaxStepVMEM,MinStepVMEM,CPUthreshold,        \n"
@@ -243,6 +268,8 @@ void print_sjinfo_help(void)
 "     -t, --apptype:                                                          \n"
 "        Displays application type information for the job. Specifying any  \n"
 "        parameter will display the application type information at the job step level \n"
+"     -u, --user:                                                           \n"
+"        Specify the user name.                                              \n"
 "     -V, --version:                                                       \n"
 "        Print sjinfo version.                                              \n"
 "     -m                                                                    \n"
@@ -251,6 +278,12 @@ void print_sjinfo_help(void)
 "        Convert KB to GB (default is in KB).                               \n"
 "     -q,--query                                                            \n"
 "        Query user-defined messages.                                       \n"
+"     -p, --parsable                                                        \n"
+"        Output will be '|' delimited with a trailing delimiter.            \n"
+"     -P, --parsable2                                                       \n"
+"        Output will be '|' delimited without a trailing delimiter.         \n"
+"         --delimiter=characters                                            \n"
+"        Use the specified delimiter with -p or -P.                         \n"
 "        jobid: Job ID.                                                     \n"
 "        Username: user name.                                               \n"
 "        StepID: Job Step ID,                                               \n"
@@ -441,6 +474,9 @@ int parse_command_and_query(int argc, char **argv, slurm_influxdb *data, query_j
 	params.units = NO_VAL;
 	params.opt_uid = getuid();
 	params.opt_gid = getgid();
+	params.noheader = false;
+	params.parsable = PRINT_FIELDS_PARSABLE_NOT;
+	params.delimiter = NULL;
     /*
         |-e|overall|event|load|
     */
@@ -453,28 +489,33 @@ int parse_command_and_query(int argc, char **argv, slurm_influxdb *data, query_j
 	static struct option long_options[] = {
                 {"abnormal",    no_argument,        0,      'A'},
                 {"all",         no_argument,        0,      'a'},
-                {"desc",        no_argument,        0,      'd'},        
+                {"desc",        no_argument,        0,      'd'},
                 {"display ",    no_argument,        0,      'D'},
+                {"delimiter",   required_argument,  0,      'B'},
                 {"event",       required_argument,  0,      'e'},
                 {"end",         required_argument,  0,      'E'},
                 {"help",        no_argument,        0,      'h'},
+                {"helpformat",  no_argument,        0,      'f'},
                 {"jobs",        required_argument,  0,      'j'},
                 {"job-summary", no_argument,        0,      'J'},
                 {"load",        no_argument,        0,      'l'},
+                {"noheader",    no_argument,        0,      'n'},
                 {"format",      required_argument,  0,      'o'},
+                {"parsable",    no_argument,        0,      'p'},
+                {"parsable2",   no_argument,        0,      'P'},
                 {"running",     no_argument,        0,      'r'},
                 {"steps",       required_argument,  0,      's'},
-                {"start",       required_argument,  0,      'S'}, 
+                {"start",       required_argument,  0,      'S'},
                 {"apptype",     optional_argument,  0,      't'},
                 {"user",        required_argument,  0,      'u'},
-                {"query",       no_argument,        0,      'q'},         
+                {"query",       no_argument,        0,      'q'},
                 {"version",     no_argument,        0,      'V'},
                 {"overall",     no_argument,        0,      'O'},
                 {0,             0,                  0,      0}};
     
     optind = 0;
     while ((c = getopt_long(argc, argv,
-				       "dt:e:E:j:s:lo:rS:u:VOmgaAhqDJ",
+				       "dt:e:E:j:s:lo:rS:u:VOmgaAhqDJnB:pPf",
 				       long_options, &optionIndex)) != -1) {   
         if (c == -1) {
             sql_labels.no_jobid = true;
@@ -484,6 +525,9 @@ int parse_command_and_query(int argc, char **argv, slurm_influxdb *data, query_j
             case 'a':
                 params.level |= INFLUXDB_ALL;
                 break;
+            case 'f':
+                print_available_fields();
+                exit(0);
             case 'A':
                 params.level |= INFLUXDB_EVENT;
                 break;
@@ -567,8 +611,20 @@ int parse_command_and_query(int argc, char **argv, slurm_influxdb *data, query_j
                 params.level |= INFLUXDB_OVERALL;
                 break;
             case 'q':
-                sql_labels.query_label = true;    
-                break;                 
+                sql_labels.query_label = true;
+                break;
+            case 'n':
+                params.noheader = true;
+                break;
+            case 'B':
+                params.delimiter = xstrdup(optarg);
+                break;
+            case 'p':
+                params.parsable = PRINT_FIELDS_PARSABLE_ENDING;
+                break;
+            case 'P':
+                params.parsable = PRINT_FIELDS_PARSABLE_NO_ENDING;
+                break;
     		case '?':	/* getopt() has explained it */
 			    exit(1);
             default:
@@ -723,6 +779,8 @@ file_fail:
     xfree(influxdb_data);
     if(params.opt_field_list)
         xfree(params.opt_field_list);
+    if(params.delimiter)
+        xfree(params.delimiter);
 
     return 0;
 }

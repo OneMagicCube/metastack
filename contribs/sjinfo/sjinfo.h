@@ -89,13 +89,16 @@ typedef struct {
 	int opt_gid;		/* running persons gid */
 	int opt_uid;		/* running persons uid */
 	int units;		/* --units*/
-	uint32_t convert_flags;	/* --noconvert */    
-	char *opt_field_list;	/* --fields= */ 
+	uint32_t convert_flags;	/* --noconvert */
+	char *opt_field_list;	/* --fields= */
     uint64_t level;
     bool desc_set;      /* output data in reverse order*/
     // bool only_run_job;  /* querying for running jobs*/
     bool show_jobstep_apptype;  /* Displays the apptype information for each job step */
-    bool display;        /*user show job */ 
+    bool display;        /*user show job */
+    bool noheader;       /* --noheader - don't print header */
+    int parsable;        /* -p/-P parsable output format */
+    char *delimiter;     /* --delimiter delimiter string */
 } sjinfo_parameters_t;
 
 typedef struct {
@@ -316,7 +319,9 @@ extern List print_apptype_job_value_list;
 extern list_itr_t *print_apptype_job_itr;
 // /* Names for the values of the `has_arg' field of `struct option'.  */
 extern void print_fields_str(print_field_t *field, char *value, int last);
+extern void print_fields_header(list_t *print_fields_list);
+void print_available_fields(void);
+int parse_sacct_line(const char *line, int count, List print_head_list);
 extern int print_fields_parsable_print;
 #define KEYDIR "/opt/gridview/slurm"
 #endif /* !_SJINFO_H */
-

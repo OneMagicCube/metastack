@@ -444,6 +444,88 @@ a command line option of \-\-core\-spec must be specified. The default
 value for this option is "YES" for Cray systems and "NO" for other system types.
 .IP
 
+.\" __METASTACK_OPT_APP  
+.TP  
+\fBAppName\fR  
+Define a preset application record. Each \fBAppName\fR line registers an  
+application that users can reference via the \fB\-\-app\fR submission option.  
+\fBAppName\fR is the unique primary key; if the same \fBAppName\fR appears on  
+multiple lines, the records are merged: versions are appended (duplicates  
+removed), and \fBDescription\fR, \fBWatchdog\fR, and \fBDefault\fR are  
+overwritten by the last occurrence.  
+.br  
+Only the \fBslurmctld\fR daemon parses \fBAppName\fR lines. Client commands  
+(sinfo, squeue, sbatch, etc.) skip them entirely for performance.  
+  
+.RS  
+.TP 15  
+\fBAppName\fR  
+Application name (required). Must be unique across all app records.  
+.IP  
+  
+.TP  
+\fBVersion\fR  
+Comma\-separated list of allowed version strings (optional). If omitted,  
+the application has no version restriction. Users reference a specific  
+version as \fIappname\-version\fR (e.g. \fBvasp\-5.7.1\fR).  
+.IP  
+  
+.TP  
+\fBDescription\fR  
+Free\-text description of the application (optional). Use double quotes if  
+the value contains spaces.  
+.IP  
+  
+.TP  
+\fBWatchdog\fR  
+Name of a WatchdogName record to bind to this application (optional).  
+During configuration file parsing, if the specified Watchdog does not exist,  
+the Watchdog setting is silently ignored and the application is still  
+created. During \fBscontrol create/update app\fR, a missing Watchdog causes  
+the operation to be rejected.  
+.IP  
+  
+.TP  
+\fBDefault\fR  
+Set to \fBYES\fR to mark this application as the cluster default (optional).  
+At most one application may be the default at any time; setting a new default  
+automatically clears the previous one. The default application provides a  
+fallback Watchdog policy for jobs that do not specify \fB\-\-app\fR. Only the  
+Watchdog configuration takes effect; \fBapp_name\fR and \fBapp_version\fR are  
+not populated for these jobs.  
+.RE  
+  
+\fBNOTE\fR: For best performance, it is \fBstrongly recommended\fR to place  
+all \fBAppName\fR lines in a dedicated file and include it via the  
+\fBInclude\fR directive (e.g. "Include /etc/slurm/slurm_app.conf"). When  
+\fBAppName\fR lines are in a separate included file, client commands can skip  
+the entire file at the I/O level, resulting in near\-zero overhead regardless  
+of the number of application records. If \fBAppName\fR lines are placed  
+directly in slurm.conf, client commands must still read each line before  
+skipping it, which may cause noticeable latency with thousands of records.  
+  
+\fBNOTE\fR: Application records can also be managed dynamically at runtime  
+via "scontrol create app", "scontrol update app", "scontrol delete app",  
+and "scontrol show app". See the \fBscontrol\fR(1) man page for details.  
+Use \fBReconfigFlags=KeepAppInfo\fR to preserve dynamic changes across  
+"scontrol reconfig".  
+  
+Example:  
+.nf  
+  
+  # In /etc/slurm/slurm_app.conf (recommended separate file)  
+  AppName=general  Version=1.0    Description="Default app"    Watchdog=default_monitor Default=YES  
+  AppName=vasp     Version=5.7.1  Description="VASP template"  Watchdog=vasp_abnormal  
+  AppName=vasp     Version=4.8.0  Description="VASP old ver"   Watchdog=vasp_abnormal  
+  AppName=lammps   Version=2025r1 Description="LAMMPS"         Watchdog=lammps_progress  
+  
+  # In slurm.conf  
+  Include /etc/slurm/slurm_app.conf  
+  
+.fi  
+.IP  
+.\" __METASTACK_OPT_APP
+
 .TP
 \fBAssocServerSort\fR
 This option is used to control whether the assoc_list is sorted. If set to "YES",
