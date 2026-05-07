@@ -45,9 +45,7 @@
 
 #include "src/common/hostlist.h"
 #include "src/common/read_config.h"
-
-#include "src/interfaces/select.h"
-
+#include "src/common/select.h"
 #include "src/slurmctld/agent.h"
 #include "src/slurmctld/front_end.h"
 #include "src/slurmctld/ping_nodes.h"
@@ -82,7 +80,7 @@ bool is_ping_done (void)
 		is_done = false;
 		if (!ping_msg_sent &&
 		    (difftime(time(NULL), ping_start) >= PING_TIMEOUT)) {
-			error("A node ping cycle took more than %d seconds. Node RPC requests like ping, register status, health check and/or accounting gather update are triggered less frequently than configured. Either many nodes are non-responsive or one of SlurmdTimeout, HealthCheckInterval, JobAcctGatherFrequency should be increased.",
+			error("A node ping cycle took more than %d seconds. Node RPC requests like ping, register status, health check and/or accounting gather update are triggered less frequently than configured. Either many nodes are non-responsive or one of SlurmdTimeout, HealthCheckInterval, JobAcctGatherFrequency, ExtSensorsFreq should be increased.",
 			      PING_TIMEOUT);
 			ping_msg_sent = true;
 		}
@@ -135,7 +133,7 @@ void ping_end (void)
 void ping_nodes (void)
 {
 	static bool restart_flag = true;	/* system just restarted */
-	static int reg_offset = 0;	/* mutex via node table write lock on entry */
+	static int offset = 0;	/* mutex via node table write lock on entry */
 	static int max_reg_threads = 0;	/* max node registration threads
 					 * this can include DOWN nodes, so
 					 * limit the number to avoid huge
@@ -144,7 +142,7 @@ void ping_nodes (void)
 	time_t now = time(NULL), still_live_time, node_dead_time;
 	static time_t last_ping_time = (time_t) 0;
 	static time_t last_ping_timeout = (time_t) 0;
-	hostlist_t *down_hostlist = NULL;
+	hostlist_t down_hostlist = NULL;
 	char *host_str = NULL;
 	agent_arg_t *ping_agent_args = NULL;
 	agent_arg_t *reg_agent_args = NULL;
@@ -154,12 +152,11 @@ void ping_nodes (void)
 	node_record_t *node_ptr = NULL;
 	time_t old_cpu_load_time = now - slurm_conf.slurmd_timeout;
 	time_t old_free_mem_time = now - slurm_conf.slurmd_timeout;
-	int node_offset = 0;
 #endif
 #ifdef __METASTACK_OPT_REGISTRATION_FIX
-	static uint32_t reg_counts = 0; /* Count the number of registrations */
-	hostlist_t *no_par_hostlist = NULL;
-	hostlist_t *already_down_hostlist = NULL;
+	static int reg_counts = 0; /* Count the number of registrations */
+	hostlist_t no_par_hostlist = NULL;
+	hostlist_t already_down_hostlist = NULL;
 #endif
 
 	ping_agent_args = xmalloc (sizeof (agent_arg_t));
@@ -195,12 +192,11 @@ void ping_nodes (void)
 
 	if (max_reg_threads == 0) {
 		max_reg_threads = MAX(slurm_conf.tree_width, 1);
-		max_reg_threads = MIN(max_reg_threads, 50);
 	}
-	reg_offset += max_reg_threads;
-	if ((reg_offset > active_node_record_count) &&
-	    (reg_offset >= (max_reg_threads * MAX_REG_FREQUENCY)))
-		reg_offset = 0;
+	offset += max_reg_threads;
+	if ((offset > node_record_count) &&
+	    (offset >= (max_reg_threads * MAX_REG_FREQUENCY)))
+		offset = 0;
 
 #ifdef HAVE_FRONT_END
 	for (i = 0, front_end_ptr = front_end_nodes;
@@ -240,7 +236,7 @@ void ping_nodes (void)
 		 * once in a while). We limit these requests since they
 		 * can generate a flood of incoming RPCs. */
 		if (IS_NODE_UNKNOWN(front_end_ptr) || restart_flag ||
-		    ((i >= reg_offset) && (i < (reg_offset + max_reg_threads)))) {
+		    ((i >= offset) && (i < (offset + max_reg_threads)))) {
 			if (reg_agent_args->protocol_version >
 			    front_end_ptr->protocol_version)
 				reg_agent_args->protocol_version =
@@ -273,7 +269,6 @@ void ping_nodes (void)
 	}
 #else
 	for (i = 0; (node_ptr = next_node(&i)); i++) {
-		node_offset++;
 		if (IS_NODE_FUTURE(node_ptr) ||
 		    IS_NODE_POWERED_DOWN(node_ptr) ||
 		    IS_NODE_POWERING_DOWN(node_ptr) ||
@@ -304,9 +299,8 @@ void ping_nodes (void)
 			node_ptr->not_responding = false;  /* logged below */
 			continue;
 		}
-
 #ifdef __METASTACK_OPT_REGISTRATION_FIX
-		if (!(slurm_conf.conf_flags & CONF_FLAG_DNR))
+		if (!(slurm_conf.conf_flags & CTL_CONF_DNR))
 		{
 			/*
 			* After slurmctld restart and reg_counts >= 5, when the node status is UNKNOWN and NO_RESPOND,
@@ -333,8 +327,8 @@ void ping_nodes (void)
 			* After slurmctld restart and reg_counts >= 5, when the node status is DOWN NO_RESPOND and boot_time=0,
 			* disable node registration.
 			*/
-			if ( ! ((node_ptr->index >= reg_offset) &&
-				(node_ptr->index < (reg_offset + max_reg_threads))))
+			if ( ! ((node_ptr->index >= offset) &&
+				(node_ptr->index < (offset + max_reg_threads))))
 			{
 				if (reg_counts >= 5 && node_ptr->boot_time == 0 && (! node_ptr->do_reg) &&
 					IS_NODE_NO_RESPOND(node_ptr) && IS_NODE_DOWN(node_ptr))
@@ -363,14 +357,10 @@ void ping_nodes (void)
 		 * can generate a flood of incoming RPCs. */
 #ifdef __METASTACK_OPT_REGISTRATION_FIX
 		if (IS_NODE_UNKNOWN(node_ptr) || (node_ptr->boot_time == 0) || node_ptr->do_reg ||
-		    ((node_offset >= reg_offset) &&
-		     (node_offset < (reg_offset + max_reg_threads))))
-#else
-		if (IS_NODE_UNKNOWN(node_ptr) || (node_ptr->boot_time == 0) ||
-		    ((node_offset >= reg_offset) &&
-		     (node_offset < (reg_offset + max_reg_threads))))
+		    ((node_ptr->index >= offset) &&
+		     (node_ptr->index < (offset + max_reg_threads))))
 #endif
-			 {
+		{
 			if (reg_agent_args->protocol_version >
 			    node_ptr->protocol_version)
 				reg_agent_args->protocol_version =
@@ -381,8 +371,6 @@ void ping_nodes (void)
 			node_ptr->do_reg = false;
 #endif
 			reg_agent_args->node_count++;
-			if (PACK_FANOUT_ADDRS(node_ptr))
-				reg_agent_args->msg_flags |= SLURM_PACK_ADDRS;
 			continue;
 		}
 
@@ -403,8 +391,6 @@ void ping_nodes (void)
 				node_ptr->protocol_version;
 		hostlist_push_host(ping_agent_args->hostlist, node_ptr->name);
 		ping_agent_args->node_count++;
-		if (PACK_FANOUT_ADDRS(node_ptr))
-			ping_agent_args->msg_flags |= SLURM_PACK_ADDRS;
 	}
 #endif
 
@@ -481,12 +467,6 @@ extern void run_health_check(void)
 	char *host_str = NULL;
 	agent_arg_t *check_agent_args = NULL;
 
-	check_agent_args = xmalloc (sizeof (agent_arg_t));
-	check_agent_args->msg_type = REQUEST_HEALTH_CHECK;
-	check_agent_args->retry = 0;
-	check_agent_args->protocol_version = SLURM_PROTOCOL_VERSION;
-	check_agent_args->hostlist = hostlist_create(NULL);
-
 	/* Sync plugin internal data with
 	 * node select_nodeinfo. This is important
 	 * after reconfig otherwise select_nodeinfo
@@ -496,6 +476,11 @@ extern void run_health_check(void)
 	select_g_select_nodeinfo_set_all();
 
 #ifdef HAVE_FRONT_END
+	check_agent_args = xmalloc (sizeof (agent_arg_t));
+	check_agent_args->msg_type = REQUEST_HEALTH_CHECK;
+	check_agent_args->retry = 0;
+	check_agent_args->protocol_version = SLURM_PROTOCOL_VERSION;
+	check_agent_args->hostlist = hostlist_create(NULL);
 	for (i = 0, front_end_ptr = front_end_nodes;
 	     i < front_end_node_cnt; i++, front_end_ptr++) {
 		if (IS_NODE_NO_RESPOND(front_end_ptr))
@@ -522,18 +507,26 @@ extern void run_health_check(void)
 			;	/* mid-cycle */
 		else if (difftime(now, cycle_start_time) <
 		         slurm_conf.health_check_interval) {
-			hostlist_destroy(check_agent_args->hostlist);
-			xfree(check_agent_args);
 			return;	/* Wait to start next cycle */
 		}
 		cycle_start_time = now;
 		/* Determine how many nodes we want to test on each call of
 		 * run_health_check() to spread out the work. */
-		node_limit = (active_node_record_count * 2) /
+		node_limit = (node_record_count * 2) /
 		             slurm_conf.health_check_interval;
 		node_limit = MAX(node_limit, 10);
 	}
+	if ((node_states != HEALTH_CHECK_NODE_ANY) &&
+	    (node_states != HEALTH_CHECK_NODE_IDLE)) {
+		/* Update each node's alloc_cpus count */
+		select_g_select_nodeinfo_set_all();
+	}
 
+	check_agent_args = xmalloc (sizeof (agent_arg_t));
+	check_agent_args->msg_type = REQUEST_HEALTH_CHECK;
+	check_agent_args->retry = 0;
+	check_agent_args->protocol_version = SLURM_PROTOCOL_VERSION;
+	check_agent_args->hostlist = hostlist_create(NULL);
 #ifdef __METASTACK_NEW_STATE_TO_NHC
 	node_rec_state_array_split_t **node_rec_state_array_split = xmalloc(sizeof(node_rec_state_array_split_t *));
 	node_rec_state_array_split_t *node_rec_state_array_split_args = xmalloc(sizeof(node_rec_state_array_split_t));
@@ -541,7 +534,7 @@ extern void run_health_check(void)
 	node_rec_state_array_split_args->node_rec_state_array_data = xmalloc(node_rec_state_array_split_args->data_size * sizeof(node_rec_state_array_t *));
 	node_rec_state_array_t *node_rec_state_slurmd = xmalloc(sizeof(node_rec_state_array_t));
 	int actual_size = 0;
-	if (slurm_conf.conf_flags & CONF_FLAG_HCN)
+	if (slurm_conf.conf_flags & CTL_CONF_HCN)
 	{
 		node_rec_state_slurmd->array_size = node_record_count;
 		node_rec_state_slurmd->node_rec_state_info_array = xmalloc(node_record_count * sizeof(node_rec_state_info_t));
@@ -549,18 +542,16 @@ extern void run_health_check(void)
 		node_rec_state_slurmd->array_size = 0;
 	}
 #endif
-
-	for (; (node_ptr = next_node(&base_node_loc)); base_node_loc++) {
+	for (; base_node_loc < node_record_count; base_node_loc++) {
+		if (!(node_ptr = node_record_table_ptr[base_node_loc]))
+			continue;
 		if (run_cyclic &&
 		    (node_test_cnt++ >= node_limit))
 				break;
-		if (IS_NODE_FUTURE(node_ptr) ||
-		    IS_NODE_INVALID_REG(node_ptr) ||
-		    IS_NODE_NO_RESPOND(node_ptr) ||
-		    IS_NODE_POWERED_DOWN(node_ptr) ||
+		if (IS_NODE_NO_RESPOND(node_ptr) ||
+		    IS_NODE_FUTURE(node_ptr) ||
 		    IS_NODE_POWERING_DOWN(node_ptr) ||
-		    IS_NODE_POWERING_UP(node_ptr) ||
-		    IS_NODE_REBOOT_ISSUED(node_ptr))
+		    IS_NODE_POWERED_DOWN(node_ptr))
 			continue;
 		if (node_states != HEALTH_CHECK_NODE_ANY) {
 			uint16_t cpus_total, cpus_used = 0;
@@ -582,11 +573,8 @@ extern void run_health_check(void)
 			 *       means the node is allocated
 			 */
 			if (cpus_used == 0) {
-				if (!(node_states & HEALTH_CHECK_NODE_IDLE) &&
-				    (!(node_states & HEALTH_CHECK_NODE_NONDRAINED_IDLE) ||
-				     IS_NODE_DRAIN(node_ptr))) {
+				if (!(node_states & HEALTH_CHECK_NODE_IDLE))
 					continue;
-				}
 				if (!IS_NODE_IDLE(node_ptr))
 					continue;
 			} else if (cpus_used < cpus_total) {
@@ -612,10 +600,8 @@ extern void run_health_check(void)
 			actual_size++;
 		}
 #endif
-		if (PACK_FANOUT_ADDRS(node_ptr))
-			check_agent_args->msg_flags |= SLURM_PACK_ADDRS;
 	}
-	if (!node_ptr)
+	if (base_node_loc >= node_record_count)
 		base_node_loc = 0;
 #endif
 
@@ -680,21 +666,16 @@ extern void update_nodes_acct_gather_data(void)
 	}
 #else
 	for (i = 0; (node_ptr = next_node(&i)); i++) {
-		if (IS_NODE_FUTURE(node_ptr) ||
-		    IS_NODE_INVALID_REG(node_ptr) ||
-		    IS_NODE_NO_RESPOND(node_ptr) ||
-		    IS_NODE_POWERED_DOWN(node_ptr) ||
+		if (IS_NODE_NO_RESPOND(node_ptr) ||
+		    IS_NODE_FUTURE(node_ptr) ||
 		    IS_NODE_POWERING_DOWN(node_ptr) ||
-		    IS_NODE_POWERING_UP(node_ptr) ||
-		    IS_NODE_REBOOT_ISSUED(node_ptr))
+		    IS_NODE_POWERED_DOWN(node_ptr))
 			continue;
 		if (agent_args->protocol_version > node_ptr->protocol_version)
 			agent_args->protocol_version =
 				node_ptr->protocol_version;
 		hostlist_push_host(agent_args->hostlist, node_ptr->name);
 		agent_args->node_count++;
-		if (PACK_FANOUT_ADDRS(node_ptr))
-			agent_args->msg_flags |= SLURM_PACK_ADDRS;
 	}
 #endif
 
@@ -711,3 +692,4 @@ extern void update_nodes_acct_gather_data(void)
 		agent_queue_request(agent_args);
 	}
 }
+

@@ -1,7 +1,8 @@
 /*****************************************************************************\
  *  as_ext_dbd.c - External Database connections
  *****************************************************************************
- *  Copyright (C) SchedMD LLC.
+ *  Copyright (C) 2011-2020 SchedMD LLC.
+ *  Written by Brian Christiansen <brian@schedmd.com>
  *
  *  This file is part of Slurm, a resource management program.
  *  For details, see <https://slurm.schedmd.com/>.
@@ -35,7 +36,7 @@
 
 #include "src/common/slurm_xlator.h"
 
-#include "src/interfaces/accounting_storage.h"
+#include "src/common/slurm_accounting_storage.h"
 
 #if HAVE_SYS_PRCTL_H
 #  include <sys/prctl.h>
@@ -55,9 +56,9 @@ static pthread_mutex_t ext_conns_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t  ext_thread_cond = PTHREAD_COND_INITIALIZER;
 static pthread_mutex_t ext_thread_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-static void _destroy_external_host_conns(void *object)
+extern void _destroy_external_host_conns(void *object)
 {
-	persist_conn_t *conn = object;
+	slurm_persist_conn_t *conn = (slurm_persist_conn_t *)object;
 	/*
 	 * Don't call dbd_conn_close() to prevent DBD_FINI being sent to
 	 * external DBDs.
@@ -66,10 +67,10 @@ static void _destroy_external_host_conns(void *object)
 }
 
 /* don't connect now as it will block the ctld */
-extern persist_conn_t *_create_slurmdbd_conn(char *host, int port)
+extern slurm_persist_conn_t *_create_slurmdbd_conn(char *host, int port)
 {
 	uint16_t persist_conn_flags = PERSIST_FLAG_EXT_DBD;
-	persist_conn_t *dbd_conn =
+	slurm_persist_conn_t *dbd_conn =
 		dbd_conn_open(&persist_conn_flags, NULL, host, port);
 
 	dbd_conn->shutdown = &ext_shutdown;
@@ -85,10 +86,10 @@ extern persist_conn_t *_create_slurmdbd_conn(char *host, int port)
 	return dbd_conn;
 }
 
-static int _find_ext_conn(void *x, void *key)
+extern int _find_ext_conn(void *x, void *key)
 {
-	persist_conn_t *selected_conn = x;
-	persist_conn_t *query_conn = key;
+	slurm_persist_conn_t *selected_conn = (slurm_persist_conn_t *)x;
+	slurm_persist_conn_t *query_conn = (slurm_persist_conn_t *)key;
 
 	if (!xstrcmp(selected_conn->rem_host, query_conn->rem_host) &&
 	    (selected_conn->rem_port == query_conn->rem_port))
@@ -106,7 +107,7 @@ static void _create_ext_conns(void)
 	if ((ext_hosts = xstrdup(slurm_conf.accounting_storage_ext_host)))
 		tok = strtok_r(ext_hosts, ",", &save_ptr);
 	while (ext_hosts && tok) {
-		persist_conn_t *dbd_conn, tmp_conn = {0};
+		slurm_persist_conn_t *dbd_conn, tmp_conn = { 0 };
 		char *colon = xstrstr(tok, ":");
 		int port = slurm_conf.accounting_storage_port;
 		if (colon) {
@@ -145,11 +146,11 @@ static void _create_ext_conns(void)
 static int _for_each_check_ext_conn(void *x, void *arg)
 {
 	bool delete = false;
-	persist_conn_t *dbd_conn = x;
+	slurm_persist_conn_t *dbd_conn = (slurm_persist_conn_t *)x;
 
 	if (slurm_persist_conn_writeable(dbd_conn) == -1) {
 		int rc;
-		slurm_persist_conn_reopen(dbd_conn);
+		slurm_persist_conn_reopen(dbd_conn, true);
 
 		/* slurm_persist_send_msg will reconnect */
 		rc = clusteracct_storage_p_register_ctld(
@@ -217,7 +218,9 @@ static void _destroy_ext_thread(void)
 	slurm_cond_broadcast(&ext_thread_cond);
 	slurm_mutex_unlock(&ext_thread_mutex);
 
-	slurm_thread_join(ext_thread_tid);
+	if (ext_thread_tid)
+		pthread_join(ext_thread_tid,  NULL);
+	ext_thread_tid = 0;
 }
 
 extern void ext_dbd_init(void)

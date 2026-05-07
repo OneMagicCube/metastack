@@ -55,10 +55,11 @@ bool have_control = false;
  *	mode, assuming control when the primary controller stops responding */
 extern void run_dbd_backup(void)
 {
-	persist_conn_t slurmdbd_conn = {0};
+	slurm_persist_conn_t slurmdbd_conn;
 
 	primary_resumed = false;
 
+	memset(&slurmdbd_conn, 0, sizeof(slurm_persist_conn_t));
 	slurmdbd_conn.rem_host = slurmdbd_conf->dbd_addr;
 	slurmdbd_conn.rem_port = slurmdbd_conf->dbd_port;
 	slurmdbd_conn.cluster_name = "backup_slurmdbd";
@@ -66,10 +67,10 @@ extern void run_dbd_backup(void)
 	slurmdbd_conn.shutdown = &shutdown_time;
 	// Prevent constant reconnection tries from filling up the error logs
 	slurmdbd_conn.flags |= PERSIST_FLAG_SUPPRESS_ERR;
-	slurmdbd_conn.flags |= PERSIST_FLAG_DBD;
-	slurmdbd_conn.r_uid = slurm_conf.slurm_user_id;
 
-	slurm_persist_conn_open(&slurmdbd_conn);
+	slurm_persist_conn_open_without_init(&slurmdbd_conn);
+	if (slurmdbd_conn.fd > 0)
+		net_set_keep_alive(slurmdbd_conn.fd);
 
 	/* repeatedly ping Primary */
 	while (!shutdown_time) {
@@ -90,7 +91,7 @@ extern void run_dbd_backup(void)
 
 		sleep(1);
 		if (writeable <= 0)
-			slurm_persist_conn_reopen(&slurmdbd_conn);
+			slurm_persist_conn_reopen(&slurmdbd_conn, false);
 	}
 
 	slurm_persist_conn_close(&slurmdbd_conn);

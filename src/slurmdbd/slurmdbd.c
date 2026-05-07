@@ -58,17 +58,14 @@
 #include "src/common/log.h"
 #include "src/common/proc_args.h"
 #include "src/common/read_config.h"
-#include "src/interfaces/accounting_storage.h"
-#include "src/interfaces/auth.h"
+#include "src/common/slurm_accounting_storage.h"
+#include "src/common/slurm_auth.h"
 #include "src/common/slurm_rlimits_info.h"
 #include "src/common/slurm_time.h"
 #include "src/common/uid.h"
 #include "src/common/xmalloc.h"
 #include "src/common/xsignal.h"
 #include "src/common/xstring.h"
-
-#include "src/interfaces/hash.h"
-#include "src/interfaces/tls.h"
 
 #include "src/slurmdbd/read_config.h"
 #include "src/slurmdbd/rpc_mgr.h"
@@ -96,7 +93,7 @@ static int    dbd_sigarray[] = {	/* blocked signals for this process */
 	SIGUSR2, SIGTSTP, SIGXCPU, SIGQUIT,
 	SIGPIPE, SIGALRM, SIGABRT, SIGHUP, 0 };
 static int    debug_level = 0;		/* incremented for -v on command line */
-static bool daemonize = true;		/* run process as a daemon */
+static int    foreground = 0;		/* run process as a daemon */
 static int    setwd = 0;		/* change working directory -s  */
 static log_options_t log_opts = 	/* Log to stderr & syslog */
 	LOG_OPTS_INITIALIZER;
@@ -104,6 +101,9 @@ static int	 new_nice = 0;
 static pthread_t rpc_handler_thread = 0; /* thread ID for RPC hander */
 static pthread_t rollup_handler_thread = 0; /* thread ID for rollup hander */
 static pthread_t commit_handler_thread = 0; /* thread ID for commit hander */
+#ifdef __METASTACK_ASSOC_HASH
+static pthread_t uid_save_thread = 0; /* thread ID for saving uid */
+#endif
 static pthread_mutex_t rollup_lock = PTHREAD_MUTEX_INITIALIZER;
 static bool running_rollup = 0;
 static bool running_commit = 0;
@@ -119,6 +119,7 @@ static void  _become_slurm_user(void);
 static void  _commit_handler_cancel(void);
 static void *_commit_handler(void *no_data);
 static void  _daemonize(void);
+static void  _default_sigaction(int sig);
 static void  _init_config(void);
 static void  _init_pidfile(void);
 static void  _kill_old_slurmdbd(void);
@@ -148,13 +149,16 @@ int main(int argc, char **argv)
 #ifdef __METASTACK_ASSOC_HASH
 	if (read_slurmdbd_conf(false))
 		exit(1);
+#else
+	if (read_slurmdbd_conf())
+		exit(1);
 #endif
 	_parse_commandline(argc, argv);
 	_update_logging(true);
 	_update_nice();
 
 	_kill_old_slurmdbd();
-	if (daemonize)
+	if (foreground == 0)
 		_daemonize();
 
 	/*
@@ -167,27 +171,14 @@ int main(int argc, char **argv)
 	_become_slurm_user();
 
 	/*
-	 * This must happen before we spawn any threads
-	* which are not designed to handle them
-	*/
-	if (xsignal_block(dbd_sigarray) < 0)
-		error("Unable to block signals");
-
-	/*
 	 * Do plugin init's after _init_pidfile so systemd is happy as
-	 * acct_storage_g_init() could take a long time to finish if running
+	 * slurm_acct_storage_init() could take a long time to finish if running
 	 * for the first time after an upgrade.
 	 */
-	if (auth_g_init() != SLURM_SUCCESS) {
+	if (slurm_auth_init(NULL) != SLURM_SUCCESS) {
 		fatal("Unable to initialize authentication plugins");
 	}
-	if (hash_g_init() != SLURM_SUCCESS) {
-		fatal("failed to initialize hash plugin");
-	}
-	if (tls_g_init() != SLURM_SUCCESS) {
-		fatal("Failed to initialize tls plugin");
-	}
-	if (acct_storage_g_init() != SLURM_SUCCESS) {
+	if (slurm_acct_storage_init() != SLURM_SUCCESS) {
 		fatal("Unable to initialize %s accounting storage plugin",
 		      slurm_conf.accounting_storage_type);
 	}
@@ -203,7 +194,7 @@ int main(int argc, char **argv)
 	}
 #endif
 
-	if (daemonize || setwd)
+	if (foreground == 0 || setwd)
 		_set_work_dir();
 	log_config();
 	init_dbd_stats();
@@ -212,6 +203,9 @@ int main(int argc, char **argv)
 	if (prctl(PR_SET_DUMPABLE, 1) < 0)
 		debug ("Unable to set dumpable to 1");
 #endif /* PR_SET_DUMPABLE */
+
+	if (xsignal_block(dbd_sigarray) < 0)
+		error("Unable to block signals");
 
 	/* Create attached thread for signal handling */
 	slurm_thread_create(&signal_handler_thread, _signal_handler, NULL);
@@ -224,12 +218,12 @@ int main(int argc, char **argv)
 
 	/*
 	 * If we are tracking wckey we need to cache wckeys,
-	 * if we aren't only cache the assoc, users, qos, and tres.
+	 * if we aren't only cache the users, qos, and tres.
 	 */
 	assoc_init_arg.cache_level = ASSOC_MGR_CACHE_USER |
-		ASSOC_MGR_CACHE_ASSOC |
-		ASSOC_MGR_CACHE_QOS | ASSOC_MGR_CACHE_TRES |
-		ASSOC_MGR_CACHE_WCKEY;
+		ASSOC_MGR_CACHE_QOS | ASSOC_MGR_CACHE_TRES;
+	if (slurmdbd_conf->track_wckey)
+		assoc_init_arg.cache_level |= ASSOC_MGR_CACHE_WCKEY;
 
 	db_conn = acct_storage_g_get_connection(0, NULL, true, NULL);
 	if (assoc_mgr_init(db_conn, &assoc_init_arg, errno) == SLURM_ERROR) {
@@ -246,9 +240,7 @@ int main(int argc, char **argv)
 		    != SLURM_SUCCESS)
 			fatal("Error when trying to reset lft and rgt's");
 
-#ifdef __METASTACK_BUG_CTLD_RESTART_POLL_HANG_FIX			
-		if (acct_storage_g_commit(db_conn, 1, false))
-#endif
+		if (acct_storage_g_commit(db_conn, 1))
 			fatal("commit failed, meaning reset failed");
 		FREE_NULL_LIST(lft_rgt_list);
 	}
@@ -267,9 +259,7 @@ int main(int argc, char **argv)
 			have_control = false;
 			backup = true;
 			/* make sure any locks are released */
-#ifdef __METASTACK_BUG_CTLD_RESTART_POLL_HANG_FIX
-			acct_storage_g_commit(db_conn, 1, false);
-#endif
+			acct_storage_g_commit(db_conn, 1);
 			run_dbd_backup();
 			if (!shutdown_time)
 				assoc_mgr_refresh_lists(db_conn, 0);
@@ -301,7 +291,7 @@ int main(int argc, char **argv)
 #ifdef __METASTACK_ASSOC_HASH
 		if (slurmdbd_conf->save_uid && !shutdown_time) {
 			/* Create detached thread to save uid */
-			slurm_thread_create_detached(slurmdbd_uid_save, NULL);
+			slurm_thread_create_detached(&uid_save_thread, slurmdbd_uid_save, NULL);
 		}
 #endif
 
@@ -315,15 +305,24 @@ int main(int argc, char **argv)
 		}
 
 		_request_registrations(db_conn);
-#ifdef __METASTACK_BUG_CTLD_RESTART_POLL_HANG_FIX
-		acct_storage_g_commit(db_conn, 1, false);
-#endif
+		acct_storage_g_commit(db_conn, 1);
+
 
 		/* this is only ran if not backup */
-		slurm_thread_join(rollup_handler_thread);
-		slurm_thread_join(rpc_handler_thread);
+		if (rollup_handler_thread) {
+			pthread_join(rollup_handler_thread, NULL);
+			rollup_handler_thread = 0;
+		}
+		if (rpc_handler_thread) {
+			pthread_join(rpc_handler_thread, NULL);
+			rpc_handler_thread = 0;
+		}
+
 #ifdef __METASTACK_ASSOC_HASH
-		shutdown_uid_save();
+		if (uid_save_thread) {
+			shutdown_uid_save();
+			uid_save_thread = 0;
+		}
 #endif
 
 		if (backup && primary_resumed && !restart_backup) {
@@ -338,13 +337,12 @@ int main(int argc, char **argv)
 
 end_it:
 
-	if (!backup || !restart_backup)
-		slurm_thread_join(signal_handler_thread);
-	slurm_thread_join(commit_handler_thread);
+	if (signal_handler_thread && (!backup || !restart_backup))
+		pthread_join(signal_handler_thread, NULL);
+	if (commit_handler_thread)
+		pthread_join(commit_handler_thread, NULL);
 
-#ifdef __METASTACK_BUG_CTLD_RESTART_POLL_HANG_FIX
-	acct_storage_g_commit(db_conn, 1, false);
-#endif
+	acct_storage_g_commit(db_conn, 1);
 	acct_storage_g_close_connection(&db_conn);
 
 	if (slurmdbd_conf->pid_file &&
@@ -368,10 +366,8 @@ end_it:
 	}
 #endif
 	assoc_mgr_fini(0);
-	acct_storage_g_fini();
-	auth_g_fini();
-	hash_g_fini();
-	tls_g_fini();
+	slurm_acct_storage_fini();
+	slurm_auth_fini();
 	log_fini();
 	free_slurmdbd_conf();
 	slurm_mutex_lock(&rpc_mutex);
@@ -382,6 +378,7 @@ end_it:
 
 extern void reconfig(void)
 {
+
 #ifdef __METASTACK_ASSOC_HASH
 	read_slurmdbd_conf(true);
 	if (slurmdbd_conf->save_uid) {
@@ -390,6 +387,7 @@ extern void reconfig(void)
 #else
 	read_slurmdbd_conf();
 #endif
+	
 	assoc_mgr_set_missing_uids();
 	acct_storage_g_reconfig(NULL, 0);
 	_update_logging(false);
@@ -398,7 +396,7 @@ extern void reconfig(void)
 extern void handle_rollup_stats(List rollup_stats_list,
 				long delta_time, int type)
 {
-	list_itr_t *itr;
+	ListIterator itr;
 	slurmdb_rollup_stats_t *rollup_stats, *rpc_rollup_stats;
 
 	xassert(type < DBD_ROLLUP_COUNT);
@@ -460,9 +458,11 @@ extern void shutdown_threads(void)
 	/* End commit before rpc_mgr_wake.  It will do the final
 	   commit on the connection.
 	*/
-
 #ifdef __METASTACK_ASSOC_HASH
-	shutdown_uid_save();
+	if (uid_save_thread) {
+		shutdown_uid_save();
+		uid_save_thread = 0;
+	}
 #endif
 
 	_commit_handler_cancel();
@@ -530,7 +530,7 @@ static void _parse_commandline(int argc, char **argv)
 	while ((c = getopt(argc, argv, "Dhn:R::svV")) != -1)
 		switch (c) {
 		case 'D':
-			daemonize = 0;
+			foreground = 1;
 			break;
 		case 'h':
 			_usage(argv[0]);
@@ -606,14 +606,14 @@ static void _update_logging(bool startup)
 
 	log_opts.logfile_level = slurmdbd_conf->debug_level;
 
-	if (!daemonize)
+	if (foreground)
 		log_opts.stderr_level  = slurmdbd_conf->debug_level;
 	else
 		log_opts.stderr_level = LOG_LEVEL_QUIET;
 
 	if (slurmdbd_conf->syslog_debug != LOG_LEVEL_END) {
 		log_opts.syslog_level =	slurmdbd_conf->syslog_debug;
-	} else if (!daemonize) {
+	} else if (foreground) {
 		log_opts.syslog_level = LOG_LEVEL_QUIET;
 	} else if ((slurmdbd_conf->debug_level > LOG_LEVEL_QUIET)
 		   && !slurmdbd_conf->log_file) {
@@ -865,7 +865,7 @@ static void _request_registrations(void *db_conn)
 {
 	List cluster_list = acct_storage_g_get_clusters(
 		db_conn, getuid(), NULL);
-	list_itr_t *itr;
+	ListIterator itr;
 	slurmdb_cluster_rec_t *cluster_rec = NULL;
 
 	if (!cluster_list)
@@ -944,9 +944,7 @@ static void *_rollup_handler(void *db_conn)
 		START_TIMER;
 		acct_storage_g_roll_usage(db_conn, 0, 0, 1, &rollup_stats_list);
 		END_TIMER;
-#ifdef __METASTACK_BUG_CTLD_RESTART_POLL_HANG_FIX
-		acct_storage_g_commit(db_conn, 1, false);
-#endif
+		acct_storage_g_commit(db_conn, 1);
 		running_rollup = 0;
 
 		handle_rollup_stats(rollup_stats_list, DELTA_TIMER, 0);
@@ -995,7 +993,7 @@ static void _commit_handler_cancel()
 /* _commit_handler - Process commit's of registered clusters */
 static void *_commit_handler(void *db_conn)
 {
-	list_itr_t *itr;
+	ListIterator itr;
 	slurmdbd_conn_t *slurmdbd_conn;
 
 	(void) pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
@@ -1010,10 +1008,8 @@ static void *_commit_handler(void *db_conn)
 			while ((slurmdbd_conn = list_next(itr))) {
 				debug4("running commit for %s",
 				       slurmdbd_conn->conn->cluster_name);
-#ifdef __METASTACK_BUG_CTLD_RESTART_POLL_HANG_FIX
 				acct_storage_g_commit(
-					slurmdbd_conn->db_conn, 1, true);
-#endif
+					slurmdbd_conn->db_conn, 1);
 			}
 			list_iterator_destroy(itr);
 			running_commit = 0;
@@ -1079,11 +1075,11 @@ static void *_signal_handler(void *no_data)
 	(void) pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
 
 	/* Make sure no required signals are ignored (possibly inherited) */
-	xsignal_default(SIGINT);
-	xsignal_default(SIGTERM);
-	xsignal_default(SIGHUP);
-	xsignal_default(SIGABRT);
-	xsignal_default(SIGUSR2);
+	_default_sigaction(SIGINT);
+	_default_sigaction(SIGTERM);
+	_default_sigaction(SIGHUP);
+	_default_sigaction(SIGABRT);
+	_default_sigaction(SIGUSR2);
 
 	while (1) {
 		xsignal_sigset_create(sig_array, &set);
@@ -1114,6 +1110,24 @@ static void *_signal_handler(void *no_data)
 		}
 	}
 
+}
+
+/* Reset some signals to their default state to clear any
+ * inherited signal states */
+static void _default_sigaction(int sig)
+{
+	struct sigaction act;
+
+	if (sigaction(sig, NULL, &act)) {
+		error("sigaction(%d): %m", sig);
+		return;
+	}
+	if (act.sa_handler != SIG_IGN)
+		return;
+
+	act.sa_handler = SIG_DFL;
+	if (sigaction(sig, &act, NULL))
+		error("sigaction(%d): %m", sig);
 }
 
 static void _become_slurm_user(void)
@@ -1158,7 +1172,7 @@ static void _become_slurm_user(void)
 	}
 }
 
-static void _restart_self(int argc, char **argv)
+extern void _restart_self(int argc, char **argv)
 {
 	info("Restarting self");
 	if (execvp(argv[0], argv))

@@ -1,7 +1,8 @@
 /*****************************************************************************\
  *  rest_auth.c - Slurm REST API HTTP authentication
  *****************************************************************************
- *  Copyright (C) SchedMD LLC.
+ *  Copyright (C) 2019-2020 SchedMD LLC.
+ *  Written by Nathan Rini <nate@schedmd.com>
  *
  *  This file is part of Slurm, a resource management program.
  *  For details, see <https://slurm.schedmd.com/>.
@@ -41,20 +42,19 @@
 
 #include "src/common/list.h"
 #include "src/common/log.h"
+#include "src/common/openapi.h"
 #include "src/common/plugin.h"
-#include "src/common/read_config.h"
-#include "src/interfaces/auth.h"
+#include "src/common/slurm_auth.h"
 #include "src/common/xassert.h"
 #include "src/common/xmalloc.h"
 #include "src/common/xstring.h"
 
-#include "src/slurmrestd/openapi.h"
 #include "src/slurmrestd/rest_auth.h"
 
 static pthread_mutex_t init_lock = PTHREAD_MUTEX_INITIALIZER;
 
 typedef struct {
-	int (*init)(bool become_user);
+	int (*init)(void);
 	int (*fini)(void);
 	int (*auth)(on_http_request_args_t *args, rest_auth_context_t *ctxt);
 	void *(*db_conn)(rest_auth_context_t *context);
@@ -86,7 +86,9 @@ static void _check_magic(rest_auth_context_t *ctx)
 	xassert(ctx);
 	xassert(ctx->magic == MAGIC);
 
-	if (!ctx->plugin_id) {
+	if (ctx->plugin_id) {
+		xassert(ctx->user_name);
+	} else {
 		xassert(!ctx->plugin_data);
 		xassert(!ctx->user_name);
 	}
@@ -111,8 +113,7 @@ extern void destroy_rest_auth(void)
 	slurm_mutex_unlock(&init_lock);
 }
 
-extern int init_rest_auth(bool become_user,
-			  const plugin_handle_t *plugin_handles,
+extern int init_rest_auth(const plugin_handle_t *plugin_handles,
 			  const size_t plugin_count)
 {
 	int rc = SLURM_SUCCESS;
@@ -152,13 +153,40 @@ extern int init_rest_auth(bool become_user,
 			debug5("%s: found plugin_id: %u",
 			       __func__, plugin_ids[g_context_cnt]);
 
-		(*(ops[g_context_cnt].init))(become_user);
+		(*(ops[g_context_cnt].init))();
 		g_context_cnt++;
 	}
 
 	slurm_mutex_unlock(&init_lock);
 
 	return rc;
+}
+
+static void _clear_auth(rest_auth_context_t *ctxt)
+{
+	_check_magic(ctxt);
+
+	if (ctxt->plugin_id) {
+		bool found = false;
+
+		for (int i = 0; (g_context_cnt > 0) && (i < g_context_cnt); i++) {
+			if (plugin_ids[i] == ctxt->plugin_id) {
+				(*(ops[i].free))(ctxt);
+				found = true;
+				break;
+			}
+		}
+
+		if (!found)
+			fatal_abort("%s: unable to free auth context with plugin_id: %u",
+				    __func__, ctxt->plugin_id);
+	}
+
+	xassert(!ctxt->plugin_data);
+	xfree(ctxt->user_name);
+	ctxt->plugin_id = 0;
+
+	rest_auth_g_clear();
 }
 
 extern int rest_authenticate_http_request(on_http_request_args_t *args)
@@ -169,7 +197,7 @@ extern int rest_authenticate_http_request(on_http_request_args_t *args)
 
 	if (context) {
 		fatal("%s: authentication context already set for connection: %s",
-		      __func__, conmgr_fd_get_name(args->context->con));
+		      __func__, args->context->con->name);
 	}
 
 	args->context->auth = context = rest_auth_g_new();
@@ -194,7 +222,7 @@ extern int rest_authenticate_http_request(on_http_request_args_t *args)
 			break;
 	}
 
-	FREE_NULL_REST_AUTH(args->context->auth);
+	rest_auth_g_clear();
 	return rc;
 }
 
@@ -222,11 +250,13 @@ extern int rest_auth_g_apply(rest_auth_context_t *context)
 	return ESLURM_AUTH_CRED_INVALID;
 }
 
+extern void rest_auth_g_clear(void)
+{
+	auth_g_thread_clear();
+}
+
 extern void *openapi_get_db_conn(void *ctxt)
 {
-	if (!slurm_conf.accounting_storage_type)
-		return NULL;
-
 	/*
 	 * Implements authentication translation from the generic openapi
 	 * version to the rest pointer
@@ -253,10 +283,8 @@ extern void rest_auth_g_free(rest_auth_context_t *context)
 	bool found = false;
 	if (!context)
 		return;
-	_check_magic(context);
 
-	auth_g_thread_clear();
-
+	_clear_auth(context);
 	if (context->plugin_id) {
 		for (int i = 0;
 		     (g_context_cnt > 0) && (i < g_context_cnt);
@@ -264,7 +292,6 @@ extern void rest_auth_g_free(rest_auth_context_t *context)
 			if (context->plugin_id == plugin_ids[i]) {
 				found = true;
 				(*(ops[i].free))(context);
-				/* plugins are required to free their own data */
 				xassert(!context->plugin_data);
 				break;
 			}
@@ -274,9 +301,6 @@ extern void rest_auth_g_free(rest_auth_context_t *context)
 			fatal_abort("%s: unable to find plugin_id: %u",
 				    __func__, context->plugin_id);
 	}
-
-	xfree(context->user_name);
-	context->plugin_id = 0;
 	context->magic = ~MAGIC;
 	xfree(context);
 }

@@ -4,7 +4,8 @@
 #          Validate that sinfo -O (--Format) option displays the
 #          correct user specified values.
 ############################################################################
-# Copyright (C) SchedMD LLC.
+# Copyright (C) 2015 SchedMD LLC
+# Written by Nathan Yee <nyee32@schedmd.com>
 #
 # This file is part of Slurm, a resource management program.
 # For details, see <https://slurm.schedmd.com/>.
@@ -46,7 +47,7 @@ array set node_info {
 	NodeAddr           nodeaddr
 	NodeHostName       nodehost
 	RealMemory         memory
-	State              statecomplete
+	State              statelong
 	Sockets            sockets
 	ThreadsPerCore     threads
 	Version            version
@@ -84,7 +85,7 @@ foreach option [array names node_info] {
 foreach option [array names node_sinfo_vals] {
 	# Gres option (and potentially others) may include "(" and ")" as
 	# characters, they need to be escaped to be used as part of a regexp
-	set val_re [string map {\( \\( \) \\) \+ \\+} $node_sinfo_vals($option)]
+	set val_re [string map {\( \\( \) \\)} $node_sinfo_vals($option)]
 
 	set output [string trim [run_command_output -fail "$sinfo -n$test_node -O$option:256 -h"]]
 	if {$option eq "cpusload" || $option eq "freemem"} {

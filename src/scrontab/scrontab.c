@@ -1,7 +1,8 @@
 /*****************************************************************************\
  *  scrontab.c
  *****************************************************************************
- *  Copyright (C) SchedMD LLC.
+ *  Copyright (C) 2020 SchedMD LLC.
+ *  Written by Tim Wickberg <tim@schedmd.com>
  *
  *  This file is part of Slurm, a resource management program.
  *  For details, see <https://slurm.schedmd.com/>.
@@ -41,23 +42,20 @@
 
 
 #include "src/common/bitstring.h"
-#include "src/interfaces/cli_filter.h"
-#include "src/interfaces/hash.h"
+#include "src/common/cli_filter.h"
 #include "src/common/cron.h"
 #include "src/common/env.h"
 #include "src/common/fetch_config.h"
 #include "src/common/log.h"
+#include "src/common/plugstack.h"
 #include "src/common/ref.h"
 #include "src/common/read_config.h"
 #include "src/common/slurm_opt.h"
-#include "src/common/spank.h"
 #include "src/common/uid.h"
 #include "src/common/xmalloc.h"
 #include "src/common/xstring.h"
 
 #include "scrontab.h"
-
-#define OPT_LONG_AUTOCOMP 0x100
 
 static void _usage(void);
 
@@ -92,48 +90,34 @@ static void _usage(void)
 static void _parse_args(int argc, char **argv)
 {
 	log_options_t logopt = LOG_OPTS_STDERR_ONLY;
-	int c = 0, option_index = 0;
-
-	static struct option long_options[] = {
-		{"autocomplete", required_argument, 0, OPT_LONG_AUTOCOMP},
-		{NULL, no_argument, 0, 'e'},
-		{NULL, no_argument, 0, 'l'},
-		{NULL, no_argument, 0, 'r'},
-		{NULL, required_argument, 0, 'u'},
-		{NULL, no_argument, 0, 'v'},
-		{NULL, 0, 0, 0}};
+	int c = 0;
 
 	log_init(xbasename(argv[0]), logopt, 0, NULL);
 	uid = getuid();
 	gid = getgid();
 
 	opterr = 0;
-	while ((c = getopt_long(argc, argv, "elru:v",
-				long_options, &option_index)) != -1) {
+	while ((c = getopt(argc, argv, "elru:v")) != -1) {
 		switch (c) {
-		case (int)'e':
+		case 'e':
 			if (!isatty(STDIN_FILENO))
 				fatal("Standard input is not a TTY");
 			edit_only = true;
 			break;
-		case (int)'l':
+		case 'l':
 			list_only = true;
 			break;
-		case (int)'r':
+		case 'r':
 			remove_only = true;
 			break;
-		case (int)'u':
+		case 'u':
 			if (uid_from_string(optarg, &uid))
 				fatal("Could not find user %s", optarg);
 			gid = gid_from_uid(uid);
 			break;
-		case (int)'v':
+		case 'v':
 			logopt.stderr_level++;
 			log_alter(logopt, 0, NULL);
-			break;
-		case OPT_LONG_AUTOCOMP:
-			suggest_completion(long_options, optarg);
-			exit(0);
 			break;
 		default:
 			_usage();
@@ -190,7 +174,7 @@ static void _update_crontab_with_disabled_lines(char **crontab,
 	}
 	xfree(*crontab);
 	*crontab = new_crontab;
-	FREE_NULL_BITMAP(disabled);
+	bit_free(disabled);
 	xfree(lines);
 }
 
@@ -339,11 +323,12 @@ static job_desc_msg_t *_entry_to_job(cron_entry_t *entry, char *script)
 	job->script = script;
 
 	job->environment = env_array_create();
-	set_prio_process_env();
-	env_array_overwrite(&job->environment, "SLURM_PRIO_PROCESS",
-			    getenv("SLURM_PRIO_PROCESS"));
 	env_array_overwrite(&job->environment, "SLURM_GET_USER_ENV", "1");
 	job->env_size = envcount(job->environment);
+
+	job->argc = 1;
+	job->argv = xmalloc(sizeof(char *));
+	job->argv[0] = xstrdup(entry->command);
 
 	if (!job->name) {
 		char *pos;
@@ -353,8 +338,12 @@ static job_desc_msg_t *_entry_to_job(cron_entry_t *entry, char *script)
 	}
 
 	if (!job->work_dir) {
-		if (!(job->work_dir = uid_to_dir(uid)))
-			fatal("uid_to_dir(%u) failed", uid);
+		struct passwd *pwd = NULL;
+
+		if (!(pwd = getpwuid(uid)))
+			fatal("getpwuid(%u) failed", uid);
+
+		job->work_dir = xstrdup(pwd->pw_dir);
 	}
 
 	return job;
@@ -405,25 +394,8 @@ static void _edit_and_update_crontab(char *crontab)
 	crontab_update_response_msg_t *response;
 
 edit:
-	if (edit_only && crontab) {
-		slurm_hash_t before = { .type = HASH_PLUGIN_K12 };
-		slurm_hash_t after = { .type = HASH_PLUGIN_K12 };
-		int before_len, after_len;
-
-		before_len = hash_g_compute(crontab, strlen(crontab), NULL, 0,
-					   &before);
+	if (edit_only)
 		_edit_crontab(&crontab);
-		after_len = hash_g_compute(crontab, strlen(crontab), NULL, 0,
-					   &after);
-		if ((before_len == after_len) &&
-		    (!memcmp(before.hash, after.hash, before_len))) {
-			info("No modification made");
-			xfree(crontab);
-			return;
-		}
-	} else if (edit_only) {
-		_edit_crontab(&crontab);
-	}
 
 	jobs = list_create((ListDelF) slurm_free_job_desc_msg);
 	env_vars = list_create(destroy_config_key_pair);
@@ -526,13 +498,13 @@ edit:
 			printf("There are errors in your crontab.\n");
 			xfree(badline);
 			xfree(crontab);
-			FREE_NULL_LIST(jobs);
+			list_destroy(jobs);
 			exit(1);
 		}
 
 		char c = '\0';
 
-		FREE_NULL_LIST(jobs);
+		list_destroy(jobs);
 
 		while (tolower(c) != 'y' && tolower(c) != 'n') {
 			printf("There are errors in your crontab.\n"
@@ -563,12 +535,12 @@ edit:
 				response->err_msg);
 			slurm_free_crontab_update_response_msg(response);
 			xfree(crontab);
-			FREE_NULL_LIST(jobs);
+			list_destroy(jobs);
 			exit(1);
 		}
 
 		char c = '\0';
-		FREE_NULL_LIST(jobs);
+		list_destroy(jobs);
 		while (tolower(c) != 'y' && tolower(c) != 'n') {
 			printf("There was an issue with the job submission on lines %s\n"
 			       "The error code return was: %s\n"
@@ -591,16 +563,12 @@ edit:
 		goto edit;
 	}
 
-	if (response->job_submit_user_msg)
-		print_multi_line_string(response->job_submit_user_msg, -1,
-					LOG_LEVEL_INFO);
-
 	for (int i = 0; i < response->jobids_count; i++)
 		cli_filter_g_post_submit(0, response->jobids[i], NO_VAL);
 
 	slurm_free_crontab_update_response_msg(response);
 	xfree(crontab);
-	FREE_NULL_LIST(jobs);
+	list_destroy(jobs);
 }
 
 static void _handle_first_form(char **new_crontab)
@@ -629,11 +597,8 @@ extern int main(int argc, char **argv)
 	int rc;
 	char *crontab = NULL, *disabled_lines = NULL;
 
-	slurm_init(NULL);
+	slurm_conf_init(NULL);
 	_parse_args(argc, argv);
-
-	if (cli_filter_init() != SLURM_SUCCESS)
-		fatal("failed to initialize cli_filter plugin");
 
 	if (!xstrcasestr(slurm_conf.scron_params, "enable"))
 		fatal("scrontab is disabled on this cluster");
@@ -678,7 +643,6 @@ extern int main(int argc, char **argv)
 
 	_edit_and_update_crontab(crontab);
 
-	cli_filter_fini();
 	spank_fini(NULL);
 
 	return 0;

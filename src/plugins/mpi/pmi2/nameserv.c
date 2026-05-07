@@ -123,7 +123,7 @@ name_publish_up(char *name, char *port)
 	size = get_buf_offset(buf);
 
 	rc = tree_msg_to_srun_with_resp(size, get_buf_data(buf), &resp_buf);
-	FREE_NULL_BUFFER(buf);
+	free_buf(buf);
 
 	if (rc == SLURM_SUCCESS) {
 		safe_unpack32(&tmp_32, resp_buf);
@@ -131,7 +131,8 @@ name_publish_up(char *name, char *port)
 	}
 
 unpack_error:
-	FREE_NULL_BUFFER(resp_buf);
+	if (resp_buf)
+		free_buf(resp_buf);
 
 	return rc;
 }
@@ -149,7 +150,7 @@ name_unpublish_up(char *name)
 	size = get_buf_offset(buf);
 
 	rc = tree_msg_to_srun_with_resp(size, get_buf_data(buf), &resp_buf);
-	FREE_NULL_BUFFER(buf);
+	free_buf(buf);
 
 	if (rc == SLURM_SUCCESS) {
 		safe_unpack32(&tmp_32, resp_buf);
@@ -157,7 +158,8 @@ name_unpublish_up(char *name)
 	}
 
 unpack_error:
-	FREE_NULL_BUFFER(resp_buf);
+	if (resp_buf)
+		free_buf(resp_buf);
 
 	return rc;
 }
@@ -177,12 +179,13 @@ name_lookup_up(char *name)
 	size = get_buf_offset(buf);
 
 	rc = tree_msg_to_srun_with_resp(size, get_buf_data(buf), &resp_buf);
-	FREE_NULL_BUFFER(buf);
+	free_buf(buf);
 
 	if (rc == SLURM_SUCCESS)
 		safe_unpackstr_xmalloc(&port, (uint32_t *)&size, resp_buf);
 unpack_error:
-	FREE_NULL_BUFFER(resp_buf);
+	if (resp_buf)
+		free_buf(resp_buf);
 
 	return port;
 }

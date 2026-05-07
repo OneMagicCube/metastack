@@ -3,7 +3,7 @@
  *****************************************************************************
  *  Copyright (C) 2002-2007 The Regents of the University of California.
  *  Copyright (C) 2008-2010 Lawrence Livermore National Security.
- *  Copyright (C) SchedMD LLC.
+ *  Portions Copyright (C) 2010 SchedMD <https://www.schedmd.com>.
  *  Produced at Lawrence Livermore National Laboratory (cf, DISCLAIMER).
  *  Written by Morris Jette <jette1@llnl.gov>
  *  CODE-OCEC-09-009. All rights reserved.
@@ -50,7 +50,6 @@ scontrol_parse_part_options (int argc, char **argv, int *update_cnt_ptr,
 	int i, min, max;
 	char *tag, *val;
 	int taglen, vallen;
-
 #ifdef __METASTACK_PART_PRIORITY_WEIGHT
 	bool prio_mul = false, with_slurmdbd = false;
 
@@ -77,15 +76,10 @@ scontrol_parse_part_options (int argc, char **argv, int *update_cnt_ptr,
 	}
 
 	for (i = 0; i < argc; i++) {
-		char plus_minus = '\0';
 		tag = argv[i];
 		val = strchr(argv[i], '=');
 		if (val) {
 			taglen = val - argv[i];
-			if ((val[-1] == '+') || (val[-1] == '-')) {
-				plus_minus = val[-1];
-				taglen--;
-			}
 			val++;
 			vallen = strlen(val);
 		} else {
@@ -137,19 +131,8 @@ scontrol_parse_part_options (int argc, char **argv, int *update_cnt_ptr,
 				return SLURM_ERROR;
 			}
 			(*update_cnt_ptr)++;
-		} else if (!xstrncasecmp(tag, "MaxCPUsPerSocket",
-					 MAX(taglen, 4))) {
-			if (!xstrcasecmp(val, "UNLIMITED") ||
-			    !xstrcasecmp(val, "INFINITE")) {
-				part_msg_ptr->max_cpus_per_socket = INFINITE;
-			} else if (parse_uint32(val, &part_msg_ptr->
-						max_cpus_per_socket)) {
-				error("Invalid MaxCPUsPerSocket value: %s",
-				      val);
-				return SLURM_ERROR;
-			}
-			(*update_cnt_ptr)++;
-		} else if (xstrncasecmp(tag, "MaxNodes", MAX(taglen, 4)) == 0) {
+		}
+		else if (xstrncasecmp(tag, "MaxNodes", MAX(taglen, 4)) == 0) {
 			min = 1;
 			if ((xstrcasecmp(val,"UNLIMITED") == 0) ||
 			    (xstrcasecmp(val,"INFINITE") == 0)) {
@@ -164,7 +147,7 @@ scontrol_parse_part_options (int argc, char **argv, int *update_cnt_ptr,
 		}
 		else if (xstrncasecmp(tag, "MinNodes", MAX(taglen, 2)) == 0) {
 			min = 1;
-			verify_node_count(val, &min, &max, NULL);
+			verify_node_count(val, &min, &max);
 			part_msg_ptr->min_nodes = min;
 			(*update_cnt_ptr)++;
 		}
@@ -221,20 +204,7 @@ scontrol_parse_part_options (int argc, char **argv, int *update_cnt_ptr,
 			}
 			(*update_cnt_ptr)++;
 		}
-#endif		
-		else if (!xstrncasecmp(tag, "ExclusiveTopo", MAX(taglen, 1))) {
-			if (xstrncasecmp(val, "NO", MAX(vallen, 1)) == 0)
-				part_msg_ptr->flags |= PART_FLAG_EXC_TOPO_CLR;
-			else if (xstrncasecmp(val, "YES", MAX(vallen, 1)) == 0)
-				part_msg_ptr->flags |= PART_FLAG_EXCLUSIVE_TOPO;
-			else {
-				exit_code = 1;
-				error("Invalid input: %s", argv[i]);
-				error("Acceptable ExclusiveTopo values are YES and NO");
-				return SLURM_ERROR;
-			}
-			(*update_cnt_ptr)++;
-		}
+#endif
 #ifdef __METASTACK_NEW_PART_RBN
 		else if (xstrncasecmp(tag, "RBN", MAX(taglen, 1)) == 0) {
 			if (xstrncasecmp(val, "NO", MAX(vallen, 1)) == 0)
@@ -279,9 +249,9 @@ scontrol_parse_part_options (int argc, char **argv, int *update_cnt_ptr,
 #ifdef __METASTACK_NEW_PART_LLS
 		else if (xstrncasecmp(tag, "LLS", MAX(taglen, 1)) == 0) {
 			if (xstrncasecmp(val, "NO", MAX(vallen, 1)) == 0)
-				part_msg_ptr->meta_flags |= PART_METAFLAG_LLS_CLR;
+				part_msg_ptr->flags |= PART_FLAG_LLS_CLR;
 			else if (xstrncasecmp(val, "YES", MAX(vallen, 1)) == 0)
-				part_msg_ptr->meta_flags |= PART_METAFLAG_LLS;
+				part_msg_ptr->flags |= PART_FLAG_LLS;
 			else {
 				exit_code = 1;
 				error("Invalid input: %s", argv[i]);
@@ -290,7 +260,7 @@ scontrol_parse_part_options (int argc, char **argv, int *update_cnt_ptr,
 			}
 			(*update_cnt_ptr)++;
 		}
-#endif
+#endif		
 		else if (xstrncasecmp(tag, "RootOnly", MAX(taglen, 3)) == 0) {
 			if (xstrncasecmp(val, "NO", MAX(vallen, 1)) == 0)
 				part_msg_ptr->flags |= PART_FLAG_ROOT_ONLY_CLR;
@@ -372,19 +342,6 @@ scontrol_parse_part_options (int argc, char **argv, int *update_cnt_ptr,
 			}
 			(*update_cnt_ptr)++;
 		}
-		else if (!xstrncasecmp(tag, "PowerDownOnIdle", MAX(taglen, 1))) {
-			if (!xstrncasecmp(val, "NO", MAX(vallen, 1)))
-				part_msg_ptr->flags |= PART_FLAG_PDOI_CLR;
-			else if (!xstrncasecmp(val, "YES", MAX(vallen, 1)))
-				part_msg_ptr->flags |= PART_FLAG_PDOI;
-			else {
-				exit_code = 1;
-				error("Invalid input: %s", argv[i]);
-				error("Acceptable PowerDownOnIdle values are YES and NO");
-				return SLURM_ERROR;
-			}
-			(*update_cnt_ptr)++;
-		}
 		else if (xstrncasecmp(tag, "PreemptMode", MAX(taglen, 3)) == 0) {
 			uint16_t new_mode = preempt_mode_num(val);
 			if (new_mode != NO_VAL16)
@@ -420,26 +377,7 @@ scontrol_parse_part_options (int argc, char **argv, int *update_cnt_ptr,
 			}
 			(*update_cnt_ptr)++;
 		}
-#ifdef __METASTACK_NEW_AUTO_SUPPLEMENT_AVAIL_NODES
-		else if (!xstrncasecmp(tag, "StandbyNodes", MAX(taglen, 12))) {
-			part_msg_ptr->standby_nodes = val;
-			(*update_cnt_ptr)++;
-		}
 
-		else if (!xstrncasecmp(tag, "StandbyNodeParameters", MAX(taglen, 13))) {			
-			part_msg_ptr->standby_node_parameters = val;
-			(*update_cnt_ptr)++;
-		}
-#endif
-#ifdef __METASTACK_NEW_SUSPEND_KEEP_IDLE
-		else if (!xstrncasecmp(tag, "SuspendKeepIdle", MAX(taglen, 8))) {
-			if (parse_uint32(val, &part_msg_ptr->suspend_idle)) {
-				error ("Invalid SuspendKeepIdle value: %s", val);
-				return SLURM_ERROR;
-			}
-			(*update_cnt_ptr)++;
-		}
-#endif
 #ifdef __METASTACK_PART_PRIORITY_WEIGHT
 		else if (xstrncasecmp(tag, "PriorityFavorSmall", MAX(taglen, 15)) == 0) {
 			if (!prio_mul) {
@@ -568,6 +506,27 @@ scontrol_parse_part_options (int argc, char **argv, int *update_cnt_ptr,
 			(*update_cnt_ptr)++;
 		}												
 #endif
+
+#ifdef __METASTACK_NEW_AUTO_SUPPLEMENT_AVAIL_NODES
+		else if (!xstrncasecmp(tag, "StandbyNodes", MAX(taglen, 12))) {
+			part_msg_ptr->standby_nodes = val;
+			(*update_cnt_ptr)++;
+		}
+
+		else if (!xstrncasecmp(tag, "StandbyNodeParameters", MAX(taglen, 13))) {			
+			part_msg_ptr->standby_node_parameters = val;
+			(*update_cnt_ptr)++;
+		}
+#endif		
+#ifdef __METASTACK_NEW_SUSPEND_KEEP_IDLE
+		else if (!xstrncasecmp(tag, "SuspendKeepIdle", MAX(taglen, 8))) {
+			if (parse_uint32(val, &part_msg_ptr->suspend_idle)) {
+				error ("Invalid SuspendKeepIdle value: %s", val);
+				return SLURM_ERROR;
+			}
+			(*update_cnt_ptr)++;
+		}
+#endif
 		else if (!xstrncasecmp(tag, "State", MAX(taglen, 2))) {
 			if (!xstrncasecmp(val, "INACTIVE", MAX(vallen, 1)))
 				part_msg_ptr->state_up = PARTITION_INACTIVE;
@@ -586,12 +545,7 @@ scontrol_parse_part_options (int argc, char **argv, int *update_cnt_ptr,
 			(*update_cnt_ptr)++;
 		}
 		else if (!xstrncasecmp(tag, "Nodes", MAX(taglen, 1))) {
-			if (plus_minus)
-				part_msg_ptr->nodes =
-					scontrol_process_plus_minus(plus_minus,
-								    val, true);
-			else
-				part_msg_ptr->nodes = val;
+			part_msg_ptr->nodes = val;
 			(*update_cnt_ptr)++;
 		}
 		else if (!xstrncasecmp(tag, "AllowGroups", MAX(taglen, 6))) {

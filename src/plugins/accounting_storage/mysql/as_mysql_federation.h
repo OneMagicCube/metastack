@@ -1,7 +1,8 @@
 /*****************************************************************************\
  *  as_mysql_federation.h - functions dealing with federations.
  *****************************************************************************
- *  Copyright (C) SchedMD LLC.
+ *  Copyright (C) 2016 SchedMD LLC.
+ *  Written by Brian Christiansen <brian@schedmd.com>
  *
  *  This file is part of Slurm, a resource management program.
  *  For details, see <https://slurm.schedmd.com/>.

@@ -85,7 +85,8 @@ extern void fini(void)
 	if (backfill_thread) {
 		verbose("Backfill scheduler plugin shutting down");
 		stop_backfill_agent();
-		slurm_thread_join(backfill_thread);
+		pthread_join(backfill_thread, NULL);
+		backfill_thread = 0;
 	}
 	slurm_mutex_unlock(&thread_flag_mutex);
 }

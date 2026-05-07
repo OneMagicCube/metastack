@@ -47,7 +47,7 @@
 
 #include "src/common/bitstring.h"
 #include "src/common/eio.h"
-#include "src/interfaces/mpi.h"
+#include "src/common/slurm_mpi.h"
 #include "src/common/slurm_step_layout.h"
 
 #include "src/api/step_io.h"
@@ -75,8 +75,6 @@ struct step_launch_state {
 	bool abort;
 	bool abort_action_taken;
 
-	uint32_t job_id;
-
 	/* message thread variables */
 	eio_handle_t *msg_handle;
 	pthread_t msg_thread;
@@ -91,9 +89,9 @@ struct step_launch_state {
 
 	slurm_step_layout_t *layout; /* a pointer into the ctx
 					step_resp, do not free */
-	mpi_step_info_t mpi_step[1];
+	mpi_plugin_client_info_t mpi_info[1];
 	mpi_plugin_client_state_t *mpi_state;
-	int ret_code;
+	int mpi_rc;
 
 	/* user registered callbacks */
 	slurm_step_launch_callbacks_t callback;

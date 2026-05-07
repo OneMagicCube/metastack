@@ -43,7 +43,7 @@
 
 #include "src/common/plugin.h"
 #include "src/common/log.h"
-#include "src/interfaces/select.h"
+#include "src/common/select.h"
 #include "src/slurmctld/job_scheduler.h"
 #include "src/slurmctld/reservation.h"
 #include "src/slurmctld/slurmctld.h"
@@ -82,7 +82,8 @@ void fini(void)
 	if ( builtin_thread ) {
 		verbose( "Built-in scheduler plugin shutting down" );
 		stop_builtin_agent();
-		slurm_thread_join(builtin_thread);
+		pthread_join(builtin_thread, NULL);
+		builtin_thread = 0;
 	}
 	slurm_mutex_unlock( &thread_flag_mutex );
 }

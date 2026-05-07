@@ -44,7 +44,7 @@
 #include "as_mysql_jobacct_process.h"
 
 typedef struct {
-	hostlist_t *hl;
+	hostlist_t hl;
 	time_t start;
 	time_t end;
 	bitstr_t *asked_bitmap;
@@ -63,8 +63,6 @@ char *job_req_inx[] = {
 	"t1.derived_ec",
 	"t1.derived_es",
 	"t1.exit_code",
-	"t1.extra",
-	"t1.failed_node",
 	"t1.flags",
 	"t1.id_array_job",
 	"t1.id_array_task",
@@ -82,7 +80,6 @@ char *job_req_inx[] = {
 	"t1.job_db_inx",
 	"t1.job_name",
 	"t1.kill_requid",
-	"t1.licenses",
 	"t1.mem_req",
 	"t1.node_inx",
 	"t1.nodelist",
@@ -106,11 +103,12 @@ char *job_req_inx[] = {
 #ifdef __METASTACK_OPT_SACCT_COMMAND
 	"t1.command",
 #endif
+#ifdef __METASTACK_OPT_SACCT_OUTPUT
+	"t1.stdout",
+	"t1.stderr",
+#endif
 	"t1.mcs_label",
 	"t4.batch_script",
-	"t1.std_err",
-	"t1.std_in",
-	"t1.std_out",
 	"t1.submit_line",
 	"t4.env_vars",
 	"t2.acct",
@@ -118,12 +116,6 @@ char *job_req_inx[] = {
 #ifdef __METASTACK_OPT_RESC_NODEDETAIL
 	"t1.resource_node_detail",
 #endif
-	"t2.lineage",
-#ifdef __METASTACK_OPT_APP  
-	"t5.app_name",  
-	"t5.app_version",  
-	"t5.app_source",
-#endif 
 	"t2.user"
 };
 
@@ -138,8 +130,6 @@ enum {
 	JOB_REQ_DERIVED_EC,
 	JOB_REQ_DERIVED_ES,
 	JOB_REQ_EXIT_CODE,
-	JOB_REQ_EXTRA,
-	JOB_REQ_FAILED_NODE,
 	JOB_REQ_FLAGS,
 	JOB_REQ_ARRAYJOBID,
 	JOB_REQ_ARRAYTASKID,
@@ -157,7 +147,6 @@ enum {
 	JOB_REQ_DB_INX,
 	JOB_REQ_NAME,
 	JOB_REQ_KILL_REQUID,
-	JOB_REQ_LICENSES,
 	JOB_REQ_REQ_MEM,
 	JOB_REQ_NODE_INX,
 	JOB_REQ_NODELIST,
@@ -181,23 +170,18 @@ enum {
 #ifdef __METASTACK_OPT_SACCT_COMMAND
 	JOB_REQ_COMMAND,
 #endif
+#ifdef __METASTACK_OPT_SACCT_OUTPUT
+	JOB_REQ_STDOUT,
+	JOB_REQ_STDERR,
+#endif
 	JOB_REQ_MCS_LABEL,
 	JOB_REQ_SCRIPT,
-	JOB_REQ_STDERR,
-	JOB_REQ_STDIN,
-	JOB_REQ_STDOUT,
 	JOB_REQ_SUBMIT_LINE,
 	JOB_REQ_ENV,
 	JOB_REQ_ACCOUNT,
 	JOB_REQ_LFT,
 #ifdef __METASTACK_OPT_RESC_NODEDETAIL
 	JOB_REQ_RESC_NODE,
-#endif
-	JOB_REQ_LINEAGE,
-#ifdef __METASTACK_OPT_APP  
-	JOB_REQ_APP_NAME,  
-	JOB_REQ_APP_VERSION,  
-	JOB_REQ_APP_SOURCE,  
 #endif
 	JOB_REQ_USER_NAME,
 	JOB_REQ_COUNT
@@ -299,7 +283,7 @@ enum {
 static void _setup_job_cond_selected_steps(slurmdb_job_cond_t *job_cond,
 					   char *cluster_name, char **extra)
 {
-	list_itr_t *itr = NULL;
+	ListIterator itr = NULL;
 	slurm_selected_step_t *selected_step = NULL;
 
 	if (!job_cond || (job_cond->flags & JOBCOND_FLAG_RUNAWAY))
@@ -515,15 +499,13 @@ static int _cluster_get_jobs(mysql_conn_t *mysql_conn,
 	slurmdb_step_rec_t *step = NULL;
 	time_t now = time(NULL);
 	List job_list = list_create(slurmdb_destroy_job_rec);
-	list_itr_t *itr = NULL, *itr2 = NULL;
+	ListIterator itr = NULL, itr2 = NULL;
 	List local_cluster_list = NULL;
 	int set = 0;
 	char *prefix="t2";
 	int rc = SLURM_SUCCESS;
 	int last_id = -1, curr_id = -1;
-	int comb_id = 0;
 	local_cluster_t *curr_cluster = NULL;
-	bool jobid_filtered = false;
 
 	/* This is here to make sure we are looking at only this user
 	 * if this flag is set.  We also include any accounts they may be
@@ -535,24 +517,62 @@ static int _cluster_get_jobs(mysql_conn_t *mysql_conn,
 	if (!is_admin && ((slurm_conf.private_data & PRIVATE_DATA_JOBS) ||
 			  (job_cond->flags & JOBCOND_FLAG_SCRIPT) ||
 			  (job_cond->flags & JOBCOND_FLAG_ENV))) {
-		if (!extra)
-			xstrcat(extra, " where ");
-		else
-			xstrcat(extra, " && ");
-		xstrfmtcat(extra, "((%s.lineage like '%%/0-%s/%%')",
-			   prefix, user->name);
-		if (!(slurmdbd_conf->flags & DBD_CONF_FLAG_DISABLE_COORD_DBD) &&
-		    user->coord_accts && list_count(user->coord_accts)) {
+		query = xstrdup_printf("select lft from \"%s_%s\" "
+				       "where user='%s'",
+				       cluster_name, assoc_table, user->name);
+		if (user->coord_accts) {
 			slurmdb_coord_rec_t *coord = NULL;
 			itr = list_iterator_create(user->coord_accts);
 			while ((coord = list_next(itr))) {
-				xstrfmtcat(extra,
-					   " || (%s.lineage like '%%/%s/%%')",
-					   prefix, coord->name);
+				xstrfmtcat(query, " || acct='%s'",
+					   coord->name);
 			}
 			list_iterator_destroy(itr);
 		}
-		xstrcatchar(extra, ')');
+		DB_DEBUG(DB_JOB, mysql_conn->conn, "query\n%s", query);
+		if (!(result = mysql_db_query_ret(
+			      mysql_conn, query, 0))) {
+			xfree(extra);
+			xfree(query);
+			rc = SLURM_ERROR;
+			goto end_it;
+		}
+		xfree(query);
+		set = 0;
+		while ((row = mysql_fetch_row(result))) {
+			if (set) {
+				xstrfmtcat(extra,
+					   " || (%s between %s.lft and %s.rgt)",
+					   row[0], prefix, prefix);
+			} else {
+				set = 1;
+				if (extra)
+					xstrfmtcat(extra,
+						   " && ((%s between %s.lft "
+						   "and %s.rgt)",
+						   row[0], prefix,
+						   prefix);
+				else
+					xstrfmtcat(extra,
+						   " where ((%s between %s.lft "
+						   "and %s.rgt)",
+						   row[0], prefix,
+						   prefix);
+			}
+		}
+
+		mysql_free_result(result);
+
+		if (set)
+			xstrcat(extra, ")");
+		else {
+			xfree(extra);
+			debug("User %s has no associations, and is not admin, "
+			      "so not returning any jobs.", user->name);
+			/* This user has no valid associations, so
+			 * they will not have any jobs. */
+			goto end_it;
+		}
 	}
 
 	setup_job_cluster_cond_limits(mysql_conn, job_cond,
@@ -586,14 +606,7 @@ static int _cluster_get_jobs(mysql_conn_t *mysql_conn,
 			   " left join \"%s_%s\" as t4 "
 			   "on t1.env_hash_inx=t4.hash_inx",
 			   cluster_name, job_env_table);
-#ifdef __METASTACK_OPT_APP  
-	/* Only LEFT JOIN app table when app info is actually needed */
-	if (job_cond->flags & JOBCOND_FLAG_APP)  
-		xstrfmtcat(query,  
-			   " left join \"%s_%s\" as t5 "  
-			   "on t1.job_db_inx=t5.job_db_inx",  
-			   cluster_name, job_app_table);  
-#endif  
+
 	if (job_cond->flags & JOBCOND_FLAG_RUNAWAY) {
 		if (extra)
 			xstrcat(extra, " && (t1.time_end=0)");
@@ -605,8 +618,6 @@ static int _cluster_get_jobs(mysql_conn_t *mysql_conn,
 		xstrcat(query, extra);
 		xfree(extra);
 	}
-	if (job_cond->step_list)
-		jobid_filtered = true;
 
 	/* Here we want to order them this way in such a way so it is
 	   easy to look for duplicates, it is also easy to sort the
@@ -643,26 +654,13 @@ static int _cluster_get_jobs(mysql_conn_t *mysql_conn,
 		char *db_inx_char = row[JOB_REQ_DB_INX];
 		bool job_ended = 0;
 		int start = slurm_atoul(row[JOB_REQ_START]);
-		int arrayjob = slurm_atoul(row[JOB_REQ_ARRAYJOBID]);
-		int hetjob = slurm_atoul(row[JOB_REQ_HET_JOB_ID]);
 
 		curr_id = slurm_atoul(row[JOB_REQ_JOBID]);
-		if (job_cond && !(job_cond->flags & JOBCOND_FLAG_DUP)) {
-			if ((curr_id == last_id) &&
-			    (slurm_atoul(row[JOB_REQ_STATE]) != JOB_RESIZING))
-				continue;
-			/*
-			 * Doing advanced duplication removal when requesting
-			 * specific jobIDs and hetjobs/arrayjobs involved
-			*/
-			if (jobid_filtered) {
-				if ((last_id != hetjob) &&
-				    (last_id != arrayjob)) {
-					comb_id = arrayjob + hetjob;
-				} else if (comb_id != (arrayjob + hetjob))
-					continue;
-			}
-		}
+
+		if (job_cond && !(job_cond->flags & JOBCOND_FLAG_DUP)
+		    && (curr_id == last_id)
+		    && (slurm_atoul(row[JOB_REQ_STATE]) != JOB_RESIZING))
+			continue;
 
 		/* check the bitmap to see if this is one of the jobs
 		   we are looking for */
@@ -725,24 +723,12 @@ static int _cluster_get_jobs(mysql_conn_t *mysql_conn,
 			job->mcs_label = xstrdup("");
 		if (row[JOB_REQ_USER_NAME])
 			job->user = xstrdup(row[JOB_REQ_USER_NAME]);
-#ifdef __METASTACK_OPT_APP  
-		if (row[JOB_REQ_APP_NAME] && row[JOB_REQ_APP_NAME][0])  
-			job->app_name = xstrdup(row[JOB_REQ_APP_NAME]);  
-		if (row[JOB_REQ_APP_VERSION] && row[JOB_REQ_APP_VERSION][0])  
-			job->app_version = xstrdup(row[JOB_REQ_APP_VERSION]);  
-		if (row[JOB_REQ_APP_SOURCE] && row[JOB_REQ_APP_SOURCE][0])  
-			job->app_source = slurm_atoul(row[JOB_REQ_APP_SOURCE]);  
-		else  
-			job->app_source = APP_SOURCE_NOTSET;
-#endif
+
 		if (row[JOB_REQ_UID])
 			job->uid = slurm_atoul(row[JOB_REQ_UID]);
 
 		if (row[JOB_REQ_LFT])
 			job->lft = slurm_atoul(row[JOB_REQ_LFT]);
-
-		if (row[JOB_REQ_LINEAGE])
-			job->lineage = xstrdup(row[JOB_REQ_LINEAGE]);
 
 		if (row[JOB_REQ_ACCOUNT] && row[JOB_REQ_ACCOUNT][0])
 			job->account = xstrdup(row[JOB_REQ_ACCOUNT]);
@@ -765,6 +751,12 @@ static int _cluster_get_jobs(mysql_conn_t *mysql_conn,
 		if (row[JOB_REQ_COMMAND])
 			job->command = xstrdup(row[JOB_REQ_COMMAND]);
 #endif
+#ifdef __METASTACK_OPT_SACCT_OUTPUT
+		if (row[JOB_REQ_STDOUT])
+			job->stdout = xstrdup(row[JOB_REQ_STDOUT]);
+		if (row[JOB_REQ_STDERR])
+			job->stderr = xstrdup(row[JOB_REQ_STDERR]);
+#endif
 		job->eligible = slurm_atoul(row[JOB_REQ_ELIGIBLE]);
 		job->submit = slurm_atoul(row[JOB_REQ_SUBMIT]);
 		job->start = start;
@@ -774,10 +766,6 @@ static int _cluster_get_jobs(mysql_conn_t *mysql_conn,
 		job->script = xstrdup(row[JOB_REQ_SCRIPT]);
 
 		job->env = xstrdup(row[JOB_REQ_ENV]);
-
-		job->std_err = xstrdup(row[JOB_REQ_STDERR]);
-		job->std_in = xstrdup(row[JOB_REQ_STDIN]);
-		job->std_out = xstrdup(row[JOB_REQ_STDOUT]);
 
 		job->submit_line = xstrdup(row[JOB_REQ_SUBMIT_LINE]);
 
@@ -883,7 +871,6 @@ static int _cluster_get_jobs(mysql_conn_t *mysql_conn,
 		job->jobname = xstrdup(row[JOB_REQ_NAME]);
 		job->gid = slurm_atoul(row[JOB_REQ_GID]);
 		job->exitcode = slurm_atoul(row[JOB_REQ_EXIT_CODE]);
-		job->failed_node = xstrdup(row[JOB_REQ_FAILED_NODE]);
 		job->derived_ec = slurm_atoul(row[JOB_REQ_DERIVED_EC]);
 		job->derived_es = xstrdup(row[JOB_REQ_DERIVED_ES]);
 		job->admin_comment = xstrdup(row[JOB_REQ_ADMIN_COMMENT]);
@@ -893,8 +880,6 @@ static int _cluster_get_jobs(mysql_conn_t *mysql_conn,
 #endif
 		job->constraints = xstrdup(row[JOB_REQ_CONSTRAINTS]);
 		job->container = xstrdup(row[JOB_REQ_CONTAINER]);
-		job->extra = xstrdup(row[JOB_REQ_EXTRA]);
-		job->licenses = xstrdup(row[JOB_REQ_LICENSES]);
 		job->flags = slurm_atoul(row[JOB_REQ_FLAGS]);
 
 		/*
@@ -1209,8 +1194,8 @@ extern List setup_cluster_list_with_inx(mysql_conn_t *mysql_conn,
 	time_t now = time(NULL);
 	MYSQL_RES *result = NULL;
 	MYSQL_ROW row;
-	hostlist_t *temp_hl = NULL;
-	hostlist_iterator_t *h_itr = NULL;
+	hostlist_t temp_hl = NULL;
+	hostlist_iterator_t h_itr = NULL;
 	char *query = NULL;
 	int dims = 0;
 
@@ -1323,7 +1308,7 @@ extern int good_nodes_from_inx(List local_cluster_list,
 		    || (start >= (*curr_cluster)->end)) {
 			local_cluster_t *local_cluster = NULL;
 
-			list_itr_t *itr =
+			ListIterator itr =
 				list_iterator_create(local_cluster_list);
 			while ((local_cluster = list_next(itr))) {
 				if ((start >= local_cluster->start)
@@ -1352,7 +1337,7 @@ extern int setup_job_cluster_cond_limits(mysql_conn_t *mysql_conn,
 					 char *cluster_name, char **extra)
 {
 	int set = 0;
-	list_itr_t *itr = NULL;
+	ListIterator itr = NULL;
 	char *object = NULL;
 
 	if (!job_cond)
@@ -1437,68 +1422,6 @@ no_resv:
 			   *extra ? "&&" : "where",
 			   JOB_REVOKED);
 
-#ifdef __METASTACK_OPT_APP  
-	if (job_cond->appname_list &&  
-	    list_count(job_cond->appname_list)) {  
-		set = 0;  
-		if (*extra)  
-			xstrcat(*extra, " && (");  
-		else  
-			xstrcat(*extra, " where (");  
-		itr = list_iterator_create(job_cond->appname_list);  
-		while ((object = list_next(itr))) {  
-			char *esc_obj = slurm_add_slash_to_quotes(object);  
-			if (set)  
-				xstrcat(*extra, " || ");  
-			xstrfmtcat(*extra, "t5.app_name='%s'",  
-				   esc_obj ? esc_obj : "");  
-			xfree(esc_obj);  
-			set = 1;  
-		}  
-		list_iterator_destroy(itr);  
-		xstrcat(*extra, ")");  
-	}  
-  
-	if (job_cond->appversion_list &&  
-	    list_count(job_cond->appversion_list)) {  
-		set = 0;  
-		if (*extra)  
-			xstrcat(*extra, " && (");  
-		else  
-			xstrcat(*extra, " where (");  
-		itr = list_iterator_create(job_cond->appversion_list);  
-		while ((object = list_next(itr))) {  
-			char *esc_obj = slurm_add_slash_to_quotes(object);  
-			if (set)  
-				xstrcat(*extra, " || ");  
-			xstrfmtcat(*extra, "t5.app_version='%s'",  
-				   esc_obj ? esc_obj : "");  
-			xfree(esc_obj);  
-			set = 1;  
-		}  
-		list_iterator_destroy(itr);  
-		xstrcat(*extra, ")");  
-	}  
-	if (job_cond->appsource_list &&  
-	    list_count(job_cond->appsource_list)) {  
-		set = 0;  
-		if (*extra)  
-			xstrcat(*extra, " && (");  
-		else  
-			xstrcat(*extra, " where (");  
-		itr = list_iterator_create(job_cond->appsource_list);  
-		while ((object = list_next(itr))) {  
-			if (set)  
-				xstrcat(*extra, " || ");  
-			/* appsource_list stores numeric strings like "3","4" */  
-			xstrfmtcat(*extra, "t5.app_source=%lu", slurm_atoul(object));
-			set = 1;  
-		}  
-		list_iterator_destroy(itr);  
-		xstrcat(*extra, ")");  
-	}  
-#endif  
-
 	return SLURM_SUCCESS;
 }
 
@@ -1506,7 +1429,7 @@ extern int setup_job_cond_limits(slurmdb_job_cond_t *job_cond,
 				 char **extra)
 {
 	int set = 0;
-	list_itr_t *itr = NULL;
+	ListIterator itr = NULL;
 	char *object = NULL;
 
 	if (!job_cond || (job_cond->flags & JOBCOND_FLAG_RUNAWAY))
@@ -1831,7 +1754,7 @@ extern List as_mysql_jobacct_process_get_jobs(mysql_conn_t *mysql_conn,
 {
 	char *extra = NULL;
 	char *tmp = NULL, *tmp2 = NULL;
-	list_itr_t *itr = NULL;
+	ListIterator itr = NULL;
 	int is_admin=1;
 	int i;
 	List job_list = NULL;
@@ -1854,11 +1777,7 @@ extern List as_mysql_jobacct_process_get_jobs(mysql_conn_t *mysql_conn,
 	    (job_cond->flags & JOBCOND_FLAG_SCRIPT) ||
 	    (job_cond->flags & JOBCOND_FLAG_ENV)) {
 		if (!(is_admin = is_user_min_admin_level(
-#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
-			      mysql_conn, uid, SLURMDB_ADMIN_READ_ONLY))) {
-#else
 			      mysql_conn, uid, SLURMDB_ADMIN_OPERATOR))) {
-#endif
 			/*
 			 * Only fill in the coordinator accounts here we will
 			 * check them later when we actually try to get the jobs
@@ -1903,14 +1822,7 @@ extern List as_mysql_jobacct_process_get_jobs(mysql_conn_t *mysql_conn,
 		if (((i == JOB_REQ_SCRIPT) &&
 		     (!job_cond || !(job_cond->flags & JOBCOND_FLAG_SCRIPT))) ||
 		    ((i == JOB_REQ_ENV) &&
-		     (!job_cond || !(job_cond->flags & JOBCOND_FLAG_ENV)))
-#ifdef __METASTACK_OPT_APP  
-		    || ((i == JOB_REQ_APP_NAME ||  
-		         i == JOB_REQ_APP_VERSION ||  
-		         i == JOB_REQ_APP_SOURCE) &&  
-		        (!job_cond || !(job_cond->flags & JOBCOND_FLAG_APP)))  
-#endif
-			 )
+		     (!job_cond || !(job_cond->flags & JOBCOND_FLAG_ENV))))
 			xstrcat(tmp, ", ''");
 		else
 			xstrfmtcat(tmp, ", %s", job_req_inx[i]);

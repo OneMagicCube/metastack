@@ -1,7 +1,8 @@
 /*****************************************************************************\
  * runaway_jobs_functions.c - functions dealing with runaway/orphan jobs
  *****************************************************************************
- *  Copyright (C) SchedMD LLC.
+ *  Copyright (C) 2016 SchedMD LLC.
+ *  Written by Nathan Yee <nyee32@schedmd.com>
  *
  *  This file is part of Slurm, a resource management program.
  *  For details, see <https://slurm.schedmd.com/>.
@@ -83,8 +84,8 @@ static void _print_runaway_jobs(List format_list, List jobs)
 {
 	char outbuf[FORMAT_STRING_SIZE];
 	slurmdb_job_rec_t *job = NULL;
-	list_itr_t *itr = NULL;
-	list_itr_t *field_itr = NULL;
+	ListIterator itr = NULL;
+	ListIterator field_itr = NULL;
 	List print_fields_list; /* types are of print_field_t */
 	print_field_t *field = NULL;
 	int field_count;
@@ -109,7 +110,7 @@ static void _print_runaway_jobs(List format_list, List jobs)
 			case PRINT_ID:
 				field->print_routine(
 					field,
-					&job->jobid,
+					job->jobid,
 					(curr_inx == field_count));
 				break;
 			case PRINT_NAME:
@@ -141,25 +142,25 @@ static void _print_runaway_jobs(List format_list, List jobs)
 			case PRINT_TIMESTART:
 				field->print_routine(
 					field,
-					&job->start,
+					job->start,
 					(curr_inx == field_count));
 				break;
 			case PRINT_TIMEEND:
 				field->print_routine(
 					field,
-					&job->end,
+					job->end,
 					(curr_inx == field_count));
 				break;
 			case PRINT_TIMESUBMIT:
 				field->print_routine(
 					field,
-					&job->submit,
+					job->submit,
 					(curr_inx == field_count));
 				break;
 			case PRINT_TIMEELIGIBLE:
 				field->print_routine(
 					field,
-					&job->eligible,
+					job->eligible,
 					(curr_inx == field_count));
 				break;
 			default:
@@ -329,14 +330,6 @@ extern int sacctmgr_list_runaway_jobs(int argc, char **argv)
 			"ID%-12,Name,Part,Cluster,State%10,Submit,Start,End");
 
 	_print_runaway_jobs(format_list, runaway_jobs);
-
-#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
-	uid_t uid = getuid();
-
-	if (assoc_mgr_get_admin_level(db_conn, uid) == SLURMDB_ADMIN_READ_ONLY) {
-		goto end_it;
-	}
-#endif
 
 	while (!rc && list_transfer_max(process_jobs, runaway_jobs,
 					RUNAWAY_JOBS_PER_PASS)) {

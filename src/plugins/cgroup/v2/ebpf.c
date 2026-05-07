@@ -1,7 +1,8 @@
 /*****************************************************************************\
  *  ebpf.c - library to handle BPF cgroup device constrains
  *****************************************************************************
- *  Copyright (C) SchedMD LLC.
+ *  Copyright (C) 2022 SchedMD LLC.
+ *  Written by Oriol Vilarrubi <jvilarru@schedmd.com>
  *
  *  This file is part of Slurm, a resource management program.
  *  For details, see <https://slurm.schedmd.com/>.
@@ -227,6 +228,7 @@ extern int load_ebpf_prog(bpf_program_t *program, const char cgroup_path[],
 			  bool override_flag)
 {
 	int dirfd, ret, fd = -1;
+	char log[8192] = "\0";
 	union bpf_attr attr;
 
 	/*
@@ -251,10 +253,9 @@ extern int load_ebpf_prog(bpf_program_t *program, const char cgroup_path[],
 	/* We set the license to GPL to use helper functions marked gpl_only. */
 	attr.license = (size_t) "GPL";
 	strlcpy(attr.prog_name, "Slurm_Cgroup_v2", BPF_OBJ_NAME_LEN);
-	/* Explicitly disable logging */
-	attr.log_level = 0;
-	attr.log_buf = (size_t) NULL;
-	attr.log_size = 0;
+	attr.log_level = 1;
+	attr.log_buf = (size_t) log;
+	attr.log_size = sizeof(log);
 
 	/* Call the load syscall */
 	fd = bpf(BPF_PROG_LOAD, &attr, sizeof(attr));

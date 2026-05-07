@@ -263,11 +263,7 @@ if (x) {;}
   if test x$_libcurl_with = xno || test x$libcurl_cv_lib_curl_usable != xyes ; then
      # This is the IF-NO path
      ifelse([$4],,:,[$4])
-     if [ test "x$_libcurl_with" == "xno" ]; then
-       AC_MSG_NOTICE([support for libcurl is disabled])
-     else
-       AC_MSG_WARN([unable to locate/link against libcurl-devel installation])
-     fi
+     AC_MSG_WARN([unable to locate/link against libcurl-devel installation])
   else
      # This is the IF-YES path
      ifelse([$3],,:,[$3])

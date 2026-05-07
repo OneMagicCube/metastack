@@ -132,19 +132,13 @@ static int _setup_resv_limits(slurmdb_reservation_rec_t *resv,
 		xstrfmtcat(*extra, ", tres='%s'", resv->tres_str);
 	}
 
-	if (resv->comment) {
-		xstrcat(*cols, ", comment");
-		xstrfmtcat(*vals, ", '%s'", resv->comment);
-		xstrfmtcat(*extra, ", comment='%s'", resv->comment);
-	}
-
 	return SLURM_SUCCESS;
 }
 static int _setup_resv_cond_limits(slurmdb_reservation_cond_t *resv_cond,
 				   char **extra)
 {
 	int set = 0;
-	list_itr_t *itr = NULL;
+	ListIterator itr = NULL;
 	char *object = NULL;
 	char *prefix = "t1";
 	time_t now = time(NULL);
@@ -340,8 +334,7 @@ extern int as_mysql_modify_resv(mysql_conn_t *mysql_conn,
 		"nodelist",
 		"node_inx",
 		"flags",
-		"tres",
-		"comment",
+		"tres"
 	};
 	enum {
 		RESV_ASSOCS,
@@ -353,7 +346,6 @@ extern int as_mysql_modify_resv(mysql_conn_t *mysql_conn,
 		RESV_NODE_INX,
 		RESV_FLAGS,
 		RESV_TRES,
-		RESV_COMMENT,
 		RESV_COUNT
 	};
 
@@ -473,13 +465,12 @@ extern int as_mysql_modify_resv(mysql_conn_t *mysql_conn,
 		// record, no need to create a new one since
 		// this doesn't really effect the
 		// reservation accounting wise
-		resv->name = slurm_add_slash_to_quotes(row[RESV_NAME]);
+		resv->name = xstrdup(row[RESV_NAME]);
 
 	if (xstrcmp(resv->assocs, row[RESV_ASSOCS]) ||
 	    (resv->flags != slurm_atoul(row[RESV_FLAGS])) ||
 	    xstrcmp(resv->nodes, row[RESV_NODE_INX]) ||
-	    xstrcmp(resv->tres_str, row[RESV_TRES]) ||
-	    xstrcmp(resv->comment, row[RESV_COMMENT]))
+	    xstrcmp(resv->tres_str, row[RESV_TRES]))
 		set = 1;
 
 	if (!resv->time_end)
@@ -601,7 +592,7 @@ extern List as_mysql_get_resvs(mysql_conn_t *mysql_conn, uid_t uid,
 	void *curr_cluster = NULL;
 	List local_cluster_list = NULL;
 	List use_cluster_list = NULL;
-	list_itr_t *itr = NULL;
+	ListIterator itr = NULL;
 	char *cluster_name = NULL;
 	/* needed if we don't have an resv_cond */
 	uint16_t with_usage = 0;
@@ -618,8 +609,7 @@ extern List as_mysql_get_resvs(mysql_conn_t *mysql_conn, uid_t uid,
 		"time_start",
 		"time_end",
 		"tres",
-		"unused_wall",
-		"comment",
+		"unused_wall"
 	};
 
 	enum {
@@ -633,7 +623,6 @@ extern List as_mysql_get_resvs(mysql_conn_t *mysql_conn, uid_t uid,
 		RESV_REQ_END,
 		RESV_REQ_TRES,
 		RESV_REQ_UNUSED,
-		RESV_REQ_COMMENT,
 		RESV_REQ_COUNT
 	};
 
@@ -647,11 +636,7 @@ extern List as_mysql_get_resvs(mysql_conn_t *mysql_conn, uid_t uid,
 
 	if (slurm_conf.private_data & PRIVATE_DATA_RESERVATIONS) {
 		if (!(is_admin = is_user_min_admin_level(
-#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
-			      mysql_conn, uid, SLURMDB_ADMIN_READ_ONLY))) {
-#else
 			      mysql_conn, uid, SLURMDB_ADMIN_OPERATOR))) {
-#endif
 			error("Only admins can look at reservations");
 			errno = ESLURM_ACCESS_DENIED;
 			return NULL;
@@ -749,7 +734,6 @@ empty:
 		resv->flags = slurm_atoull(row[RESV_REQ_FLAGS]);
 		resv->tres_str = xstrdup(row[RESV_REQ_TRES]);
 		resv->unused_wall = atof(row[RESV_REQ_UNUSED]);
-		resv->comment = xstrdup(row[RESV_REQ_COMMENT]);
 		if (with_usage)
 			_get_usage_for_resv(
 				mysql_conn, uid, resv, row[RESV_REQ_ID]);

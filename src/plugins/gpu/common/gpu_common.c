@@ -1,7 +1,8 @@
 /*****************************************************************************\
  *  gpu_common.c - GPU plugin common functions
  *****************************************************************************
- *  Copyright (C) SchedMD LLC.
+ *  Copyright (C) 2021 SchedMD LLC
+ *  Written by Michael Hinton <hinton@schedmd.com>
  *
  *  This file is part of Slurm, a resource management program.
  *  For details, see <https://slurm.schedmd.com/>.
@@ -329,4 +330,9 @@ extern void gpu_common_parse_gpu_freq(char *gpu_freq,
 		*mem_freq_num = def_mem_freq_code;
 	else if (def_mem_freq_value)
 		*mem_freq_num = def_mem_freq_value;
+}
+
+extern int gpu_common_sort_freq_descending(const void *a, const void *b)
+{
+	return (*(unsigned long*)b - *(unsigned long*)a);
 }

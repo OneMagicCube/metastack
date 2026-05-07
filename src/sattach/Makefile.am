@@ -12,13 +12,13 @@ sattach_SOURCES = \
 	sattach.c \
 	sattach.wrapper.c
 
-convenience_libs = $(LIB_SLURM)
+convenience_libs = $(LIB_SLURM) $(DL_LIBS)
 sattach_DEPENDENCIES = $(LIB_SLURM_BUILD)
 
 sattach_LDADD = \
 	$(convenience_libs)
 
-sattach_LDFLAGS = $(CMD_LDFLAGS)
+sattach_LDFLAGS = -export-dynamic $(CMD_LDFLAGS)
 
 force:
 $(convenience_libs) : force

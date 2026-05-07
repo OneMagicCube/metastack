@@ -2,7 +2,9 @@
  *  acct_gather_energy_pm_counters.c -
  *  slurm energy accounting plugin for HPE Cray pm_counters interface
  *****************************************************************************
- *  Copyright (C) SchedMD LLC.
+ *  Copyright (C) 2015 SchedMD LLC
+ *  Written by Danny Auble <da@schedmd.com> who borrowed from the rapl
+ *  plugin of the same type
  *
  *  This file is part of Slurm, a resource management program.
  *  For details, see <https://slurm.schedmd.com/>.
@@ -42,7 +44,7 @@
 
 
 #include "src/common/slurm_xlator.h"
-#include "src/interfaces/acct_gather_energy.h"
+#include "src/common/slurm_acct_gather_energy.h"
 
 
 /*
@@ -75,7 +77,7 @@ const char plugin_type[] = "acct_gather_energy/pm_counters";
 const uint32_t plugin_version = SLURM_VERSION_NUMBER;
 
 static acct_gather_energy_t *local_energy = NULL;
-static stepd_step_rec_t *step = NULL;
+static stepd_step_rec_t *job = NULL;
 
 enum {
 	GET_ENERGY,
@@ -242,18 +244,11 @@ extern int init(void)
 
 extern int fini(void)
 {
-	/*
-	 * We don't really want to destroy the the state, so those values
-	 * persist a reconfig. And if the process dies, this will be lost
-	 * anyway. So not freeing this variable is not really a leak.
-	 *
-	 * if (!running_in_slurmd_stepd())
-	 * 	return SLURM_SUCCESS;
-	 *
-	 * acct_gather_energy_destroy(local_energy);
-	 * local_energy = NULL;
-	 */
+	if (!running_in_slurmd_stepd())
+		return SLURM_SUCCESS;
 
+	acct_gather_energy_destroy(local_energy);
+	local_energy = NULL;
 	return SLURM_SUCCESS;
 }
 
@@ -316,7 +311,7 @@ extern int acct_gather_energy_p_set_data(enum acct_energy_type data_type,
 		break;
 	case ENERGY_DATA_STEP_PTR:
 		/* set global job if needed later */
-		step = (stepd_step_rec_t *)data;
+		job = (stepd_step_rec_t *)data;
 		break;
 	default:
 		error("acct_gather_energy_p_set_data: unknown enum %d",

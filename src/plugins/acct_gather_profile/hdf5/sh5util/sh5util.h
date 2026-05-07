@@ -3,7 +3,9 @@
  *            - Utility to merge node-step files into a job file
  *            - or extract data from an job file
  *****************************************************************************
- *  Copyright (C) SchedMD LLC.
+ *  Copyright (C) 2015 SchedMD LLC
+ *
+ *  Written by Danny Auble <da@schedmd.com> @ SchedMD.
  *
  *  This file is part of Slurm, a resource management program.
  *  For details, see <https://slurm.schedmd.com>.

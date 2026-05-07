@@ -116,6 +116,7 @@ static int _str_to_memset(nodemask_t *mask, const char* str, int local_id)
 			nodemask_set(mask, base+2);
 		if (val & 8)
 			nodemask_set(mask, base+3);
+		len--;
 		ptr--;
 		base += 4;
 	}
@@ -123,36 +124,36 @@ static int _str_to_memset(nodemask_t *mask, const char* str, int local_id)
 	return 0;
 }
 
-void slurm_chk_memset(nodemask_t *mask, stepd_step_rec_t *step)
+void slurm_chk_memset(nodemask_t *mask, stepd_step_rec_t *job)
 {
 	char *action, *bind_type, *mode;
 	char mstr[1 + NUMA_NUM_NODES / 4];
-	int task_gid = step->envtp->procid;
-	int task_lid = step->envtp->localid;
-	pid_t mypid = step->envtp->task_pid;
+	int task_gid = job->envtp->procid;
+	int task_lid = job->envtp->localid;
+	pid_t mypid = job->envtp->task_pid;
 
-	if (!(step->mem_bind_type & MEM_BIND_VERBOSE))
+	if (!(job->mem_bind_type & MEM_BIND_VERBOSE))
 		return;
 
-	if (step->mem_bind_type & MEM_BIND_NONE) {
+	if (job->mem_bind_type & MEM_BIND_NONE) {
 		mode = "=";
 		action = "";
 		bind_type = "NONE";
 	} else {
 		action = " set";
-		if (step->mem_bind_type & MEM_BIND_PREFER)
+		if (job->mem_bind_type & MEM_BIND_PREFER)
 			mode = " PREFER ";
 		else
 			mode = "=";
-		if (step->mem_bind_type & MEM_BIND_RANK) {
+		if (job->mem_bind_type & MEM_BIND_RANK) {
 			bind_type = "RANK";
-		} else if (step->mem_bind_type & MEM_BIND_LOCAL) {
+		} else if (job->mem_bind_type & MEM_BIND_LOCAL) {
 			bind_type = "LOC";
-		} else if (step->mem_bind_type & MEM_BIND_MAP) {
+		} else if (job->mem_bind_type & MEM_BIND_MAP) {
 			bind_type = "MAP";
-		} else if (step->mem_bind_type & MEM_BIND_MASK) {
+		} else if (job->mem_bind_type & MEM_BIND_MASK) {
 			bind_type = "MASK";
-		} else if (step->mem_bind_type & (~MEM_BIND_VERBOSE)) {
+		} else if (job->mem_bind_type & (~MEM_BIND_VERBOSE)) {
 			bind_type = "UNK";
 		} else {
 			action = "";
@@ -171,25 +172,25 @@ void slurm_chk_memset(nodemask_t *mask, stepd_step_rec_t *step)
 			action);
 }
 
-int get_memset(nodemask_t *mask, stepd_step_rec_t *step)
+int get_memset(nodemask_t *mask, stepd_step_rec_t *job)
 {
 	int nummasks, i, threads;
 	char *curstr, *selstr;
 	char mstr[1 + NUMA_NUM_NODES / 4];
-	int local_id = step->envtp->localid;
+	int local_id = job->envtp->localid;
 
-	debug3("get_memset (%d) %s", step->mem_bind_type, step->mem_bind);
-	if (step->mem_bind_type & MEM_BIND_LOCAL) {
+	debug3("get_memset (%d) %s", job->mem_bind_type, job->mem_bind);
+	if (job->mem_bind_type & MEM_BIND_LOCAL) {
 		*mask = numa_get_run_node_mask();
 		return true;
 	}
 
 	nodemask_zero(mask);
 
-	if (step->mem_bind_type & MEM_BIND_RANK) {
+	if (job->mem_bind_type & MEM_BIND_RANK) {
 		int node;
 		threads = MAX(conf->threads, 1);
-		node = local_id % (step->cpus * threads);
+		node = local_id % (job->cpus * threads);
 		if (node > numa_max_node()) {
 			error("NUMA node %d does not exist; cannot bind local task %d to it (--mem-bind=rank)",
 			      node, local_id);
@@ -200,7 +201,7 @@ int get_memset(nodemask_t *mask, stepd_step_rec_t *step)
 		return true;
 	}
 
-	if (!step->mem_bind) {
+	if (!job->mem_bind) {
 		error("--mem-bind value is empty for local task %d", local_id);
 		return false;
 	}
@@ -209,7 +210,7 @@ int get_memset(nodemask_t *mask, stepd_step_rec_t *step)
 	selstr = NULL;
 
 	/* get number of strings present in mem_bind */
-	curstr = step->mem_bind;
+	curstr = job->mem_bind;
 	while (*curstr) {
 		if (nummasks == local_id+1) {
 			selstr = curstr;
@@ -224,7 +225,7 @@ int get_memset(nodemask_t *mask, stepd_step_rec_t *step)
 	if (!selstr) {
 		/* ...select mask string by wrapping task ID into list */
 		i = local_id % nummasks;
-		curstr = step->mem_bind;
+		curstr = job->mem_bind;
 		while (*curstr && i) {
 			if (*curstr == ',')
 			    	i--;
@@ -232,7 +233,7 @@ int get_memset(nodemask_t *mask, stepd_step_rec_t *step)
 		}
 		if (!*curstr) {
 			error("--mem-bind value '%s' is malformed for local task %d",
-			      step->mem_bind, local_id);
+			      job->mem_bind, local_id);
 			return false;
 		}
 		selstr = curstr;
@@ -245,7 +246,7 @@ int get_memset(nodemask_t *mask, stepd_step_rec_t *step)
 		*curstr++ = *selstr++;
 	*curstr = '\0';
 
-	if (step->mem_bind_type & MEM_BIND_MASK) {
+	if (job->mem_bind_type & MEM_BIND_MASK) {
 		/* convert mask string into nodemask_t mask */
 		if (_str_to_memset(mask, mstr, local_id) < 0) {
 			return false;
@@ -262,7 +263,7 @@ int get_memset(nodemask_t *mask, stepd_step_rec_t *step)
 		return true;
 	}
 
-	if (step->mem_bind_type & MEM_BIND_MAP) {
+	if (job->mem_bind_type & MEM_BIND_MAP) {
 		long int my_node = 0;
 		char *end_ptr = NULL;
 		slurm_seterrno(0);

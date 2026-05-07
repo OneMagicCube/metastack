@@ -5,7 +5,8 @@
  *  NOTE: Enforce by configuring
  *  SchedulerParameters=jobs_per_user_per_hour=#
  *****************************************************************************
- *  Copyright (C) SchedMD LLC.
+ *  Copyright (C) 2014 SchedMD LLC.
+ *  Written by Morris Jette <jette@schedmd.com>
  *
  *  This file is part of Slurm, a resource management program.
  *  For details, see <https://slurm.schedmd.com/>.
@@ -90,8 +91,6 @@ static time_t last_reset = (time_t) 0;
 static thru_put_t *thru_put_array = NULL;
 static int thru_put_size = 0;
 
-static pthread_mutex_t throttle_mutex = PTHREAD_MUTEX_INITIALIZER;
-
 static void _get_config(void)
 {
 	char *opt;
@@ -108,7 +107,6 @@ static void _reset_counters(void)
 {
 	time_t now = time(NULL);
 	uint32_t orig_count;
-	int count;
 	int delta_t, i;
 
 	if (!last_reset) {
@@ -122,11 +120,17 @@ static void _reset_counters(void)
 	last_reset += (delta_t * 360);
 	for (i = 0; i < thru_put_size; i++) {
 		orig_count = thru_put_array[i].job_count;
-		count = orig_count - ((jobs_per_user_per_hour * delta_t) / 10);
-		if (count > 0)
-			thru_put_array[i].job_count = count;
-		else
+		if (thru_put_array[i].job_count <= 10) {
+			if (thru_put_array[i].job_count > delta_t)
+				thru_put_array[i].job_count -= delta_t;
+			else
+				thru_put_array[i].job_count = 0;
+		} else if (delta_t >= 10) {
 			thru_put_array[i].job_count = 0;
+		} else {
+			thru_put_array[i].job_count *= (delta_t - 1);
+			thru_put_array[i].job_count /=  delta_t;
+		}
 		debug2("count for user %u reset from %u to %u",
 		       thru_put_array[i].uid, orig_count,
 		       thru_put_array[i].job_count);
@@ -140,9 +144,7 @@ extern int init(void)
 
 extern int fini(void)
 {
-	slurm_mutex_lock(&throttle_mutex);
 	xfree(thru_put_array);
-	slurm_mutex_unlock(&throttle_mutex);
 	return SLURM_SUCCESS;
 }
 
@@ -155,8 +157,6 @@ extern int job_submit(job_desc_msg_t *job_desc, uint32_t submit_uid,
 		_get_config();
 	if (jobs_per_user_per_hour == 0)
 		return SLURM_SUCCESS;
-
-	slurm_mutex_lock(&throttle_mutex);
 	_reset_counters();
 
 	for (i = 0; i < thru_put_size; i++) {
@@ -164,12 +164,10 @@ extern int job_submit(job_desc_msg_t *job_desc, uint32_t submit_uid,
 			continue;
 		if (thru_put_array[i].job_count < jobs_per_user_per_hour) {
 			thru_put_array[i].job_count++;
-			slurm_mutex_unlock(&throttle_mutex);
 			return SLURM_SUCCESS;
 		}
 		if (err_msg)
 			*err_msg = xstrdup("Reached jobs per hour limit");
-		slurm_mutex_unlock(&throttle_mutex);
 		return ESLURM_ACCOUNTING_POLICY;
 	}
 	thru_put_size++;
@@ -177,12 +175,11 @@ extern int job_submit(job_desc_msg_t *job_desc, uint32_t submit_uid,
 				  (sizeof(thru_put_t) * thru_put_size));
 	thru_put_array[thru_put_size - 1].uid = job_desc->user_id;
 	thru_put_array[thru_put_size - 1].job_count = 1;
-	slurm_mutex_unlock(&throttle_mutex);
 	return SLURM_SUCCESS;
 }
 
 extern int job_modify(job_desc_msg_t *job_desc, job_record_t *job_ptr,
-		      uint32_t submit_uid, char **err_msg)
+		      uint32_t submit_uid)
 {
 	return SLURM_SUCCESS;
 }

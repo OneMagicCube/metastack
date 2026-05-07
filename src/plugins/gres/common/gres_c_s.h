@@ -1,7 +1,8 @@
 /*****************************************************************************\
  *  gres_c_s.h - common functions for shared gres plugins
  *****************************************************************************
- *  Copyright (C) SchedMD LLC.
+ *  Copyright (C) 2021 SchedMD LLC
+ *  Written by Danny Auble <da@schedmd.com>
  *
  *  This file is part of Slurm, a resource management program.
  *  For details, see <https://slurm.schedmd.com/>.
@@ -55,7 +56,8 @@ extern void gres_c_s_fini(void);
 extern int gres_c_s_init_share_devices(List gres_conf_list,
 				       List *share_devices,
 				       node_config_load_t *config,
-				       char *sharing_name);
+				       char *sharing_name,
+				       char *shared_name);
 
 /*
  * Send shared_info over to the stepd from the slurmd.

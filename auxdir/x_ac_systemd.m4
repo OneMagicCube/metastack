@@ -40,15 +40,13 @@ AC_DEFUN([X_AC_SYSTEMD],
 				    [Directory for systemd service files])],,
 		    [with_systemdsystemunitdir=no])
 
-	unitdir="$with_systemdsystemunitdir"
-
 	AS_IF([test "x$with_systemdsystemunitdir" = "xyes"],
-	      [unitdir=$($PKG_CONFIG --variable=systemdsystemunitdir systemd)
-	       AS_IF([test "x$unitdir" = "x"],
-		     [AC_MSG_ERROR([systemd support requested but pkg-config unable to query systemd package])])])
+	      [def_systemdsystemunitdir=$($PKG_CONFIG --variable=systemdsystemunitdir systemd)
+	      AS_IF([test "x$def_systemdsystemunitdir" = "x"],
+		    [AC_MSG_ERROR([systemd support requested but pkg-config unable to query systemd package])])])
 
 	AS_IF([test "x$with_systemdsystemunitdir" != "xno"],
-	      [AC_SUBST([systemdsystemunitdir], [$unitdir])])
+	      [AC_SUBST([systemdsystemunitdir], [$with_systemdsystemunitdir])])
 
 	AM_CONDITIONAL([WITH_SYSTEMD_UNITS],
 		       [test "x$with_systemdsystemunitdir" != "xno"])

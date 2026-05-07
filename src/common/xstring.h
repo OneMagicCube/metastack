@@ -49,7 +49,6 @@
 #define xstrftimecat(__p, __fmt)	_xstrftimecat(&(__p), __fmt)
 #define xiso8601timecat(__p, __msec)            _xiso8601timecat(&(__p), __msec)
 #define xrfc5424timecat(__p, __msec)            _xrfc5424timecat(&(__p), __msec)
-#define xrfc3339timecat(__p) _xrfc3339timecat(&(__p))
 #define xstrfmtcat(__p, __fmt, args...)	_xstrfmtcat(&(__p), __fmt, ## args)
 #define xstrfmtcatat(__p, __q, __fmt, args...) \
 	_xstrfmtcatat(&(__p), __q, __fmt, ## args)
@@ -112,11 +111,6 @@ void _xiso8601timecat(char **str, bool);
 void _xrfc5424timecat(char **str, bool);
 
 /*
- * Concatenate a RFC 3339 timestamp onto str.
- */
-void _xrfc3339timecat(char **str);
-
-/*
  * Concatenate printf-style formatted string onto str
  */
 void _xstrfmtcat(char **str, const char *fmt, ...)
@@ -144,8 +138,6 @@ char *xstrdup(const char *str);
 */
 char *xstrdup_printf(const char *fmt, ...)
   __attribute__ ((format (printf, 1, 2)));
-
-size_t _xstrdup_vprintf(char **str, const char *_fmt, va_list _ap);
 
 /*
 ** strndup which uses xmalloc routines
@@ -192,11 +184,10 @@ char *xshort_hostname(void);
 bool xstring_is_whitespace(const char *str);
 
 /*
- * If str make everything lowercase.
- * Should not be called on static char *'s.
- * Returns true if any changes have been made.
+ * If str make everything lowercase.  Should not be called on static char *'s
+ * Returns the lowered string which is the same pointer that is sent in.
  */
-extern bool xstrtolower(char *str);
+char *xstrtolower(char *str);
 
 /*
  * safe strchr (handles NULL values)
@@ -261,10 +252,5 @@ extern char *xstring_bytes2hex(const unsigned char *string, int len,
  */
 extern char *xstring_bytes2printable(const unsigned char *string, int len,
 				     const char replace);
-
-/*
- * Return an xmalloc'd string in base64 format given a base64url string.
- */
-extern char *xbase64_from_base64url(const char *in);
 
 #endif /* !_XSTRING_H */

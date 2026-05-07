@@ -1,6 +1,6 @@
 [Unit]
 Description=Slurm REST daemon
-After=network-online.target remote-fs.target slurmctld.service
+After=network-online.target slurmctld.service
 Wants=network-online.target
 ConditionPathExists=@sysconfdir@/slurm.conf
 
@@ -14,11 +14,10 @@ EnvironmentFile=-/etc/default/slurmrestd
 # an unpriviledged user to run as.
 # User=
 # Group=
-ExecStart=@sbindir@/slurmrestd $SLURMRESTD_OPTIONS
+# Default to listen on both socket and slurmrestd port
+ExecStart=@sbindir@/slurmrestd $SLURMRESTD_OPTIONS unix:@sharedstatedir@/slurmrestd.socket 0.0.0.0:@SLURMRESTD_PORT@
 # Enable auth/jwt be default, comment out the line to disable it for slurmrestd
-Environment=SLURM_JWT=daemon
-# Listen on TCP socket by default.
-Environment=SLURMRESTD_LISTEN=:@SLURMRESTD_PORT@
+Environment="SLURM_JWT=daemon"
 ExecReload=/bin/kill -HUP $MAINPID
 
 [Install]

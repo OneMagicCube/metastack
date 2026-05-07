@@ -36,6 +36,7 @@
 #include <stdarg.h>		/* va_start   */
 #include <stdio.h>
 #include <stdlib.h>		/* getenv     */
+#include <sys/param.h>		/* MAXPATHLEN */
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/utsname.h>
@@ -46,7 +47,7 @@
 #include "src/common/parse_time.h"
 #include "src/common/proc_args.h"
 #include "src/common/read_config.h" /* contains getnodename() */
-#include "src/interfaces/mpi.h"
+#include "src/common/slurm_mpi.h"
 #include "src/common/slurm_protocol_api.h"
 #include "src/common/slurm_rlimits_info.h"
 #include "src/common/uid.h"
@@ -62,7 +63,6 @@
 #define LONG_OPT_OUT_FILTER    0x103
 #define LONG_OPT_ERR_FILTER    0x104
 #define LONG_OPT_PTY           0x105
-#define OPT_LONG_AUTOCOMP      0x106
 
 /*---- global variables, defined in opt.h ----*/
 opt_t opt;
@@ -159,8 +159,8 @@ static void _opt_default()
 	opt.quiet = 0;
 	opt.verbose = 0;
 
-	opt.euid = SLURM_AUTH_NOBODY;
-	opt.egid = SLURM_AUTH_NOBODY;
+	opt.euid = (uid_t) -1;
+	opt.egid = (gid_t) -1;
 
 	opt.labelio = false;
 	opt.ctrl_comm_ifhn  = xshort_hostname();
@@ -237,7 +237,6 @@ void set_options(const int argc, char **argv)
 {
 	int opt_char, option_index = 0;
 	static struct option long_options[] = {
-		{"autocomplete", required_argument, 0, OPT_LONG_AUTOCOMP},
 		{"help", 	no_argument,       0, 'h'},
 		{"label",       no_argument,       0, 'l'},
 		{"quiet",       no_argument,       0, 'Q'},
@@ -319,10 +318,6 @@ void set_options(const int argc, char **argv)
 			      "type");
 #endif
 			break;
-		case OPT_LONG_AUTOCOMP:
-			suggest_completion(long_options, optarg);
-			exit(0);
-			break;
 		default:
 			error("Unrecognized command line parameter %c",
 			      opt_char);
@@ -377,12 +372,6 @@ static bool _opt_verify(void)
 		verified = false;
 	}
 
-	if ((opt.selected_step->step_id.step_id == SLURM_EXTERN_CONT) ||
-	    (opt.selected_step->step_id.step_id == SLURM_BATCH_SCRIPT)) {
-		error("Cannot be used with extern or batch steps");
-		verified = false;
-	}
-
 	/*
 	 * set up standard IO filters
 	 */
@@ -414,8 +403,8 @@ static void _opt_list()
 	info("job ID         : %u", opt.selected_step->step_id.job_id);
 	info("step ID        : %u", opt.selected_step->step_id.step_id);
 	info("user           : `%s'", opt.user);
-	info("uid            : %u", opt.uid);
-	info("gid            : %u", opt.gid);
+	info("uid            : %ld", (long) opt.uid);
+	info("gid            : %ld", (long) opt.gid);
 	info("verbose        : %d", opt.verbose);
 }
 

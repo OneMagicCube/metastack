@@ -3,7 +3,7 @@
  *****************************************************************************
  *  Copyright (C) 2002-2007 The Regents of the University of California.
  *  Copyright (C) 2008-2010 Lawrence Livermore National Security.
- *  Copyright (C) SchedMD LLC.
+ *  Portions Copyright (C) 2010-2016 SchedMD <https://www.schedmd.com>.
  *  Produced at Lawrence Livermore National Laboratory (cf, DISCLAIMER).
  *  Written by Morris Jette <jette1@llnl.gov> et. al.
  *  CODE-OCEC-09-009. All rights reserved.
@@ -49,10 +49,9 @@
 #include "src/common/read_config.h"
 #include "src/common/slurm_protocol_api.h"
 #include "src/common/slurm_resource_info.h"
+#include "src/common/slurm_selecttype_info.h"
 #include "src/common/xmalloc.h"
 #include "src/common/xstring.h"
-
-#include "src/interfaces/select.h"
 
 /* Data structures for pthreads used to gather partition information from
  * multiple clusters in parallel */
@@ -81,7 +80,7 @@ void slurm_print_partition_info_msg ( FILE* out,
 {
 	int i ;
 	partition_info_t * part_ptr = part_info_ptr->partition_array ;
-	char time_str[256];
+	char time_str[32];
 
 	slurm_make_time_str ((time_t *)&part_info_ptr->last_update, time_str,
 		sizeof(time_str));
@@ -89,7 +88,7 @@ void slurm_print_partition_info_msg ( FILE* out,
 		time_str, part_info_ptr->record_count);
 
 	for (i = 0; i < part_info_ptr->record_count; i++) {
-		slurm_print_partition_info ( out, & part_ptr[i], one_liner ) ;
+		slurm_print_partition_info ( out, & part_ptr[i], one_liner ) ;	
 	}
 
 }
@@ -100,24 +99,16 @@ void slurm_print_partition_info_msg ( FILE* out,
  *	partition based upon message as loaded using slurm_load_partitions
  * IN part_ptr - an individual partition information record pointer
  * IN one_liner - print as a single line if true
+ * IN meta_flags - print additional information related if true
  * RET out - char * containing formatted output (must be freed after call)
  *           NULL is returned on failure.
  */
 char *_slurm_sprint_partition_info ( partition_info_t * part_ptr,
-				    int one_liner, uint16_t meta_flags)
+				    int one_liner, uint16_t meta_flags )
 {
-	char *out = NULL;
-	char *allow_deny = NULL, *value = NULL;
-	uint16_t force = 0, preempt_mode = 0, val = 0;
+	char *out = NULL, *allow_deny = NULL, *value = NULL;
+	uint16_t force, preempt_mode, val;
 	char *line_end = (one_liner) ? " " : "\n   ";
-	bool power_save_on = false;
-
-	/*
-	 * This is a good enough to determine if power_save is enabled.
-	 * power_save_test() is better but makes more dependencies.
-	 */
-	if (slurm_conf.suspend_program && slurm_conf.resume_program)
-		power_save_on = true;
 
 	/****** Line 1 ******/
 
@@ -211,11 +202,6 @@ char *_slurm_sprint_partition_info ( partition_info_t * part_ptr,
 	else
 		xstrcat(out, " ExclusiveUser=NO");
 
-	if (part_ptr->flags & PART_FLAG_EXCLUSIVE_TOPO)
-		xstrcat(out, " ExclusiveTopo=YES");
-	else
-		xstrcat(out, " ExclusiveTopo=NO");
-
 	xstrfmtcat(out, " GraceTime=%u", part_ptr->grace_time);
 
 	if (part_ptr->flags & PART_FLAG_HIDDEN)
@@ -248,8 +234,15 @@ char *_slurm_sprint_partition_info ( partition_info_t * part_ptr,
 	else
 		xstrcat(out, " LLN=NO");
 
+	if (part_ptr->max_cpus_per_node == INFINITE)
+		xstrcat(out, " MaxCPUsPerNode=UNLIMITED");
+	else {
+		xstrfmtcat(out, " MaxCPUsPerNode=%u",
+			   part_ptr->max_cpus_per_node);
+	}
+
 #ifdef __METASTACK_NEW_PART_LLS
-	if (part_ptr->meta_flags & PART_METAFLAG_LLS)
+	if (part_ptr->flags & PART_FLAG_LLS)
 		xstrcat(out, " LLS=YES");
 	else
 		xstrcat(out, " LLS=NO");
@@ -262,27 +255,12 @@ char *_slurm_sprint_partition_info ( partition_info_t * part_ptr,
 		xstrcat(out, " HetPart=NO");
 #endif
 
-	if (part_ptr->max_cpus_per_node == INFINITE)
-		xstrcat(out, " MaxCPUsPerNode=UNLIMITED");
-	else {
-		xstrfmtcat(out, " MaxCPUsPerNode=%u",
-			   part_ptr->max_cpus_per_node);
-	}
-
-	if (part_ptr->max_cpus_per_socket == INFINITE) {
-		xstrcat(out, " MaxCPUsPerSocket=UNLIMITED");
-	} else {
-		xstrfmtcat(out, " MaxCPUsPerSocket=%u",
-			   part_ptr->max_cpus_per_socket);
-	}
-
 #ifdef __METASTACK_NEW_PART_RBN
 	if (part_ptr->meta_flags & PART_METAFLAG_RBN)
 		xstrcat(out, " RBN=YES");
 	else
 		xstrcat(out, " RBN=NO");
 #endif
-
 	xstrcat(out, line_end);
 
 	/****** Line ******/
@@ -308,7 +286,6 @@ char *_slurm_sprint_partition_info ( partition_info_t * part_ptr,
 		xstrcat(out, line_end);	
 	}	
 #endif
-
 	/****** Line 7 ******/
 
 	xstrfmtcat(out, "PriorityJobFactor=%u", part_ptr->priority_job_factor);
@@ -431,7 +408,6 @@ char *_slurm_sprint_partition_info ( partition_info_t * part_ptr,
 	xstrfmtcat(out, "JobDefaults=%s", value);
 	xfree(value);
 	xstrcat(out, line_end);
-
 #ifdef __METASTACK_NEW_SUSPEND_KEEP_IDLE
 	if (part_ptr->suspend_idle != NO_VAL)
 		xstrfmtcat(out, "SuspendKeepIdle=%u", part_ptr->suspend_idle);
@@ -439,7 +415,6 @@ char *_slurm_sprint_partition_info ( partition_info_t * part_ptr,
 		xstrcat(out, "SuspendKeepIdle=n/a");
 	xstrcat(out, line_end);
 #endif
-
 	/****** Line ******/
 	if (part_ptr->def_mem_per_cpu & MEM_PER_CPU) {
 		if (part_ptr->def_mem_per_cpu == MEM_PER_CPU) {
@@ -482,7 +457,9 @@ char *_slurm_sprint_partition_info ( partition_info_t * part_ptr,
 	}
 
 	/****** Line ******/
-	if (power_save_on) {
+	if ((part_ptr->resume_timeout != NO_VAL16) ||
+	    (part_ptr->suspend_timeout != NO_VAL16) ||
+	    (part_ptr->suspend_time != NO_VAL)) {
 		xstrcat(out, line_end);
 
 		if (part_ptr->resume_timeout == NO_VAL16)
@@ -508,11 +485,6 @@ char *_slurm_sprint_partition_info ( partition_info_t * part_ptr,
 		else
 			xstrfmtcat(out, " SuspendTime=%d",
 				part_ptr->suspend_time);
-		
-		if (part_ptr->flags & PART_FLAG_PDOI)
-			xstrcat(out, " PowerDownOnIdle=YES");
-		else
-			xstrcat(out, " PowerDownOnIdle=NO");
 	}
 
 	if (one_liner)
@@ -538,8 +510,7 @@ void _slurm_print_partition_info ( FILE* out, partition_info_t * part_ptr,
 	fprintf ( out, "%s", print_this);
 	xfree(print_this);
 }
-
-#endif /* __METASTACK_NEW_AUTO_SUPPLEMENT_AVAIL_NODES || __METASTACK_PART_PRIORITY_WEIGHT */
+#endif
 
 /*
  * slurm_print_partition_info - output information about a specific Slurm
@@ -556,7 +527,6 @@ void slurm_print_partition_info ( FILE* out, partition_info_t * part_ptr,
 	xfree(print_this);
 }
 
-
 /*
  * slurm_sprint_partition_info - output information about a specific Slurm
  *	partition based upon message as loaded using slurm_load_partitions
@@ -566,20 +536,12 @@ void slurm_print_partition_info ( FILE* out, partition_info_t * part_ptr,
  *           NULL is returned on failure.
  */
 char *slurm_sprint_partition_info ( partition_info_t * part_ptr,
-				    int one_liner )
+				    int one_liner )				
 {
 	char *out = NULL;
 	char *allow_deny, *value;
 	uint16_t force, preempt_mode, val;
 	char *line_end = (one_liner) ? " " : "\n   ";
-	bool power_save_on = false;
-
-	/*
-	 * This is a good enough to determine if power_save is enabled.
-	 * power_save_test() is better but makes more dependencies.
-	 */
-	if (slurm_conf.suspend_program && slurm_conf.resume_program)
-		power_save_on = true;
 
 	/****** Line 1 ******/
 
@@ -673,11 +635,6 @@ char *slurm_sprint_partition_info ( partition_info_t * part_ptr,
 	else
 		xstrcat(out, " ExclusiveUser=NO");
 
-	if (part_ptr->flags & PART_FLAG_EXCLUSIVE_TOPO)
-		xstrcat(out, " ExclusiveTopo=YES");
-	else
-		xstrcat(out, " ExclusiveTopo=NO");
-
 	xstrfmtcat(out, " GraceTime=%u", part_ptr->grace_time);
 
 	if (part_ptr->flags & PART_FLAG_HIDDEN)
@@ -710,13 +667,6 @@ char *slurm_sprint_partition_info ( partition_info_t * part_ptr,
 	else
 		xstrcat(out, " LLN=NO");
 
-#ifdef __METASTACK_NEW_PART_LLS
-	if (part_ptr->meta_flags & PART_METAFLAG_LLS)
-		xstrcat(out, " LLS=YES");
-	else
-		xstrcat(out, " LLS=NO");
-#endif
-
 	if (part_ptr->max_cpus_per_node == INFINITE)
 		xstrcat(out, " MaxCPUsPerNode=UNLIMITED");
 	else {
@@ -724,12 +674,13 @@ char *slurm_sprint_partition_info ( partition_info_t * part_ptr,
 			   part_ptr->max_cpus_per_node);
 	}
 
-	if (part_ptr->max_cpus_per_socket == INFINITE) {
-		xstrcat(out, " MaxCPUsPerSocket=UNLIMITED");
-	} else {
-		xstrfmtcat(out, " MaxCPUsPerSocket=%u",
-			   part_ptr->max_cpus_per_socket);
-	}
+#ifdef __METASTACK_NEW_PART_LLS
+	if (part_ptr->flags & PART_FLAG_LLS)
+		xstrcat(out, " LLS=YES");
+	else
+		xstrcat(out, " LLS=NO");
+#endif
+
 #ifdef __METASTACK_NEW_HETPART_SUPPORT
 	if (part_ptr->meta_flags & PART_METAFLAG_HETPART)
 		xstrcat(out, " HetPart=YES");
@@ -874,7 +825,9 @@ char *slurm_sprint_partition_info ( partition_info_t * part_ptr,
 	}
 
 	/****** Line ******/
-	if (power_save_on) {
+	if ((part_ptr->resume_timeout != NO_VAL16) ||
+	    (part_ptr->suspend_timeout != NO_VAL16) ||
+	    (part_ptr->suspend_time != NO_VAL)) {
 		xstrcat(out, line_end);
 
 		if (part_ptr->resume_timeout == NO_VAL16)
@@ -900,11 +853,6 @@ char *slurm_sprint_partition_info ( partition_info_t * part_ptr,
 		else
 			xstrfmtcat(out, " SuspendTime=%d",
 				part_ptr->suspend_time);
-		
-		if (part_ptr->flags & PART_FLAG_PDOI)
-			xstrcat(out, " PowerDownOnIdle=YES");
-		else
-			xstrcat(out, " PowerDownOnIdle=NO");
 	}
 
 	if (one_liner)
@@ -986,7 +934,7 @@ static void *_load_part_thread(void *args)
 	}
 	xfree(args);
 
-	return NULL;
+	return (void *) NULL;
 }
 
 static int _load_fed_parts(slurm_msg_t *req_msg,
@@ -999,7 +947,7 @@ static int _load_fed_parts(slurm_msg_t *req_msg,
 	partition_info_msg_t *orig_msg = NULL, *new_msg = NULL;
 	uint32_t new_rec_cnt;
 	slurmdb_cluster_rec_t *cluster;
-	list_itr_t *iter;
+	ListIterator iter;
 	int pthread_count = 0;
 	pthread_t *load_thread = 0;
 	load_part_req_struct_t *load_args;
@@ -1032,7 +980,7 @@ static int _load_fed_parts(slurm_msg_t *req_msg,
 
 	/* Wait for all pthreads to complete */
 	for (i = 0; i < pthread_count; i++)
-		slurm_thread_join(load_thread[i]);
+		pthread_join(load_thread[i], NULL);
 	xfree(load_thread);
 
 	/* Maintain a consistent cluster/node ordering */

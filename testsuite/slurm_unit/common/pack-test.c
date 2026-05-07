@@ -1,17 +1,23 @@
 #include <errno.h>
 #include <inttypes.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
-#include <src/common/log.h>
 #include <src/common/pack.h>
 #include <src/common/xmalloc.h>
 
-#include <check.h>
+#include <testsuite/dejagnu.h>
 
+/* Test for failure: 
+*/
+#define TEST(_tst, _msg) do {			\
+	if (_tst) 				\
+		fail( _msg );       \
+	else					\
+		pass( _msg );       \
+} while (0)
 
-START_TEST(test_pack)
+int main (int argc, char *argv[])
 {
 	buf_t *buffer;
 	uint16_t test16 = 1234, out16;
@@ -44,63 +50,40 @@ START_TEST(test_pack)
 	buffer = create_buf(data, data_size);
 
         unpack16(&out16, buffer);
-	info("out16 =%d", out16);
-	info("test16=%d", test16);
-	ck_assert_msg(out16 == test16, "un/pack16");
+	TEST(out16 != test16, "un/pack16");
 
         unpack32(&out32, buffer);
-	ck_assert_msg(out32 == test32, "un/pack32");
+	TEST(out32 != test32, "un/pack32");
 
   	unpack64(&test64, buffer);
 	test_double2 = (long double)test64;
-	ck_assert_msg((uint64_t)test_double2 == (uint64_t)test_double, "un/pack double as a uint64");
+	TEST((uint64_t)test_double2 != (uint64_t)test_double, "un/pack double as a uint64");
 	/* info("Original\t %Lf", test_double); */
 	/* info("uint64\t %ld", test64); */
 	/* info("converted LD\t %Lf", test_double2); */
 
 	unpackmem_ptr(&outbytes, &byte_cnt, buffer);
-	ck_assert_msg( ( strcmp(testbytes, outbytes) == 0 ) , "un/packstr_ptr");
+	TEST( ( strcmp(testbytes, outbytes) != 0 ) , "un/packstr_ptr");
 
 	unpackstr_xmalloc(&outstring, &byte_cnt, buffer);
-	ck_assert_msg(strcmp(teststring, outstring) == 0, "un/packstr_xmalloc");
+	TEST(strcmp(teststring, outstring) != 0, "un/packstr_xmalloc");
 	xfree(outstring);
 
 	unpackstr_xmalloc(&nullstr, &byte_cnt, buffer);
-	ck_assert_msg(nullstr == NULL, "un/packstr of null string.");
+	TEST(nullstr != NULL, "un/packstr of null string.");
 
 	unpackstr_xmalloc(&outstring, &byte_cnt, buffer);
-	ck_assert_msg(strcmp("literal", outstring) == 0,
+	TEST(strcmp("literal", outstring) != 0, 
 			"un/packstr of string literal");
 	xfree(outstring);
 
 	unpackstr_xmalloc(&outstring, &byte_cnt, buffer);
-	ck_assert_msg(strcmp("", outstring) == 0, "un/packstr of string \"\" ");
+	TEST(strcmp("", outstring) != 0, "un/packstr of string \"\" ");
 
 	xfree(outstring);
+
 	free_buf(buffer);
-}
-END_TEST
+	totals();
+	return failed;
 
-int main(void)
-{
-	int number_failed;
-
-	log_options_t log_opts = LOG_OPTS_INITIALIZER;
-	log_opts.stderr_level = LOG_LEVEL_DEBUG5;
-	log_init("pack-test", log_opts, 0, NULL);
-
-	Suite *s = suite_create("pack");
-	TCase *tc_core = tcase_create("pack");
-
-	tcase_add_test(tc_core, test_pack);
-
-	suite_add_tcase(s, tc_core);
-
-	SRunner *sr = srunner_create(s);
-
-	srunner_run_all(sr, CK_ENV);
-	number_failed = srunner_ntests_failed(sr);
-	srunner_free(sr);
-
-	return (number_failed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }

@@ -20,7 +20,6 @@ AC_DEFUN([X_AC_CGROUP],
     with_cgroup=yes
     ;;
   esac
-  AM_CONDITIONAL(LINUX_BUILD, test x$with_cgroup = xyes)
   AM_CONDITIONAL(WITH_CGROUP, test x$with_cgroup = xyes)
   if test x$with_cgroup = xyes; then
     AC_DEFINE(WITH_CGROUP, 1, [Building with Linux cgroup support])
@@ -38,7 +37,7 @@ AC_DEFUN([X_AC_BPF], [
            [_x_ac_bpf_dirs="$with_bpf"])])
 
   if [test "x$with_bpf" = xno]; then
-    AC_MSG_NOTICE([support for bpf disabled])
+    AC_MSG_WARN([support for bpf disabled])
   else
     AC_CACHE_CHECK(
       [for bpf installation],
@@ -61,7 +60,7 @@ AC_DEFUN([X_AC_BPF], [
         AC_MSG_ERROR([unable to locate bpf header])
       fi
     else
-      #Check for bpf defines existence added after original file creation
+      #Check for bpf defines existance added after original file creation
       #in linux kernel release 3.18
       AC_LINK_IFELSE(
 	[AC_LANG_PROGRAM([[#include <linux/bpf.h>]],
@@ -86,11 +85,11 @@ AC_DEFUN([X_AC_BPF], [
 
 AC_DEFUN([X_AC_DBUS],
 [
-       PKG_CHECK_MODULES([dbus], [dbus-1 >= 1.11.16],
+       PKG_CHECK_MODULES([dbus], [dbus-1],
                          [x_ac_have_dbus="yes"],
                          [x_ac_have_dbus="no"])
        AM_CONDITIONAL(WITH_DBUS, test "x$x_ac_have_dbus" = "xyes")
        if test "x$x_ac_have_dbus" = "xno"; then
-          AC_MSG_WARN([unable to locate dbus-1 development headers >= 1.11.16])
+          AC_MSG_WARN([unable to link against dbus-1 libraries required for cgroup/v2])
        fi
 ])

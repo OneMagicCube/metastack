@@ -2,7 +2,8 @@
  *  prep_script.c - PrEp script plugin, handles Prolog / Epilog /
  *		    PrologSlurmctld / EpilogSlurmctld scripts
  *****************************************************************************
- *  Copyright (C) SchedMD LLC.
+ *  Copyright (C) 2020 SchedMD LLC.
+ *  Written by Tim Wickberg <tim@schedmd.com>
  *
  *  This file is part of Slurm, a resource management program.
  *  For details, see <https://slurm.schedmd.com/>.
@@ -37,7 +38,7 @@
 #include <slurm/slurm.h>
 #include <slurm/slurm_errno.h>
 
-#include "src/interfaces/prep.h"
+#include "src/common/prep.h"
 
 #include "prep_script.h"
 
@@ -81,31 +82,25 @@ void (*epilog_slurmctld_callback)(int rc, uint32_t job_id,
 
 extern int init(void)
 {
-	int rc = SLURM_SUCCESS;
-
 	if (running_in_slurmctld()) {
-		for (int i = 0; i < slurm_conf.prolog_slurmctld_cnt; i++) {
-			if (access(slurm_conf.prolog_slurmctld[i], X_OK) < 0) {
+		if (slurm_conf.prolog_slurmctld) {
+			if (access(slurm_conf.prolog_slurmctld, X_OK) < 0)
 				error("Invalid PrologSlurmctld(`%s`): %m",
-				      slurm_conf.prolog_slurmctld[i]);
-				rc = SLURM_ERROR;
-			} else {
+				      slurm_conf.prolog_slurmctld);
+			else
 				have_prolog_slurmctld = true;
-			}
 		}
 
-		for (int i = 0; i < slurm_conf.epilog_slurmctld_cnt; i++) {
-			if (access(slurm_conf.epilog_slurmctld[i], X_OK) < 0) {
+		if (slurm_conf.epilog_slurmctld) {
+			if (access(slurm_conf.epilog_slurmctld, X_OK) < 0)
 				error("Invalid EpilogSlurmctld(`%s`): %m",
-				      slurm_conf.epilog_slurmctld[i]);
-				rc = SLURM_ERROR;
-			} else {
+				      slurm_conf.epilog_slurmctld);
+			else
 				have_epilog_slurmctld = true;
-			}
 		}
 	}
 
-	return rc;
+	return SLURM_SUCCESS;
 }
 
 extern void fini(void)

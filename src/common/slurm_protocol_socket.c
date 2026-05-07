@@ -53,22 +53,20 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
-#include <sys/uio.h>
 #include <unistd.h>
 
 #include "slurm/slurm_errno.h"
-#include "src/common/fd.h"
-#include "src/common/log.h"
-#include "src/common/net.h"
 #include "src/common/read_config.h"
 #include "src/common/slurm_protocol_api.h"
+#include "src/common/slurm_protocol_interface.h"
 #include "src/common/slurm_protocol_defs.h"
-#include "src/common/slurm_protocol_socket.h"
+#include "src/common/log.h"
+#include "src/common/fd.h"
 #include "src/common/strlcpy.h"
-#include "src/common/util-net.h"
-#include "src/common/xmalloc.h"
 #include "src/common/xsignal.h"
 #include "src/common/xstring.h"
+#include "src/common/xmalloc.h"
+#include "src/common/util-net.h"
 
 #define PORT_RETRIES    3
 #define MIN_USER_PORT   (IPPORT_RESERVED + 1)
@@ -127,12 +125,13 @@ static void _sock_bind_wild(int sockfd)
 }
 
 extern ssize_t slurm_msg_recvfrom_timeout(int fd, char **pbuf, size_t *lenp,
-					  int timeout)
+					  uint32_t flags, int tmout)
 {
 	ssize_t  len;
 	uint32_t msglen;
 
-	len = slurm_recv_timeout(fd, (char *) &msglen, sizeof(msglen), timeout);
+	len = slurm_recv_timeout( fd, (char *)&msglen,
+				  sizeof(msglen), 0, tmout );
 
 	if (len < ((ssize_t) sizeof(msglen)))
 		return SLURM_ERROR;
@@ -145,10 +144,9 @@ extern ssize_t slurm_msg_recvfrom_timeout(int fd, char **pbuf, size_t *lenp,
 	/*
 	 *  Allocate memory on heap for message
 	 */
-	if (!(*pbuf = try_xmalloc(msglen)))
-		slurm_seterrno_ret(ENOMEM);
+	*pbuf = xmalloc_nz(msglen);
 
-	if (slurm_recv_timeout(fd, *pbuf, msglen, timeout) != msglen) {
+	if (slurm_recv_timeout(fd, *pbuf, msglen, 0, tmout) != msglen) {
 		xfree(*pbuf);
 		*pbuf = NULL;
 		return SLURM_ERROR;
@@ -159,13 +157,50 @@ extern ssize_t slurm_msg_recvfrom_timeout(int fd, char **pbuf, size_t *lenp,
 	return (ssize_t) msglen;
 }
 
-static int _writev_timeout(int fd, struct iovec *iov, int iovcnt, int timeout)
+extern ssize_t slurm_msg_sendto(int fd, char *buffer, size_t size)
 {
-	int tot_bytes_sent = 0;
-	size_t size = 0;
+	return slurm_msg_sendto_timeout(fd, buffer, size,
+	                                (slurm_conf.msg_timeout * 1000));
+}
+
+ssize_t slurm_msg_sendto_timeout(int fd, char *buffer,
+				 size_t size, int timeout)
+{
+	int   len;
+	uint32_t usize;
+	SigFunc *ohandler;
+
+	/*
+	 *  Ignore SIGPIPE so that send can return a error code if the
+	 *    other side closes the socket
+	 */
+	ohandler = xsignal(SIGPIPE, SIG_IGN);
+
+	usize = htonl(size);
+
+	if ((len = slurm_send_timeout(
+				fd, (char *)&usize, sizeof(usize), 0,
+				timeout)) < 0)
+		goto done;
+
+	if ((len = slurm_send_timeout(fd, buffer, size, 0, timeout)) < 0)
+		goto done;
+
+
+     done:
+	xsignal(SIGPIPE, ohandler);
+	return len;
+}
+
+static int _send_timeout(int fd, char *buf, size_t size,
+			 uint32_t flags, int *timeout)
+{
+	int rc;
+	int sent = 0;
 	int fd_flags;
 	struct pollfd ufds;
 	struct timeval tstart;
+	int timeleft = *timeout;
 	char temp[2];
 
 	ufds.fd     = fd;
@@ -176,20 +211,13 @@ static int _writev_timeout(int fd, struct iovec *iov, int iovcnt, int timeout)
 
 	gettimeofday(&tstart, NULL);
 
-	for (int i = 0; i < iovcnt; i++)
-		size += iov[i].iov_len;
-
-	while (true) {
-		ssize_t bytes_sent = 0;
-		int rc;
-		int timeleft = timeout - _tot_wait(&tstart);
-
+	while (sent < size) {
+		timeleft = *timeout - _tot_wait(&tstart);
 		if (timeleft <= 0) {
-			debug("%s at %d of %zu, timeout",
-			      __func__, tot_bytes_sent, size);
+			debug("%s at %d of %zu, timeout", __func__, sent, size);
 			slurm_seterrno(SLURM_PROTOCOL_SOCKET_IMPL_TIMEOUT);
-			tot_bytes_sent = SLURM_ERROR;
-			break;
+			sent = SLURM_ERROR;
+			goto done;
 		}
 
 		if ((rc = poll(&ufds, 1, timeleft)) <= 0) {
@@ -197,11 +225,10 @@ static int _writev_timeout(int fd, struct iovec *iov, int iovcnt, int timeout)
  				continue;
 			else {
 				debug("%s at %d of %zu, poll error: %s",
-				      __func__, tot_bytes_sent, size,
-				      strerror(errno));
+				      __func__, sent, size, strerror(errno));
 				slurm_seterrno(SLURM_COMMUNICATIONS_SEND_ERROR);
-				tot_bytes_sent = SLURM_ERROR;
-				break;
+				sent = SLURM_ERROR;
+				goto done;
 			}
 		}
 
@@ -213,7 +240,7 @@ static int _writev_timeout(int fd, struct iovec *iov, int iovcnt, int timeout)
 		 * nonblocking read means just that.
 		 */
 		if (ufds.revents & POLLERR) {
-			int e;
+			int e, rc;
 
 			if ((rc = fd_get_socket_error(fd, &e)))
 				debug("%s: Socket POLLERR, fd_get_socket_error failed: %s",
@@ -223,12 +250,12 @@ static int _writev_timeout(int fd, struct iovec *iov, int iovcnt, int timeout)
 				      __func__, slurm_strerror(e));
 
 			slurm_seterrno(e);
-			tot_bytes_sent = SLURM_ERROR;
-			break;
+			sent = SLURM_ERROR;
+			goto done;
 		}
 		if ((ufds.revents & POLLHUP) || (ufds.revents & POLLNVAL) ||
-		    (recv(fd, &temp, 1, 0) == 0)) {
-			int so_err;
+		    (recv(fd, &temp, 1, flags) == 0)) {
+			int so_err, rc;
 			if ((rc = fd_get_socket_error(fd, &so_err)))
 				debug2("%s: Socket no longer there, fd_get_socket_error failed: %s",
 				       __func__, slurm_strerror(rc));
@@ -236,58 +263,42 @@ static int _writev_timeout(int fd, struct iovec *iov, int iovcnt, int timeout)
 				debug2("%s: Socket no longer there: %s",
 				       __func__, slurm_strerror(so_err));
 			slurm_seterrno(so_err);
-			tot_bytes_sent = SLURM_ERROR;
-			break;
+			sent = SLURM_ERROR;
+			goto done;
 		}
 		if ((ufds.revents & POLLOUT) != POLLOUT) {
 			error("%s: Poll failure, revents:%d",
 			      __func__, ufds.revents);
 		}
 
-		bytes_sent = writev(fd, iov, iovcnt);
-
-		if (bytes_sent < 0) {
+		rc = send(fd, &buf[sent], (size - sent), flags);
+		if (rc < 0) {
  			if (errno == EINTR)
 				continue;
 			debug("%s at %d of %zu, send error: %s",
-			      __func__, tot_bytes_sent, size, strerror(errno));
+			      __func__, sent, size, strerror(errno));
  			if (errno == EAGAIN) {	/* poll() lied to us */
 				usleep(10000);
 				continue;
 			}
  			slurm_seterrno(SLURM_COMMUNICATIONS_SEND_ERROR);
-			tot_bytes_sent = SLURM_ERROR;
-			break;
+			sent = SLURM_ERROR;
+			goto done;
 		}
-		if (bytes_sent == 0) {
+		if (rc == 0) {
 			/*
 			 * If driver false reports POLLIN but then does not
 			 * provide any output: try poll() again.
 			 */
 			log_flag(NET, "send() sent zero bytes out of %d/%zu",
-				 tot_bytes_sent, size);
+				 sent, size);
 			continue;
 		}
 
-		tot_bytes_sent += bytes_sent;
-
-		if (tot_bytes_sent >= size)
-			break;
-
-		/* partial write, need to adjust iovec before next call */
-		for (int i = 0; i < iovcnt; i++) {
-			if (bytes_sent < iov[i].iov_len) {
-				iov[i].iov_base += bytes_sent;
-				iov[i].iov_len -= bytes_sent;
-				break;
-			}
-
-			bytes_sent -= iov[i].iov_len;
-			iov[i].iov_base = NULL;
-			iov[i].iov_len = 0;
-		}
+		sent += rc;
 	}
 
+    done:
 	/* Reset fd flags to prior state, preserve errno */
 	if (fd_flags != -1) {
 		int slurm_err = slurm_get_errno();
@@ -296,59 +307,29 @@ static int _writev_timeout(int fd, struct iovec *iov, int iovcnt, int timeout)
 		slurm_seterrno(slurm_err);
 	}
 
-	return tot_bytes_sent;
+	*timeout = *timeout - _tot_wait(&tstart);
+	return sent;
+
 }
 
 /*
  * Send slurm message with timeout
  * RET message size (as specified in argument) or SLURM_ERROR on error
  */
-extern int slurm_send_timeout(int fd, char *buf, size_t size, int timeout)
+extern int slurm_send_timeout(int fd, char *buf, size_t size,
+			      uint32_t flags, int timeout)
 {
-	struct iovec iov = { .iov_base = buf, .iov_len = size };
-	return _writev_timeout(fd, &iov, 1, timeout);
+	return _send_timeout(fd, buf, size, flags, &timeout);
 }
 
-extern ssize_t slurm_msg_sendto(int fd, char *buffer, size_t size)
+extern size_t slurm_bufs_sendto(int fd, msg_bufs_t buffer)
 {
-	struct iovec iov[2];
-	uint32_t usize;
 	int len;
-	SigFunc *ohandler;
-	int timeout = slurm_conf.msg_timeout * 1000;
-
-	/*
-	 *  Ignore SIGPIPE so that send can return a error code if the
-	 *    other side closes the socket
-	 */
-	ohandler = xsignal(SIGPIPE, SIG_IGN);
-
-	iov[0].iov_base = &usize;
-	iov[0].iov_len = sizeof(usize);
-	iov[1].iov_base = buffer;
-	iov[1].iov_len = size;
-
-	usize = htonl(iov[1].iov_len);
-
-	len = _writev_timeout(fd, iov, 2, timeout);
-
-	xsignal(SIGPIPE, ohandler);
-
-	/* Returned size should not include the 4-byte length header. */
-	if (len < 0)
-		return SLURM_ERROR;
-	return size;
-}
-
-extern ssize_t slurm_bufs_sendto(int fd, msg_bufs_t *buffers)
-{
-	struct iovec iov[4];
-	int len;
+	int part_len;
+	size_t size = 0;
 	uint32_t usize;
 	SigFunc *ohandler;
 	int timeout = slurm_conf.msg_timeout * 1000;
-
-	xassert(buffers);
 
 	/*
 	 * Ignore SIGPIPE so that send can return a error code if the other
@@ -356,27 +337,43 @@ extern ssize_t slurm_bufs_sendto(int fd, msg_bufs_t *buffers)
 	 */
 	ohandler = xsignal(SIGPIPE, SIG_IGN);
 
-	/* auth portion is optional. header and body are mandatory. */
-	iov[0].iov_base = &usize;
-	iov[0].iov_len = sizeof(usize);
-	iov[1].iov_base = get_buf_data(buffers->header);
-	iov[1].iov_len = get_buf_offset(buffers->header);
-	iov[2].iov_base = buffers->auth ? get_buf_data(buffers->auth) : NULL;
-	iov[2].iov_len = buffers->auth ? get_buf_offset(buffers->auth) : 0;
-	iov[3].iov_base = get_buf_data(buffers->body);
-	iov[3].iov_len = get_buf_offset(buffers->body);
+	size += get_buf_offset(buffer.header);
+	size += get_buf_offset(buffer.auth);
+	size += get_buf_offset(buffer.body);
 
-	usize = htonl(iov[1].iov_len + iov[2].iov_len + iov[3].iov_len);
+	usize = htonl(size);
 
-	len = _writev_timeout(fd, iov, 4, timeout);
+	if ((len = _send_timeout(fd, (char *) &usize, sizeof(usize), 0,
+				 &timeout)) < 0)
+		goto done;
 
+	if ((part_len = _send_timeout(fd, get_buf_data(buffer.header),
+				      get_buf_offset(buffer.header), 0,
+				      &timeout)) < 0)
+			goto done;
+	len += part_len;
+
+	if ((part_len = _send_timeout(fd, get_buf_data(buffer.auth),
+				      get_buf_offset(buffer.auth), 0,
+				      &timeout)) < 0)
+			goto done;
+	len += part_len;
+
+	if ((part_len = _send_timeout(fd, get_buf_data(buffer.body),
+				      get_buf_offset(buffer.body), 0,
+				      &timeout)) < 0)
+			goto done;
+	len += part_len;
+
+done:
 	xsignal(SIGPIPE, ohandler);
 	return len;
 }
 
 /* Get slurm message with timeout
  * RET message size (as specified in argument) or SLURM_ERROR on error */
-extern int slurm_recv_timeout(int fd, char *buffer, size_t size, int timeout)
+extern int slurm_recv_timeout(int fd, char *buffer, size_t size,
+			      uint32_t flags, int timeout )
 {
 	int rc;
 	int recvlen = 0;
@@ -452,13 +449,11 @@ extern int slurm_recv_timeout(int fd, char *buffer, size_t size, int timeout)
 			continue;
 		}
 
-		rc = recv(fd, &buffer[recvlen], (size - recvlen), 0);
+		rc = recv(fd, &buffer[recvlen], (size - recvlen), flags);
 		if (rc < 0)  {
-			if ((errno == EINTR) || (errno == EAGAIN)) {
-				log_flag(NET, "%s: recv(fd:%d) got %m. retrying.",
-					 __func__, fd);
+			if (errno == EINTR)
 				continue;
-			} else {
+			else {
 				debug("%s at %d of %zu, recv error: %m",
 				      __func__, recvlen, size);
 				slurm_seterrno(
@@ -541,15 +536,48 @@ error:
 extern int slurm_accept_msg_conn(int fd, slurm_addr_t *addr)
 {
 	socklen_t len = sizeof(*addr);
-	int sock = accept4(fd, (struct sockaddr *) addr, &len, SOCK_CLOEXEC);
-	net_set_nodelay(sock);
-	return sock;
+	return accept4(fd, (struct sockaddr *) addr, &len, SOCK_CLOEXEC);
 }
 
 extern int slurm_open_stream(slurm_addr_t *addr, bool retry)
 {
 	int retry_cnt;
 	int fd;
+
+#ifdef HAVE_NATIVE_CRAY
+	static int check_quiesce = -1;
+	if (check_quiesce == -1) {
+		if (xstrcasestr(slurm_conf.comm_params, "CheckGhalQuiesce"))
+			check_quiesce = 1;
+		else
+			check_quiesce = 0;
+	}
+
+	if (check_quiesce) {
+		char buffer[20];
+		char *quiesce_status = "/sys/class/gni/ghal0/quiesce_status";
+		int max_retry = 300;
+		int quiesce_fd = open(quiesce_status, O_RDONLY);
+
+		retry_cnt = 0;
+		while (quiesce_fd >= 0 && retry_cnt < max_retry) {
+			if (read(quiesce_fd, buffer, sizeof(buffer)) > 0) {
+				if (buffer[0] == '0')
+					break;
+			}
+			usleep(500000);
+			if (retry_cnt % 10 == 0)
+				debug3("WARNING: ghal0 quiesce status: %c, retry count %d",
+				       buffer[0], retry_cnt);
+			retry_cnt++;
+			close(quiesce_fd);
+			quiesce_fd = open(quiesce_status,
+					  (O_RDONLY | O_CLOEXEC));
+		}
+		if (quiesce_fd >= 0)
+			close(quiesce_fd);
+	}
+#endif
 
 	if ((slurm_addr_is_unspec(addr)) || (slurm_get_port(addr) == 0)) {
 		error("Error connecting, bad data: family = %u, port = %u",
@@ -567,8 +595,6 @@ extern int slurm_open_stream(slurm_addr_t *addr, bool retry)
 			slurm_seterrno(errno);
 			return SLURM_ERROR;
 		}
-
-		net_set_nodelay(fd);
 
 		if (retry_cnt) {
 			if (retry_cnt == 1) {
@@ -704,13 +730,13 @@ extern void slurm_set_addr(slurm_addr_t *addr, uint16_t port, char *host)
 		__func__, port, host);
 
 	/*
-	 * xgetaddrinfo uses hints from our config to determine what address
+	 * get_addr_info uses hints from our config to determine what address
 	 * families to return
 	 */
-	ai_start = xgetaddrinfo_port(host, port);
+	ai_start = get_addr_info(host, port);
 
 	if (!ai_start) {
-		error_in_daemon("%s: Unable to resolve \"%s\"", __func__, host);
+		error("%s: Unable to resolve \"%s\"", __func__, host);
 		addr->ss_family = AF_UNSPEC;
 		return;
 	}
@@ -720,7 +746,7 @@ extern void slurm_set_addr(slurm_addr_t *addr, uint16_t port, char *host)
 	 * Make sure we return the v6 wildcard address first (when applicable)
 	 * since we want v6 to be the default.
 	 */
-	if (host || !(slurm_conf.conf_flags & CONF_FLAG_IPV6_ENABLED)) {
+	if (host || !(slurm_conf.conf_flags & CTL_CONF_IPV6_ENABLED)) {
 		ai_ptr = ai_start;
 	} else {
 		for (ai_ptr = ai_start; ai_ptr; ai_ptr = ai_ptr->ai_next) {

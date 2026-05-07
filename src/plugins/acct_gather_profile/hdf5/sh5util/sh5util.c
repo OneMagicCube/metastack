@@ -6,7 +6,7 @@
  *  Copyright (C) 2013 Bull S. A. S.
  *		Bull, Rue Jean Jaures, B.P.68, 78340, Les Clayes-sous-Bois.
  *
- *  Copyright (C) SchedMD LLC.
+ *  Copyright (C) 2013-2016 SchedMD LLC
  *
  *  Initially written by Rod Schultz <rod.schultz@bull.com> @ Bull
  *  and Danny Auble <da@schedmd.com> @ SchedMD.
@@ -51,7 +51,6 @@
 #include <fcntl.h>
 #include <float.h>
 #include <getopt.h>
-#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -62,13 +61,14 @@
 #include "src/common/read_config.h"
 #include "src/common/proc_args.h"
 #include "src/common/xstring.h"
-#include "src/interfaces/acct_gather_profile.h"
-#include "src/interfaces/jobacct_gather.h"
+#include "src/common/slurm_acct_gather_profile.h"
+#include "src/common/slurm_jobacct_gather.h"
 #include "../hdf5_api.h"
 #include "sh5util.h"
 
 const char plugin_type[] = "";
 
+#define MAX_PROFILE_PATH 1024
 // #define MAX_ATTR_NAME 64
 #define MAX_GROUP_NAME 64
 // #define MAX_DATASET_NAME 64
@@ -200,11 +200,7 @@ main(int argc, char **argv)
 {
 	int cc;
 
-	slurm_init(NULL);
-
-	if (acct_gather_conf_init() != SLURM_SUCCESS)
-		fatal("Unable to initialize acct_gather_conf");
-
+	slurm_conf_init(NULL);
 	cc = _set_options(argc, argv);
 	if (cc < 0)
 		goto ouch;
@@ -592,7 +588,7 @@ static int _merge_step_files(void)
 	int last_step = -1, step_cnt = 0;
 	int job_id;
 	int rc = SLURM_SUCCESS;
-	list_itr_t *itr;
+	ListIterator itr;
 	List file_list = NULL;
 	sh5util_file_t *sh5util_file = NULL;
 
@@ -776,8 +772,9 @@ static void _table_free(void *table)
 
 static void _table_path(table_t *t, char *path)
 {
-	snprintf(path, PATH_MAX, "/"GRP_STEPS"/%s/"GRP_NODES"/%s/%s/%s",
-		 t->step, t->node, t->group, t->name);
+	snprintf(path, MAX_PROFILE_PATH,
+	         "/"GRP_STEPS"/%s/"GRP_NODES"/%s/%s/%s",
+	         t->step, t->node, t->group, t->name);
 }
 
 static herr_t _collect_tables_group(hid_t g_id, const char *name,
@@ -808,7 +805,7 @@ static herr_t _collect_tables_group(hid_t g_id, const char *name,
 static herr_t _collect_tables_node(hid_t g_id, const char *name,
                                    const H5L_info_t *link_info, void *op_data)
 {
-	char object_path[PATH_MAX];
+	char object_path[MAX_PROFILE_PATH+1];
 	List tables = (List)op_data;
 	hid_t object_id = -1;
 	herr_t err;
@@ -819,7 +816,7 @@ static herr_t _collect_tables_node(hid_t g_id, const char *name,
 	    && xstrcmp(params.node, name) != 0)
 		return 0;
 
-	snprintf(object_path, PATH_MAX, "%s/%s", name, params.series);
+	snprintf(object_path, MAX_PROFILE_PATH+1, "%s/%s", name, params.series);
 	current_node = name;
 
 	/* open the dataset. */
@@ -857,14 +854,14 @@ static herr_t _collect_tables_node(hid_t g_id, const char *name,
 static herr_t _collect_tables_step(hid_t g_id, const char *name,
                                    const H5L_info_t *link_info, void *op_data)
 {
-	char nodes_path[PATH_MAX];
+	char nodes_path[MAX_PROFILE_PATH];
 	herr_t err;
 
 	/* step filter */
 	if ((params.step_id != -1) && (atoi(name) != params.step_id))
 		return 0;
 
-	snprintf(nodes_path, PATH_MAX, "%s/"GRP_NODES, name);
+	snprintf(nodes_path, MAX_PROFILE_PATH, "%s/"GRP_NODES, name);
 	current_step = name;
 
 	err = H5Literate_by_name(g_id, nodes_path, H5_INDEX_NAME,
@@ -882,7 +879,7 @@ static herr_t _collect_tables_step(hid_t g_id, const char *name,
 static int _tables_list(hid_t fid_job, List tables)
 {
 	herr_t err;
-	list_itr_t *it;
+	ListIterator it;
 	table_t *t;
 
 	/* Find the list of tables to be extracted */
@@ -1008,7 +1005,7 @@ static void _extract_totals(size_t nb_fields, size_t *offsets, hid_t *types,
 static int _extract_series_table(hid_t fid_job, table_t *table, List fields,
 				 FILE *output, bool level_total)
 {
-	char path[PATH_MAX];
+	char path[MAX_PROFILE_PATH];
 
 	size_t i, j;
 
@@ -1138,7 +1135,7 @@ static int _extract_series(void)
 	const char *field;
 	List tables = NULL;
 	List fields = NULL;
-	list_itr_t *it;
+	ListIterator it;
 	FILE *output = NULL;
 	int rc = SLURM_ERROR;
 	table_t *t;
@@ -1431,8 +1428,8 @@ static herr_t _extract_item_step(hid_t g_id, const char *step_name,
 {
 	static bool first = true;
 
-	char nodes_path[PATH_MAX];
-	char path[PATH_MAX];
+	char nodes_path[MAX_PROFILE_PATH];
+	char path[MAX_PROFILE_PATH];
 
 	size_t i, j;
 	size_t buf_size = 0;
@@ -1449,7 +1446,7 @@ static herr_t _extract_item_step(hid_t g_id, const char *step_name,
 	herr_t err;
 
 	List tables = NULL;
-	list_itr_t *it = NULL;
+	ListIterator it = NULL;
 	table_t *t;
 
 	/* step filter */
@@ -1458,7 +1455,7 @@ static herr_t _extract_item_step(hid_t g_id, const char *step_name,
 
 	current_step = step_name;
 
-	snprintf(nodes_path, PATH_MAX, "%s/"GRP_NODES, step_name);
+	snprintf(nodes_path, MAX_PROFILE_PATH, "%s/"GRP_NODES, step_name);
 
 	tables = list_create(_table_free);
 	err = H5Literate_by_name(g_id, nodes_path, H5_INDEX_NAME,
@@ -1654,9 +1651,9 @@ static int _fields_intersection(hid_t fid_job, List tables, List fields)
 	hssize_t nb_fields;
 	size_t i;
 	char *field;
-	list_itr_t *it1, *it2;
+	ListIterator it1, it2;
 	bool found;
-	char path[PATH_MAX];
+	char path[MAX_PROFILE_PATH];
 	table_t *t;
 	bool first = true;
 
@@ -1723,7 +1720,7 @@ static int _list_items(void)
 {
 	hid_t fid_job = -1;
 	List fields;
-	list_itr_t *it;
+	ListIterator it;
 	const char *field;
 	int rc = SLURM_ERROR;
 	List tables;

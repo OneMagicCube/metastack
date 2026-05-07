@@ -58,11 +58,6 @@ extern void schedule_resv_save(void);
 /* Queue saving of trigger state information */
 extern void schedule_trigger_save(void);
 
-#ifdef __METASTACK_OPT_APP  
-/* Queue saving of app configuration state information */  
-extern void schedule_app_save(void);  
-#endif
-
 /* shutdown the slurmctld_state_save thread */
 extern void shutdown_state_save(void);
 
@@ -92,11 +87,12 @@ extern void *slurmctld_state_copy(void *no_data);
 
 extern void cache_queue_init();
 extern void cache_queue_fini();
-extern void slurm_cache_date_init(slurm_cache_date_t *msg);
 
 /* shutdown the shutdown_state_copy thread */
 extern void cache_queue_shutdown();
+extern void update_all_cache_state(void);
 extern bool cache_enqueue(slurm_cache_date_t *msg);
+
 #endif
 
 #endif

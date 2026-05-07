@@ -1,7 +1,8 @@
 /*****************************************************************************\
  *  info_fed.c - functions dealing with Federations in the controller.
  *****************************************************************************
- *  Copyright (C) SchedMD LLC.
+ *  Copyright (C) 2016-2017 SchedMD LLC.
+ *  Written by Brian Christiansen <brian@schedmd.com>
  *
  *  This file is part of Slurm, a resource management program.
  *  For details, see <https://slurm.schedmd.com/>.

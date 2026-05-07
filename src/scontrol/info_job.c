@@ -49,10 +49,6 @@
 #include "src/common/slurm_time.h"
 #include "src/common/stepd_api.h"
 
-#include "src/interfaces/data_parser.h"
-#include "src/common/openapi.h"
-
-#define CONTAINER_ID_TAG "containerid="
 #define POLL_SLEEP	3	/* retry interval in seconds  */
 
 /* Load current job table information into *job_buffer_pptr */
@@ -127,12 +123,12 @@ static int _filter_job(job_info_t * job)
 {
 	int is_filter = 1;
 	uint32_t *uuid;
-	
+
 	if (job->job_id == 0 || params.sctl_user_list == NULL) {
 		return 0;
 	}
 
-	list_itr_t * itr = list_iterator_create(params.sctl_user_list);
+	ListIterator itr = list_iterator_create(params.sctl_user_list);
 	while ((uuid = list_next(itr))) {
 		if (*uuid == job->user_id) {
 			is_filter = 0;
@@ -224,6 +220,7 @@ scontrol_print_completing (void)
 			scontrol_print_completing_job(&job_info[i],
 						      node_info_msg);
 	}
+	slurm_free_node_info_msg(node_info_msg);
 }
 
 extern void
@@ -232,9 +229,9 @@ scontrol_print_completing_job(job_info_t *job_ptr,
 {
 	int i, c_offset = 0;
 	node_info_t *node_info;
-	hostlist_t *comp_nodes, *down_nodes;
+	hostlist_t comp_nodes, down_nodes;
 	char *node_buf;
-	char time_str[256];
+	char time_str[32];
 	time_t completing_time = 0;
 
 	comp_nodes = hostlist_create(NULL);
@@ -285,6 +282,38 @@ scontrol_print_completing_job(job_info_t *job_ptr,
 	hostlist_destroy(down_nodes);
 }
 
+extern uint16_t
+scontrol_get_job_state(uint32_t job_id)
+{
+	job_info_msg_t * job_buffer_ptr = NULL;
+	int error_code = SLURM_SUCCESS, i;
+	job_info_t *job_ptr = NULL;
+
+	error_code = scontrol_load_job(&job_buffer_ptr, job_id);
+	if (error_code) {
+		exit_code = 1;
+		if (quiet_flag == -1)
+			slurm_perror ("slurm_load_job error");
+		return NO_VAL16;
+	}
+	if (quiet_flag == -1) {
+		char time_str[32];
+		slurm_make_time_str((time_t *)&job_buffer_ptr->last_update,
+				    time_str, sizeof(time_str));
+		printf("last_update_time=%s, records=%d\n",
+		       time_str, job_buffer_ptr->record_count);
+	}
+
+	job_ptr = job_buffer_ptr->job_array ;
+	for (i = 0; i < job_buffer_ptr->record_count; i++) {
+		if (job_ptr->job_id == job_id)
+			return job_ptr->job_state;
+	}
+	if (quiet_flag == -1)
+		printf("Could not find job %u", job_id);
+	return NO_VAL16;
+}
+
 static bool _het_job_offset_match(job_info_t *job_ptr, uint32_t het_job_offset)
 {
 	if ((het_job_offset == NO_VAL) ||
@@ -315,7 +344,7 @@ static bool _task_id_in_job(job_info_t *job_ptr, uint32_t array_id)
  * scontrol_print_job - print the specified job's information
  * IN job_id - job's id or NULL to print information about all jobs
  */
-extern void scontrol_print_job(char *job_id_str, int argc, char **argv)
+extern void scontrol_print_job(char * job_id_str)
 {
 	int error_code = SLURM_SUCCESS, i, print_cnt = 0;
 	uint32_t job_id = 0;
@@ -346,56 +375,31 @@ extern void scontrol_print_job(char *job_id_str, int argc, char **argv)
 		if (end_ptr[0] == '+')
 			het_job_offset = strtol(end_ptr + 1, &end_ptr, 10);
 	}
-
+	
 #ifdef __METASTACK_OPT_CACHE_QUERY
-	char *env_val = NULL;
-	if ((env_val = getenv("SCONTROL_JOB_CACHE_QUERY"))){
-		if(!cache_flag && !nocache_flag){
-			if(!xstrcmp(env_val, "cache"))
-				cache_flag = true;
-			else if(!xstrcmp(env_val, "nocache"))
-				nocache_flag = true;
-		}
-	}
+    char *env_val = NULL;
+    if ((env_val = getenv("SCONTROL_JOB_CACHE_QUERY"))){
+        if(!cache_flag && !nocache_flag){
+            if(!xstrcmp(env_val, "cache"))
+                cache_flag = true;
+            else if(!xstrcmp(env_val, "nocache"))
+                nocache_flag = true;
+        }
+    }
 	if(update_client_port(cache_flag, nocache_flag)){
 		return;
 	}
 #endif
 
 	error_code = scontrol_load_job(&job_buffer_ptr, job_id);
-
-	if (mime_type) {
-		openapi_resp_job_info_msg_t resp = {
-			.jobs = job_buffer_ptr,
-		};
-
-		if (job_buffer_ptr) {
-			resp.last_update = job_buffer_ptr->last_update;
-			resp.last_backfill = job_buffer_ptr->last_backfill;
-		}
-
-		if (is_data_parser_deprecated(data_parser))
-			DATA_DUMP_CLI_DEPRECATED(JOB_INFO_MSG, *job_buffer_ptr,
-						 "jobs", argc, argv, NULL,
-						 mime_type, error_code);
-		else
-			DATA_DUMP_CLI(OPENAPI_JOB_INFO_RESP, resp, argc, argv,
-				      NULL, mime_type, data_parser, error_code);
-
-		if (error_code)
-			exit_code = 1;
-		return;
-	}
-
 	if (error_code) {
 		exit_code = 1;
 		if (quiet_flag != 1)
-			slurm_perror("slurm_load_jobs error");
+			slurm_perror ("slurm_load_jobs error");
 		return;
 	}
-
 	if (quiet_flag == -1) {
-		char time_str[256];
+		char time_str[32];
 		slurm_make_time_str ((time_t *)&job_buffer_ptr->last_update,
 				     time_str, sizeof(time_str));
 		printf ("last_update_time=%s, records=%d\n",
@@ -452,61 +456,55 @@ extern void scontrol_print_job(char *job_id_str, int argc, char **argv)
  * IN job_step_id_str - job step's id or NULL to print information
  *	about all job steps
  */
-extern void scontrol_print_step(char *job_step_id_str, int argc, char **argv)
+extern void
+scontrol_print_step (char *job_step_id_str)
 {
-	int error_code = 0, print_cnt = 0;
+	int error_code, i, print_cnt = 0;
 	slurm_step_id_t step_id = {
-		.job_id = NO_VAL,
+		.job_id = 0,
 		.step_het_comp = NO_VAL,
 		.step_id = NO_VAL,
 	};
 	uint32_t array_id = NO_VAL;
-	job_step_info_response_msg_t *job_step_info_ptr = NULL;
+	char *next_str;
+	job_step_info_response_msg_t *job_step_info_ptr;
+	job_step_info_t * job_step_ptr;
 	static uint32_t last_job_id = 0, last_array_id, last_step_id = 0;
 	static job_step_info_response_msg_t *old_job_step_info_ptr = NULL;
 	static uint16_t last_show_flags = 0xffff;
 	uint16_t show_flags = 0;
-	job_step_info_t **steps = NULL;
 
-	if (!job_step_id_str) {
-		/* do nothing */
-	} else if (!xstrncasecmp(job_step_id_str, CONTAINER_ID_TAG,
-				 strlen(CONTAINER_ID_TAG))) {
-		uid_t uid = SLURM_AUTH_NOBODY;
-		list_t *step_list = list_create((ListDelF) slurm_free_step_id);
-		char *cid = job_step_id_str + strlen(CONTAINER_ID_TAG);
-
-		error_code = slurm_find_step_ids_by_container_id(
-			SHOW_ALL, uid, cid, step_list);
-
-		if (error_code || list_is_empty(step_list)) {
-			step_id.job_id = 0;
-		} else {
-			/* just clone out the first step id details */
-			step_id = *(slurm_step_id_t *) list_peek(step_list);
-			job_step_id_str = NULL;
-		}
-
-		FREE_NULL_LIST(step_list);
-	} else {
-		slurm_selected_step_t id = {0};
-		if (!(error_code = unfmt_job_id_string(job_step_id_str, &id,
-						       NO_VAL))) {
-			if (id.array_task_id != NO_VAL)
-				array_id = id.array_task_id;
-
-			step_id = id.step_id;
-		}
+	if (job_step_id_str) {
+		step_id.job_id = (uint32_t)strtol(job_step_id_str, &next_str,
+						  10);
+		if (next_str[0] == '_')
+			array_id = (uint32_t) strtol(next_str+1, &next_str, 10);
+		else if (next_str[0] == '.')
+			step_id.step_id = (uint32_t)strtol(next_str + 1, NULL,
+							   10);
 	}
 
 	if (all_flag)
 		show_flags |= SHOW_ALL;
 	if (local_flag)
 		show_flags |= SHOW_LOCAL;
-
-	if (!step_id.job_id || error_code) {
-		/* step lookup failed already - skip trying again */
-	} else if ((old_job_step_info_ptr) && (last_job_id == step_id.job_id) &&
+/*
+#ifdef __METASTACK_OPT_CACHE_QUERY
+	char *env_val = NULL;
+	if ((env_val = getenv("SCONTROL_STEP_CACHE_QUERY"))){
+		if(!cache_flag && !nocache_flag){
+			if(!xstrcmp(env_val, "cache"))
+				cache_flag = true;
+			else if(!xstrcmp(env_val, "nocache"))
+				nocache_flag = true;
+		}
+	}
+	if(update_client_port(cache_flag, nocache_flag)){
+		return;
+	}
+#endif
+*/
+	if ((old_job_step_info_ptr) && (last_job_id == step_id.job_id) &&
 	    (last_array_id == array_id) && (last_step_id == step_id.step_id)) {
 		if (last_show_flags != show_flags)
 			old_job_step_info_ptr->last_update = (time_t) 0;
@@ -522,8 +520,6 @@ extern void scontrol_print_step(char *job_step_id_str, int argc, char **argv)
 			error_code = SLURM_SUCCESS;
 			if (quiet_flag == -1)
 				printf("slurm_get_job_steps no change in data\n");
-		} else {
-			error_code = errno;
 		}
 	} else {
 		if (old_job_step_info_ptr) {
@@ -535,45 +531,12 @@ extern void scontrol_print_step(char *job_step_id_str, int argc, char **argv)
 						   step_id.step_id,
 						   &job_step_info_ptr,
 						   show_flags);
-		if ((error_code == SLURM_ERROR) && errno)
-			error_code = errno;
 	}
 
-	if (error_code || !job_step_info_ptr) {
-		if (mime_type) {
-			openapi_resp_job_step_info_msg_t resp = {
-				.steps = job_step_info_ptr,
-			};
-
-			if (job_step_info_ptr)
-				resp.last_update =
-					job_step_info_ptr->last_update;
-
-			if (is_data_parser_deprecated(data_parser))
-				DATA_DUMP_CLI_DEPRECATED(STEP_INFO_MSG_PTR,
-							 job_step_info_ptr,
-							 "steps", argc, argv,
-							 NULL, mime_type,
-							 error_code);
-			else
-				DATA_DUMP_CLI(OPENAPI_STEP_INFO_MSG, resp, argc,
-					      argv, NULL, mime_type,
-					      data_parser, error_code);
-
-			if (error_code)
-				exit_code = 1;
-			return;
-		}
-
+	if (error_code) {
 		exit_code = 1;
-		if (quiet_flag != 1) {
-			if (!step_id.job_id)
-				printf("No job steps found\n");
-			else
-				error("%s: slurm_get_job_steps(%s) failed: %s",
-				      __func__, job_step_id_str,
-				      slurm_strerror(error_code));
-		}
+		if (quiet_flag != 1)
+			slurm_perror ("slurm_get_job_steps error");
 		return;
 	}
 
@@ -582,58 +545,24 @@ extern void scontrol_print_step(char *job_step_id_str, int argc, char **argv)
 	last_job_id = step_id.job_id;
 	last_step_id = step_id.step_id;
 
-	if (!mime_type && (quiet_flag == -1)) {
-		char time_str[256];
+	if (quiet_flag == -1) {
+		char time_str[32];
 		slurm_make_time_str ((time_t *)&job_step_info_ptr->last_update,
 			             time_str, sizeof(time_str));
 		printf ("last_update_time=%s, records=%d\n",
 			time_str, job_step_info_ptr->job_step_count);
 	}
 
-	if (job_step_info_ptr->job_step_count) {
-		int s = 0;
-		steps = xcalloc(job_step_info_ptr->job_step_count + 1,
-				sizeof(*steps));
-
-		for (int i = 0; i < job_step_info_ptr->job_step_count; i++) {
-			job_step_info_t *step =
-				&job_step_info_ptr->job_steps[i];
-
-			if ((array_id != NO_VAL) &&
-			    (array_id != step->array_task_id))
-				continue;
-
-			steps[s] = step;
-			s++;
-		}
+	for (i = 0, job_step_ptr = job_step_info_ptr->job_steps;
+	     i < job_step_info_ptr->job_step_count; i++, job_step_ptr++) {
+		if ((array_id != NO_VAL) &&
+		    (array_id != job_step_ptr->array_task_id))
+			continue;
+		slurm_print_job_step_info(stdout, job_step_ptr, one_liner);
+		print_cnt++;
 	}
 
-	if (mime_type) {
-		openapi_resp_job_step_info_msg_t resp = {
-			.steps = job_step_info_ptr,
-		};
-
-		if (job_step_info_ptr)
-			resp.last_update = job_step_info_ptr->last_update;
-
-		if (is_data_parser_deprecated(data_parser))
-			DATA_DUMP_CLI_DEPRECATED(STEP_INFO_MSG_PTR,
-						 job_step_info_ptr, "steps",
-						 argc, argv, NULL, mime_type,
-						 error_code);
-		else
-			DATA_DUMP_CLI(OPENAPI_STEP_INFO_MSG, resp, argc, argv,
-				      NULL, mime_type, data_parser, error_code);
-	} else if (steps) {
-		int i = 0;
-
-		for (; steps[i]; i++)
-			slurm_print_job_step_info(stdout, steps[i], one_liner);
-
-		print_cnt = i;
-	}
-
-	if (!mime_type && !print_cnt) {
+	if (print_cnt == 0) {
 		if (job_step_id_str) {
 			exit_code = 1;
 			if (quiet_flag != 1) {
@@ -654,8 +583,6 @@ extern void scontrol_print_step(char *job_step_id_str, int argc, char **argv)
 		} else if (quiet_flag != 1)
 			printf ("No job steps in the system\n");
 	}
-
-	xfree(steps);
 }
 
 /* Return 1 on success, 0 on failure to find a jobid in the string */
@@ -794,7 +721,7 @@ static void
 _list_pids_all_steps(const char *node_name, slurm_step_id_t *step_id)
 {
 	List steps;
-	list_itr_t *itr;
+	ListIterator itr;
 	step_loc_t *stepd;
 	int count = 0;
 	char tmp_char[64];
@@ -849,7 +776,7 @@ static void
 _list_pids_all_jobs(const char *node_name)
 {
 	List steps;
-	list_itr_t *itr;
+	ListIterator itr;
 	step_loc_t *stepd;
 
 	steps = stepd_available(NULL, node_name);
@@ -908,7 +835,7 @@ scontrol_list_pids(const char *jobid_str, const char *node_name)
 extern void scontrol_getent(const char *node_name)
 {
 	List steps = NULL;
-	list_itr_t *itr = NULL;
+	ListIterator itr = NULL;
 	step_loc_t *stepd;
 	int fd;
 	struct passwd *pwd = NULL;
@@ -969,7 +896,7 @@ extern void scontrol_getent(const char *node_name)
 extern void scontrol_gethost(const char *stepd_node, const char *node_name)
 {
 	List steps = NULL;
-	list_itr_t *itr = NULL;
+	ListIterator itr = NULL;
 	step_loc_t *stepd;
 	int fd;
 
@@ -1021,7 +948,7 @@ extern void scontrol_gethost(const char *stepd_node, const char *node_name)
 extern void
 scontrol_print_hosts (char * node_list)
 {
-	hostlist_t *hl;
+	hostlist_t hl;
 	char *host;
 
 	if (!node_list) {
@@ -1064,22 +991,18 @@ _reformat_hostlist(char *hostlist)
  *	of a file containing hostnames, translate them into a hostlist
  *	expression
  */
-extern int scontrol_encode_hostlist(char *arg_hostlist, bool sorted)
+extern int
+scontrol_encode_hostlist(char *hostlist, bool sorted)
 {
-	char *io_buf = NULL, *tmp_list, *ranged_string, *hostlist;
+	char *io_buf = NULL, *tmp_list, *ranged_string;
 	int buf_size = 1024 * 1024;
 	int data_read = 0;
-	hostlist_t *hl;
+	hostlist_t hl;
 
-	if (!arg_hostlist) {
+	if (!hostlist) {
 		fprintf(stderr, "Hostlist is NULL\n");
 		return SLURM_ERROR;
 	}
-
-	if (!xstrcmp(arg_hostlist, "-"))
-		hostlist = "/dev/stdin";
-	else
-		hostlist = arg_hostlist;
 
 	if (hostlist[0] == '/') {
 		ssize_t buf_read;
@@ -1094,15 +1017,13 @@ extern int scontrol_encode_hostlist(char *arg_hostlist, bool sorted)
 			data_read += buf_read;
 		}
 
-		close(fd);
-
 		if (buf_read < 0) {
-			xfree(io_buf);
 			fprintf(stderr, "Error reading %s\n", hostlist);
 			return SLURM_ERROR;
 		}
 
-		if (data_read >= buf_size) {
+		close(fd);
+		if (buf_read >= buf_size) {
 			/* If over 1MB, the file is almost certainly invalid */
 			fprintf(stderr, "File %s is too large\n", hostlist);
 			xfree(io_buf);
@@ -1162,12 +1083,6 @@ static int _wait_nodes_ready(uint32_t job_id)
 			is_ready = SLURM_SUCCESS;
 			break;
 		}
-#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
-		if (rc == ESLURM_ACCESS_DENIED) {
-			info("Read-only administrators only have the permission to perform query operations");
-			break;
-		}
-#endif
 	}
 	if (is_ready == SLURM_SUCCESS)
      		info("Nodes are ready for job %u", job_id);

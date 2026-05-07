@@ -1,7 +1,7 @@
 /*****************************************************************************\
  *  tres_frequency.c - Perform TRES frequency control functions
  *****************************************************************************
- *  Copyright (C) SchedMD LLC.
+ *  Copyright (C) 2018 SchedMD LLC
  *  Written by Morris Jette
  *
  *  This file is part of Slurm, a resource management program.
@@ -37,8 +37,81 @@
 #include <limits.h>	/* For LONG_MIN, LONG_MAX */
 #include <stdlib.h>
 
-#include "src/common/xmalloc.h"
 #include "src/common/xstring.h"
+#include "src/slurmd/slurmd/slurmd.h"
+#include "src/slurmd/slurmstepd/slurmstepd_job.h"
+
+/*
+ * check if TRES frequency setting is allowed on this node
+ * if so, create and initialize appropriate data structures
+ */
+extern void tres_freq_init(slurmd_conf_t *conf)
+{
+//FIXME - To do
+}
+
+/*
+ * free memory from TRES frequency data structures
+ */
+extern void tres_freq_fini(void)
+{
+//FIXME - To do
+}
+
+/*
+ * reset debug flag (slurmd)
+ */
+extern void tres_freq_reconfig(void)
+{
+//FIXME - To do
+}
+
+/*
+ * Send the tres_frequency info to slurmstepd
+ */
+extern void tres_freq_send_info(int fd)
+{
+//FIXME - To do
+}
+
+/*
+ * Receive the tres_frequency table info from slurmd
+ */
+extern void tres_freq_recv_info(int fd)
+{
+//FIXME - To do
+}
+
+/*
+ * Validate the TRES frequency to set
+ * Called from task cpuset code
+ */
+extern void tres_freq_cpuset_validate(stepd_step_rec_t *job)
+{
+//FIXME - To do
+}
+
+/*
+ * Validate the TRES and select the frequency to set
+ * Called from task cgroup code
+ */
+extern void tres_freq_cgroup_validate(stepd_step_rec_t *job,
+				      char *step_alloc_cores)
+{
+//FIXME - To do
+}
+
+/*
+ * Verify slurm.conf TresFreqDef option
+ *
+ * arg IN - Parameter value to check
+ * RET - -1 on error, else 0
+ */
+extern int tres_freq_verify_def(const char *arg)
+{
+//FIXME - To do
+	return 0;
+}
 
 /*
  * Test for valid number or name (e.g. high, medium, low, etc.)
@@ -109,7 +182,7 @@ static int _valid_gpu_freq(const char *arg)
  */
 static int _valid_dcu_freq(const char *arg)
 {
-	char *eq = NULL, *save_ptr = NULL, *tmp = NULL, *tok = NULL;
+	char *eq, *save_ptr = NULL, *tmp, *tok;
 	int rc = 0;
 
 	if ((arg == NULL) || (arg[0] == '\0'))
@@ -118,14 +191,14 @@ static int _valid_dcu_freq(const char *arg)
 	tmp = xstrdup(arg);
 	tok = strtok_r(tmp, ",", &save_ptr);
 	while (tok) {
-		eq = xstrchr(tok, '=');
+		eq = strchr(tok, '=');
 		if (!eq) {
 			rc = _test_val(tok);
-			if ((rc != 0) && !xstrcmp(tok, "verbose"))
+			if ((rc != 0) && !strcmp(tok, "verbose"))
 				rc = 0;
 		} else {
 			eq[0] = '\0';
-			if (!xstrcmp(tok, "memory")) {
+			if (!strcmp(tok, "memory")) {
 				rc = _test_val(eq + 1);
 			} else {
 				rc = -1;
@@ -148,7 +221,7 @@ static int _valid_dcu_freq(const char *arg)
  */
 static int _valid_npu_freq(const char *arg)
 {
-	char *eq = NULL, *save_ptr = NULL, *tmp = NULL, *tok = NULL;
+	char *eq, *save_ptr = NULL, *tmp, *tok;
 	int rc = 0;
 
 	if ((arg == NULL) || (arg[0] == '\0'))
@@ -157,14 +230,14 @@ static int _valid_npu_freq(const char *arg)
 	tmp = xstrdup(arg);
 	tok = strtok_r(tmp, ",", &save_ptr);
 	while (tok) {
-		eq = xstrchr(tok, '=');
+		eq = strchr(tok, '=');
 		if (!eq) {
 			rc = _test_val(tok);
-			if ((rc != 0) && !xstrcmp(tok, "verbose"))
+			if ((rc != 0) && !strcmp(tok, "verbose"))
 				rc = 0;
 		} else {
 			eq[0] = '\0';
-			if (!xstrcmp(tok, "memory")) {
+			if (!strcmp(tok, "memory")) {
 				rc = _test_val(eq + 1);
 			} else {
 				rc = -1;
@@ -213,19 +286,19 @@ extern int tres_freq_verify_cmdline(const char *arg)
 				break;
 			}
 #ifdef __METASTACK_NEW_GRES_DCU	
-		} else if (!xstrcmp(tok, "dcu")) {
+		} else if (!strcmp(tok, "dcu")) {
 			if (_valid_dcu_freq(sep) != 0) {
 				rc = -1;
 				break;
 			}
 #endif
 #ifdef __METASTACK_NEW_GRES_NPU	
-		} else if (!xstrcmp(tok, "npu")) {
+		} else if (!strcmp(tok, "npu")) {
 			if (_valid_npu_freq(sep) != 0) {
 				rc = -1;
 				break;
 			}
-#endif		
+#endif
 		} else {
 			rc = -1;
 			break;
@@ -235,4 +308,29 @@ extern int tres_freq_verify_cmdline(const char *arg)
 	xfree(tmp);
 
 	return rc;
+}
+
+/*
+ * Set environment variables associated with TRES frequency variables.
+ */
+extern int tres_freq_set_env(char *var)
+{
+//FIXME - To do
+	return 0;
+}
+
+/*
+ * set TRES frequency values
+ */
+extern void tres_freq_set(stepd_step_rec_t *job)
+{
+//FIXME - To do
+}
+
+/*
+ * reset TRES frequency values after suspend/resume
+ */
+extern void tres_freq_reset(stepd_step_rec_t *job)
+{
+//FIXME - To do
 }

@@ -1,7 +1,8 @@
 /*****************************************************************************\
  *  fetch_config.h - functions for "configless" slurm operation
  *****************************************************************************
- *  Copyright (C) SchedMD LLC.
+ *  Copyright (C) 2020 SchedMD LLC.
+ *  Written by Tim Wickberg <tim@schedmd.com>
  *
  *  This file is part of Slurm, a resource management program.
  *  For details, see <https://slurm.schedmd.com/>.
@@ -53,16 +54,16 @@ extern int dump_to_memfd(char *type, char *config, char **filename);
 
 extern int find_conf_by_name(void *x, void *key);
 
-extern int write_config_to_memfd(void *x, void *arg);
-
 extern int find_map_conf_file(void *x, void *key);
 
 extern int write_configs_to_conf_cache(config_response_msg_t *msg,
 				       char *dir);
 
-extern config_response_msg_t *new_config_response(bool to_slurmd);
+extern void load_config_response_msg(config_response_msg_t *msg, int flags);
+
+extern void load_config_response_list(config_response_msg_t *msg,
+				      char *files[]);
 
 extern void destroy_config_file(void *object);
 
-extern void grab_include_directives(void);
 #endif

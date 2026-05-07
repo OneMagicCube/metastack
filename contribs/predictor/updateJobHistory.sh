@@ -120,13 +120,13 @@ if [ -f "$predictor_path/jobHistory_$current_date" ]; then
 	# 删除旧的jobHistory
 	find $predictor_path/ -maxdepth 1 -type f -name 'jobHistory_*' ! -name "jobHistory_$current_date" -exec rm -f {} +
 else
-	echo "$(date '+%Y-%m-%d %H:%M:%S') Warning : File jobHistory_$current_date does not exist, symbolic link not created." 2>&1 | tee -a "$predictor_path/update.log"
+	echo "$(date '+%Y-%m-%d %H:%M:%S') Warning : File jobHistory_$current_date does not exist, symbolic link not created." >> $log
 fi
 
 
 # 同步执行生成模型更新的脚本
-# sklearn_path=$(grep "^[^#]*sklearn_path=" "$configuration_path" | awk -F '=' '{print $2}')
-# . $sklearn_path/update_model.sh 2>&1 | tee -a "$predictor_path/update.log"
+sklearn_path=$(grep "^[^#]*sklearn_path=" "$configuration_path" | awk -F '=' '{print $2}')
+. $sklearn_path/update_model.sh 2>&1 | tee -a "$predictor_path/update.log"
 
 #打印提示
 echo " " >> $predictor_path/update.log

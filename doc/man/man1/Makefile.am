@@ -9,7 +9,6 @@ man1_MANS = \
 	sbcast.1 \
 	scancel.1 \
 	scontrol.1 \
-	scrun.1 \
 	scrontab.1 \
 	sdiag.1	\
 	sinfo.1   \
@@ -41,7 +40,6 @@ html_DATA = \
 	sbcast.html \
 	scancel.html \
 	scontrol.html \
-	scrun.html \
 	scrontab.html \
 	sdiag.html \
 	sinfo.html \

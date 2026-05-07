@@ -41,7 +41,7 @@
 #include "slurm/slurm_errno.h"
 #include "slurm/slurmdb.h"
 
-#include "src/interfaces/accounting_storage.h"
+#include "src/common/slurm_accounting_storage.h"
 
 /*
  * add users to accounting system
@@ -55,54 +55,6 @@ extern int slurmdb_users_add(void *db_conn, List user_list)
 
 	return acct_storage_g_add_users(db_conn, db_api_uid, user_list);
 }
-
-extern char *slurmdb_users_add_cond(void *db_conn,
-				    slurmdb_add_assoc_cond_t *add_assoc,
-				    slurmdb_user_rec_t *user)
-{
-	xassert(add_assoc);
-
-	if (db_api_uid == -1)
-		db_api_uid = getuid();
-
-	return acct_storage_g_add_users_cond(
-		db_conn, db_api_uid, add_assoc, user);
-}
-
-#ifdef __METASTACK_OPT_USER_DEACTIVATE
-/*
- * activate existing users in the accounting system
- * IN:  slurmdb_user_cond_t *user_cond
- * IN:  slurmdb_user_rec_t *user
- * RET: List containing (char *'s) else NULL on error
- * note List needs to be freed with slurm_list_destroy() when called
- */
-extern List slurmdb_users_activate(void *db_conn,
-				 slurmdb_user_cond_t *user_cond,
-				 slurmdb_user_rec_t *user)
-{
-	if (db_api_uid == -1)
-		db_api_uid = getuid();
-
-	return acct_storage_g_modify_users(db_conn, db_api_uid, true,
-					   user_cond, user);
-}
-
-/*
- * deactivate users from accounting system
- * IN:  slurmdb_user_cond_t *user_cond
- * RET: List containing (char *'s) else NULL on error
- * note List needs to be freed with slurm_list_destroy() when called
- */
-extern List slurmdb_users_deactivate(void *db_conn,
-				 slurmdb_user_cond_t *user_cond)
-{
-	if (db_api_uid == -1)
-		db_api_uid = getuid();
-
-	return acct_storage_g_remove_users(db_conn, db_api_uid, true, user_cond);
-}
-#endif
 
 /*
  * get info from the storage
@@ -133,13 +85,8 @@ extern List slurmdb_users_modify(void *db_conn,
 	if (db_api_uid == -1)
 		db_api_uid = getuid();
 
-#ifdef __METASTACK_OPT_USER_DEACTIVATE
-	return acct_storage_g_modify_users(db_conn, db_api_uid, false,
-					   user_cond, user);
-#else
 	return acct_storage_g_modify_users(db_conn, db_api_uid,
 					   user_cond, user);
-#endif
 }
 
 /*
@@ -154,9 +101,5 @@ extern List slurmdb_users_remove(void *db_conn,
 	if (db_api_uid == -1)
 		db_api_uid = getuid();
 
-#ifdef __METASTACK_OPT_USER_DEACTIVATE
-	return acct_storage_g_remove_users(db_conn, db_api_uid, false, user_cond);
-#else
 	return acct_storage_g_remove_users(db_conn, db_api_uid, user_cond);
-#endif
 }

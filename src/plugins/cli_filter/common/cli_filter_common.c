@@ -41,10 +41,9 @@
 #include <pwd.h>
 #include "cli_filter_common.h"
 
-#include "src/interfaces/cli_filter.h"
-#include "src/interfaces/serializer.h"
+#include "src/common/cli_filter.h"
 #include "src/common/data.h"
-#include "src/common/spank.h"
+#include "src/common/plugstack.h"
 #include "src/common/xstring.h"
 #include "src/common/xmalloc.h"
 
@@ -78,15 +77,20 @@ char *cli_filter_json_set_options(slurm_opt_t *options)
 		xfree(sname);
 	}
 
-	argv = options->argv;
-	argc = options->argc;
+	if (options->sbatch_opt) {
+		argv = options->sbatch_opt->script_argv;
+		argc = options->sbatch_opt->script_argc;
+	} else if (options->srun_opt) {
+		argv = options->srun_opt->argv;
+		argc = options->srun_opt->argc;
+	}
 
 	dargv = data_set_list(data_key_set(d, "argv"));
 	for (char **ptr = argv; ptr && *ptr && ptr - argv < argc; ptr++)
 		data_set_string(data_list_append(dargv), *ptr);
 
-	if ((rc = serialize_g_data_to_string(&json, NULL, d, MIME_TYPE_JSON,
-					     SER_FLAGS_COMPACT))) {
+	if ((rc = data_g_serialize(&json, d, MIME_TYPE_JSON,
+				   DATA_SER_FLAGS_COMPACT))) {
 		/* json will remain NULL on failure */
 		error("%s: unable to serialize JSON: %s", __func__,
 		      slurm_strerror(rc));
@@ -130,8 +134,8 @@ char *cli_filter_json_env(void)
 		xfree(key);
 	}
 
-	if ((rc = serialize_g_data_to_string(&json, NULL, d, MIME_TYPE_JSON,
-					     SER_FLAGS_COMPACT))) {
+	if ((rc = data_g_serialize(&json, d, MIME_TYPE_JSON,
+				   DATA_SER_FLAGS_COMPACT))) {
 		/* json will remain NULL on failure */
 		error("%s: unable to serialize JSON: %s", __func__,
 		      slurm_strerror(rc));

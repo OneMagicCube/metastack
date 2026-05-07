@@ -1,7 +1,8 @@
 /*****************************************************************************\
  *  slurm_resolv.h - functions for DNS SRV resolution
  *****************************************************************************
- *  Copyright (C) SchedMD LLC.
+ *  Copyright (C) 2020 SchedMD LLC.
+ *  Written by Tim Wickberg <tim@schedmd.com>
  *
  *  This file is part of Slurm, a resource management program.
  *  For details, see <https://slurm.schedmd.com/>.
@@ -40,8 +41,6 @@ typedef struct {
 	uint16_t priority;
 	uint16_t port;
 	char hostname[1024];
-	bool has_ipv4;
-	bool has_ipv6;
 } ctl_entry_t;
 
 /*

@@ -126,10 +126,6 @@ void print_fields(slurmdb_step_rec_t *step)
 		double cpu_util = 0;
 		double all_task_mem=0;
 #endif
-#ifdef __METASTACK_NEW_GRES_GATHER_DCU
-		double dcu_util = 0;
-		double gpu_mem=0;
-#endif
 		memset(&outbuf, 0, sizeof(outbuf));
 		switch(field->type) {
 		case PRINT_AVECPU:
@@ -173,7 +169,7 @@ void print_fields(slurmdb_step_rec_t *step)
 			break;
 		case PRINT_CONSUMED_ENERGY_RAW:
 			field->print_routine(field,
-					     &step->stats.consumed_energy,
+					     step->stats.consumed_energy,
 					     (curr_inx == field_count));
 			break;
 		case PRINT_AVEDISKREAD:
@@ -230,12 +226,12 @@ void print_fields(slurmdb_step_rec_t *step)
 			if (tmp_uint64 != NO_VAL64)
 #ifdef __METASTACK_OPT_SSTAT_CPUUTIL
 				convert_num_unit((double)tmp_uint64, outbuf,
-					sizeof(outbuf), UNIT_NONE, params.units,
-					params.convert_flags);
+					 sizeof(outbuf), UNIT_NONE, params.units,
+					 params.convert_flags);
 #else
 				convert_num_unit((double)tmp_uint64, outbuf,
-					sizeof(outbuf), UNIT_NONE, NO_VAL,
-					params.convert_flags);
+					 sizeof(outbuf), UNIT_NONE, NO_VAL,
+					 params.convert_flags);
 #endif
 			field->print_routine(field,
 					     outbuf,
@@ -300,7 +296,7 @@ void print_fields(slurmdb_step_rec_t *step)
 				tmp_uint64 = NO_VAL64;
 
 			field->print_routine(field,
-					     &tmp_uint64,
+					     tmp_uint64,
 					     (curr_inx == field_count));
 			break;
 		case PRINT_MAXDISKWRITE:
@@ -339,7 +335,7 @@ void print_fields(slurmdb_step_rec_t *step)
 				tmp_uint64 = NO_VAL64;
 
 			field->print_routine(field,
-					     &tmp_uint64,
+					     tmp_uint64,
 					     (curr_inx == field_count));
 			break;
 		case PRINT_MAXPAGES:
@@ -378,7 +374,7 @@ void print_fields(slurmdb_step_rec_t *step)
 				tmp_uint64 = NO_VAL64;
 
 			field->print_routine(field,
-					     &tmp_uint64,
+					     tmp_uint64,
 					     (curr_inx == field_count));
 			break;
 		case PRINT_MAXRSS:
@@ -389,15 +385,14 @@ void print_fields(slurmdb_step_rec_t *step)
 
 			if (tmp_uint64 != NO_VAL64)
 #ifdef __METASTACK_OPT_SSTAT_CPUUTIL
-			convert_num_unit((double)tmp_uint64, outbuf,
-				 sizeof(outbuf), UNIT_NONE, params.units,
-				 params.convert_flags);
+				convert_num_unit((double)tmp_uint64, outbuf,
+					 sizeof(outbuf), UNIT_NONE, params.units,
+					 params.convert_flags);
 #else
-			convert_num_unit((double)tmp_uint64, outbuf,
-				 sizeof(outbuf), UNIT_NONE, NO_VAL,
-				 params.convert_flags);
+				convert_num_unit((double)tmp_uint64, outbuf,
+					 sizeof(outbuf), UNIT_NONE, NO_VAL,
+					 params.convert_flags);
 #endif
-
 			field->print_routine(field,
 					     outbuf,
 					     (curr_inx == field_count));
@@ -423,7 +418,7 @@ void print_fields(slurmdb_step_rec_t *step)
 				tmp_uint64 = NO_VAL64;
 
 			field->print_routine(field,
-					     &tmp_uint64,
+					     tmp_uint64,
 					     (curr_inx == field_count));
 			break;
 		case PRINT_MAXVSIZE:
@@ -462,7 +457,7 @@ void print_fields(slurmdb_step_rec_t *step)
 				tmp_uint64 = NO_VAL64;
 
 			field->print_routine(field,
-					     &tmp_uint64,
+					     tmp_uint64,
 					     (curr_inx == field_count));
 			break;
 		case PRINT_MINCPU:
@@ -502,7 +497,7 @@ void print_fields(slurmdb_step_rec_t *step)
 				tmp_uint64 = NO_VAL64;
 
 			field->print_routine(field,
-					     &tmp_uint64,
+					     tmp_uint64,
 					     (curr_inx == field_count));
 			break;
 		case PRINT_TRESUIA:
@@ -576,7 +571,7 @@ void print_fields(slurmdb_step_rec_t *step)
 			break;
 		case PRINT_NTASKS:
 			field->print_routine(field,
-					     &step->ntasks,
+					     step->ntasks,
 					     (curr_inx == field_count));
 			break;
 		case PRINT_PIDS:
@@ -608,7 +603,7 @@ void print_fields(slurmdb_step_rec_t *step)
 #ifdef __METASTACK_OPT_SSTAT_CPUUTIL
 	        case PRINT_CPUREALUTIL:
 			cpu_util = (double)step->stats.cpu_util;
-			if(tran_util_readable)
+			if(cpu_util_readable)
 				cpu_util /= 100;
 			snprintf(outbuf, sizeof(outbuf), "%.2f", cpu_util);
 			field->print_routine(field,
@@ -617,7 +612,7 @@ void print_fields(slurmdb_step_rec_t *step)
 			break;
 		case PRINT_CPUUTILAVE:
 			cpu_util = (double)step->stats.avg_cpu_util;
-			if(tran_util_readable)
+			if(cpu_util_readable)
 				cpu_util /= 100;
 			snprintf(outbuf, sizeof(outbuf), "%.2f", cpu_util);
 			field->print_routine(field,
@@ -626,7 +621,7 @@ void print_fields(slurmdb_step_rec_t *step)
 			break;
 		case PRINT_MAXCPUUTIL:
 			cpu_util = (double)step->stats.max_cpu_util;
-			if(tran_util_readable)
+			if(cpu_util_readable)
 				cpu_util /= 100;
 			snprintf(outbuf, sizeof(outbuf), "%.2f", cpu_util);
 			field->print_routine(field,
@@ -635,7 +630,7 @@ void print_fields(slurmdb_step_rec_t *step)
 			break;
 		case PRINT_MINCPUUTIL:
 			cpu_util = (double)step->stats.min_cpu_util;
-			if(tran_util_readable)
+			if(cpu_util_readable)
 				cpu_util /= 100;
 			snprintf(outbuf, sizeof(outbuf), "%.2f", cpu_util);
 			field->print_routine(field,
@@ -647,83 +642,16 @@ void print_fields(slurmdb_step_rec_t *step)
 				     step->stats.tres_usage_in_ave,
 				     TRES_MEM)) == INFINITE64)
 				tmp_uint64 = NO_VAL64;
-			if (tmp_uint64 != NO_VAL64) {
-				all_task_mem = (double) step->ntasks * tmp_uint64;
+		    all_task_mem=(double)step->ntasks*tmp_uint64;
+            if (all_task_mem!= NO_VAL64)
 				convert_num_unit((double)all_task_mem, outbuf,
 					 sizeof(outbuf), UNIT_NONE, params.units,
 					 params.convert_flags);
-			}
 			field->print_routine(field,
 					     outbuf,
 					     (curr_inx == field_count));
 			break;
-#endif
-#ifdef __METASTACK_NEW_GRES_GATHER_DCU
-	    case PRINT_DCUREALUTIL:
-			dcu_util = (double)step->stats.dcu_step_real;
-			if(tran_util_readable)
-				dcu_util /= 100;
-			snprintf(outbuf, sizeof(outbuf), "%.2f", dcu_util);
-			field->print_routine(field,
-					     outbuf,
-					     (curr_inx == field_count));
-			break;
-		case PRINT_MAXDCUUTIL:
-			dcu_util = (double)step->stats.dcu_step_max;
-			if(tran_util_readable)
-				dcu_util /= 100;
-			snprintf(outbuf, sizeof(outbuf), "%.2f", dcu_util);
-			field->print_routine(field,
-					     outbuf,
-					     (curr_inx == field_count));
-			break;
-		case PRINT_MINDCUUTIL:
-			dcu_util = (double)step->stats.dcu_step_min;
-			if(tran_util_readable)
-				dcu_util /= 100;
-			snprintf(outbuf, sizeof(outbuf), "%.2f", dcu_util);
-			field->print_routine(field,
-					     outbuf,
-					     (curr_inx == field_count));
-			break;
-
-		case PRINT_DCUREALMEM:
-			tmp_uint64 = step->stats.dcu_mem_step;
-			if (tmp_uint64 != NO_VAL64) {
-				gpu_mem = (double) tmp_uint64;
-				convert_num_unit(gpu_mem, outbuf,
-					 sizeof(outbuf), UNIT_MEGA, params.units,
-					 params.convert_flags);
-			}
-			field->print_routine(field,
-					     outbuf,
-					     (curr_inx == field_count));
-			break;
-		case PRINT_MAXDCUMEM:
-			tmp_uint64 = step->stats.dcu_mem_step_max;
-			if (tmp_uint64 != NO_VAL64) {
-				gpu_mem = (double) tmp_uint64;
-				convert_num_unit(gpu_mem, outbuf,
-					 sizeof(outbuf), UNIT_MEGA, params.units,
-					 params.convert_flags);
-			}
-			field->print_routine(field,
-					     outbuf,
-					     (curr_inx == field_count));
-			break;
-		case PRINT_MINDCUMEM:
-			tmp_uint64 = step->stats.dcu_mem_step_min;
-			if (tmp_uint64 != NO_VAL64) {
-				gpu_mem = (double) tmp_uint64;
-				convert_num_unit(gpu_mem, outbuf,
-					 sizeof(outbuf), UNIT_MEGA, params.units,
-					 params.convert_flags);
-			}
-			field->print_routine(field,
-					     outbuf,
-					     (curr_inx == field_count));
-			break;
-#endif
+#endif						
 		default:
 			break;
 		}

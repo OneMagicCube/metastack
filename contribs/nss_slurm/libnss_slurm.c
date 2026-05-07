@@ -37,12 +37,10 @@
 #include <fcntl.h>
 #include <grp.h>
 #include <limits.h>
-#include <netdb.h>
 #include <nss.h>
 #include <pwd.h>
 #include <stdio.h>
 #include <string.h>
-#include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <time.h>
@@ -52,9 +50,7 @@
 #include "src/common/slurm_xlator.h"
 
 #include "src/common/parse_config.h"
-#include "src/common/read_config.h"
 #include "src/common/stepd_api.h"
-#include "src/common/xstring.h"
 
 /*
  * One important design note: we cannot load the slurm.conf file using the
@@ -85,7 +81,7 @@ static int _load_config(void)
 	tbl = s_p_hashtbl_create(options);
 	if (stat(conf, &statbuf) || !statbuf.st_size) {
 		/* No file, continue below to set defaults */
-	} else if (s_p_parse_file(tbl, NULL, conf, 0, NULL)) {
+	} else if (s_p_parse_file(tbl, NULL, conf, false, NULL)) {
 		/* could not load or parse file */
 		return (config_loaded = SLURM_ERROR);
 	}
@@ -133,8 +129,8 @@ error:
 
 static struct hostent *_host_internal(int mode, const char *nodename)
 {
-	list_t *steps = NULL;
-	list_itr_t *itr = NULL;
+	List steps = NULL;
+	ListIterator itr = NULL;
 	step_loc_t *stepd;
 	int fd;
 	struct hostent *host = NULL;
@@ -171,7 +167,7 @@ static struct hostent *_host_internal(int mode, const char *nodename)
 }
 
 static int _internal_gethost(int af, const char *name, char *buf,
-			     size_t buflen, struct hostent *result, int *errnop)
+			     size_t buflen, struct hostent *result)
 {
 	int len_name, len_aliases = 0, cnt_aliases = 0, len_addr;
 	struct hostent *rpc_result = NULL;
@@ -198,8 +194,7 @@ static int _internal_gethost(int af, const char *name, char *buf,
 	if ((len_name + len_aliases + ((cnt_aliases + 1) * sizeof(char*)) +
 	     len_addr + (2 * sizeof(char *)) + cnt_aliases + 1) > buflen) {
 		xfree_struct_hostent(rpc_result);
-		*errnop = ERANGE;
-		return NSS_STATUS_TRYAGAIN;
+		return ERANGE;
 	}
 
 	strncpy(buf, rpc_result->h_name, len_name + 1);
@@ -235,7 +230,7 @@ enum nss_status _nss_slurm_gethostbyname_r(const char *name,
 					   size_t buflen, int *errnop,
 					   int *herrnop)
 {
-	return _internal_gethost(AF_UNSPEC, name, buf, buflen, result, errnop);
+	return _internal_gethost(AF_UNSPEC, name, buf, buflen, result);
 }
 
 enum nss_status _nss_slurm_gethostbyname2_r(const char *name, int af,
@@ -243,13 +238,13 @@ enum nss_status _nss_slurm_gethostbyname2_r(const char *name, int af,
 					    char *buf, size_t buflen,
 					    int *errnop, int *herrnop)
 {
-	return _internal_gethost(af, name, buf, buflen, result, errnop);
+	return _internal_gethost(af, name, buf, buflen, result);
 }
 
 static struct passwd *_pw_internal(int mode, uid_t uid, const char *name)
 {
-	list_t *steps = NULL;
-	list_itr_t *itr = NULL;
+	List steps = NULL;
+	ListIterator itr = NULL;
 	step_loc_t *stepd;
 	int fd;
 	struct passwd *pwd = NULL;
@@ -286,7 +281,7 @@ static struct passwd *_pw_internal(int mode, uid_t uid, const char *name)
 
 static int _internal_getpw(int mode, uid_t uid, const char *name,
 			   struct passwd *pwd, char *buf, size_t buflen,
-			   int *errnop)
+			   struct passwd **result)
 {
 	int len_name, len_passwd, len_gecos, len_dir, len_shell;
 	struct passwd *rpc_result = NULL;
@@ -304,8 +299,7 @@ static int _internal_getpw(int mode, uid_t uid, const char *name,
 	if ((len_name + len_passwd + len_gecos + len_dir + len_shell + 5)
 	    > buflen) {
 		xfree_struct_passwd(rpc_result);
-		*errnop = ERANGE;
-		return NSS_STATUS_TRYAGAIN;
+		return ERANGE;
 	}
 
 	strncpy(buf, rpc_result->pw_name, len_name + 1);
@@ -330,22 +324,24 @@ static int _internal_getpw(int mode, uid_t uid, const char *name,
 	strncpy(buf, rpc_result->pw_shell, len_shell + 1);
 	pwd->pw_shell = buf;
 
+	*result = pwd;
 	xfree_struct_passwd(rpc_result);
 	return NSS_STATUS_SUCCESS;
 }
 
-enum nss_status _nss_slurm_getpwnam_r(const char *name, struct passwd *pwd,
-				      char *buf, size_t buflen, int *errnop)
+int _nss_slurm_getpwnam_r(const char *name, struct passwd *pwd,
+			  char *buf, size_t buflen, struct passwd **result)
 {
 	return _internal_getpw(GETPW_MATCH_USER_AND_PID, NO_VAL, name, pwd,
-			       buf, buflen, errnop);
+			       buf, buflen, result);
+
 }
 
-enum nss_status _nss_slurm_getpwuid_r(uid_t uid, struct passwd *pwd,
-				      char *buf, size_t buflen, int *errnop)
+int _nss_slurm_getpwuid_r(uid_t uid, struct passwd *pwd,
+			  char *buf, size_t buflen, struct passwd **result)
 {
 	return _internal_getpw(GETPW_MATCH_USER_AND_PID, uid, NULL, pwd,
-			       buf, buflen, errnop);
+			       buf, buflen, result);
 }
 
 static int entry_fetched = 1;
@@ -356,8 +352,8 @@ int _nss_slurm_setpwent(void)
 	return NSS_STATUS_SUCCESS;
 }
 
-enum nss_status _nss_slurm_getpwent_r(struct passwd *pwd, char *buf,
-				      size_t buflen, int *errnop)
+int _nss_slurm_getpwent_r(struct passwd *pwd, char *buf, size_t buflen,
+			  struct passwd **result)
 {
 	/*
 	 * There is only ever one entry here. The docs indicate we should
@@ -367,19 +363,19 @@ enum nss_status _nss_slurm_getpwent_r(struct passwd *pwd, char *buf,
 		return NSS_STATUS_NOTFOUND;
 	entry_fetched = 1;
 
-	return _internal_getpw(GETPW_MATCH_PID, NO_VAL, NULL, pwd, buf, buflen,
-			       errnop);
+	return _internal_getpw(GETPW_MATCH_PID, NO_VAL, NULL, pwd,
+			     buf, buflen, result);
 }
 
-enum nss_status _nss_slurm_endpwent(void)
+int _nss_slurm_endpwent(void)
 {
 	return NSS_STATUS_SUCCESS;
 }
 
 static struct group **_gr_internal(int mode, gid_t gid, const char *name)
 {
-	list_t *steps = NULL;
-	list_itr_t *itr = NULL;
+	List steps = NULL;
+	ListIterator itr = NULL;
 	step_loc_t *stepd;
 	int fd;
 	struct group **grps = NULL;
@@ -420,7 +416,7 @@ static struct group **gr_rpc_results = NULL;
 
 static int _internal_getgr(int mode, gid_t gid, const char *name,
 			   struct group *grp, char *buf, size_t buflen,
-			   int *errnop)
+			   struct group **result)
 {
 	int len_name, len_passwd, len_mem = 0;
 	int i = 0;
@@ -458,8 +454,7 @@ static int _internal_getgr(int mode, gid_t gid, const char *name,
 	if ((len_name + len_passwd + len_mem + 3)
 	    > buflen) {
 		xfree_struct_group_array(gr_rpc_results);
-		*errnop = ERANGE;
-		return NSS_STATUS_TRYAGAIN;
+		return ERANGE;
 	}
 
 	strncpy(buf, gr_rpc_results[i]->gr_name, len_name + 1);
@@ -500,6 +495,7 @@ static int _internal_getgr(int mode, gid_t gid, const char *name,
 	} else
 		grp->gr_mem = NULL;
 
+	*result = grp;
 	if (mode != GETGR_MATCH_PID) {
 		xfree_struct_group_array(gr_rpc_results);
 		gr_rpc_results = NULL;
@@ -513,22 +509,22 @@ static int _internal_getgr(int mode, gid_t gid, const char *name,
 	return NSS_STATUS_SUCCESS;
 }
 
-enum nss_status _nss_slurm_getgrnam_r(const char *name, struct group *pwd,
-				      char *buf, size_t buflen, int *errnop)
+int _nss_slurm_getgrnam_r(const char *name, struct group *pwd,
+			  char *buf, size_t buflen, struct group **result)
 {
 	return _internal_getgr(GETGR_MATCH_GROUP_AND_PID, NO_VAL, name, pwd,
-			       buf, buflen, errnop);
+			       buf, buflen, result);
 
 }
 
-enum nss_status _nss_slurm_getgrgid_r(gid_t gid, struct group *pwd,
-				      char *buf, size_t buflen, int *errnop)
+int _nss_slurm_getgrgid_r(gid_t gid, struct group *pwd,
+			  char *buf, size_t buflen, struct group **result)
 {
 	return _internal_getgr(GETGR_MATCH_GROUP_AND_PID, gid, NULL, pwd,
-			       buf, buflen, errnop);
+			       buf, buflen, result);
 }
 
-enum nss_status _nss_slurm_setgrent(void)
+int _nss_slurm_setgrent(void)
 {
 	xfree_struct_group_array(gr_rpc_results);
 	gr_rpc_results = NULL;
@@ -537,14 +533,14 @@ enum nss_status _nss_slurm_setgrent(void)
 	return NSS_STATUS_SUCCESS;
 }
 
-enum nss_status _nss_slurm_getgrent_r(struct group *grp, char *buf,
-				      size_t buflen, int *errnop)
+int _nss_slurm_getgrent_r(struct group *grp, char *buf, size_t buflen,
+			  struct group **result)
 {
-	return _internal_getgr(GETGR_MATCH_PID, NO_VAL, NULL, grp, buf, buflen,
-			       errnop);
+	return _internal_getgr(GETGR_MATCH_PID, NO_VAL, NULL, grp,
+			       buf, buflen, result);
 }
 
-enum nss_status _nss_slurm_endgrent(void)
+int _nss_slurm_endgrent(void)
 {
 	xfree_struct_group_array(gr_rpc_results);
 	gr_rpc_results = NULL;

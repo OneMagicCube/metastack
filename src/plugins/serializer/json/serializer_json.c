@@ -1,7 +1,8 @@
 /*****************************************************************************\
  *  serializer_json.c - Serializer for JSON.
  *****************************************************************************
- *  Copyright (C) SchedMD LLC.
+ *  Copyright (C) 2021 SchedMD LLC
+ *  Written by Nathan Rini <nate@schedmd.com>
  *
  *  This file is part of Slurm, a resource management program.
  *  For details, see <https://slurm.schedmd.com/>.
@@ -49,7 +50,6 @@
 #include "src/common/read_config.h"
 #include "src/common/xassert.h"
 #include "src/common/xstring.h"
-#include "src/interfaces/serializer.h"
 
 /*
  * These variables are required by the generic plugin interface.  If they
@@ -114,7 +114,7 @@ static json_object *_try_parse(const char *src, size_t stringlen,
 		return NULL;
 	}
 	if (tok->char_offset < stringlen)
-		log_flag(DATA, "%s: Extra %zu characters after JSON string detected",
+		info("%s: WARNING: Extra %zu characters after JSON string detected",
 		     __func__, (stringlen - tok->char_offset));
 
 	return jobj;
@@ -232,32 +232,27 @@ static json_object *_data_to_json(const data_t *d)
 	};
 }
 
-extern int serialize_p_data_to_string(char **dest, size_t *length,
-				      const data_t *src,
-				      serializer_flags_t flags)
+extern int serializer_p_serialize(char **dest, const data_t *data,
+				  data_serializer_flags_t flags)
 {
-	struct json_object *jobj = _data_to_json(src);
+	struct json_object *jobj = _data_to_json(data);
 	int jflags = 0;
 
 	/* can't be pretty and compact at the same time! */
-	xassert((flags & (SER_FLAGS_PRETTY | SER_FLAGS_COMPACT)) !=
-		(SER_FLAGS_PRETTY | SER_FLAGS_COMPACT));
+	xassert((flags & (DATA_SER_FLAGS_PRETTY | DATA_SER_FLAGS_COMPACT)) !=
+		(DATA_SER_FLAGS_PRETTY | DATA_SER_FLAGS_COMPACT));
 
 	switch (flags) {
-	case SER_FLAGS_PRETTY:
+	case DATA_SER_FLAGS_PRETTY:
 		jflags = JSON_C_TO_STRING_SPACED | JSON_C_TO_STRING_PRETTY;
 		break;
-	case SER_FLAGS_COMPACT: /* fallthrough */
+	case DATA_SER_FLAGS_COMPACT: /* fallthrough */
 	default:
 		jflags = JSON_C_TO_STRING_PLAIN;
 	}
 
 	/* string will die with jobj */
 	*dest = xstrdup(json_object_to_json_string_ext(jobj, jflags));
-	if (length) {
-		/* add 1 for \0 */
-		*length = strlen(*dest) + 1;
-	}
 
 	/* put is equiv to free() */
 	json_object_put(jobj);
@@ -265,13 +260,12 @@ extern int serialize_p_data_to_string(char **dest, size_t *length,
 	return SLURM_SUCCESS;
 }
 
-extern int serialize_p_string_to_data(data_t **dest, const char *src,
-				      size_t length)
+extern int serializer_p_deserialize(data_t **dest, const char *src,
+				    size_t len)
 {
 	json_object *jobj = NULL;
 	data_t *data = NULL;
 	struct json_tokener *tok = json_tokener_new();
-	int rc;
 
 	if (!tok)
 		return ENOMEM;
@@ -280,22 +274,20 @@ extern int serialize_p_string_to_data(data_t **dest, const char *src,
 		return ESLURM_DATA_PTR_NULL;
 
 	/* json-c has hard limit of 32 bits */
-	if (length >= INT32_MAX) {
+	if (len >= INT32_MAX) {
 		error("%s: unable to parse JSON: too large",
 		      __func__);
 		return ESLURM_DATA_TOO_LARGE;
 	}
 
-	jobj = _try_parse(src, length, tok);
+	jobj = _try_parse(src, len, tok);
 	if (jobj) {
 		data = _json_to_data(jobj, NULL);
 		json_object_put(jobj);
-		rc = SLURM_SUCCESS;
-	} else
-		rc = ESLURM_REST_FAIL_PARSING;
+	}
 
 	json_tokener_free(tok);
 
 	*dest = data;
-	return rc;
+	return SLURM_SUCCESS;
 }

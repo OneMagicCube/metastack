@@ -54,9 +54,6 @@ typedef struct {
 #define PMIXP_INFO_MAGIC 0xCAFE01F0
 	int magic;
 #endif
-#ifdef __METASTACK_BUG_SLURMDSPOOLDIR_SYMBOLIC_LINK
-	uint32_t flags;
-#endif
 	pmix_nspace_t nspace;
 	slurm_step_id_t step_id; /* Current step id (or NO_VAL) */
 	uint32_t nnodes; /* number of nodes in current step */
@@ -67,8 +64,8 @@ typedef struct {
 	uint32_t *task_cnts; /* Number of tasks on each node in this step */
 	int node_id; /* relative position of this node in this step */
 	int node_id_job; /* relative position of this node in Slurm job */
-	hostlist_t *job_hl;
-	hostlist_t *step_hl;
+	hostlist_t job_hl;
+	hostlist_t step_hl;
 	char *hostname;
 	uint32_t node_tasks; /* number of tasks on *this* node */
 	uint32_t *gtids; /* global ids of tasks located on *this* node */
@@ -76,7 +73,6 @@ typedef struct {
 	int timeout;
 	char *cli_tmpdir, *cli_tmpdir_base;
 	char *lib_tmpdir;
-	char *client_lib_tmpdir; /* path to lib_tmpdir on client */
 	char *server_addr_unfmt;
 	char *spool_dir;
 	uid_t uid;
@@ -87,17 +83,14 @@ typedef struct {
 
 extern pmix_jobinfo_t _pmixp_job_info;
 
-#ifdef __METASTACK_BUG_SLURMDSPOOLDIR_SYMBOLIC_LINK
-extern uint32_t pmixp_info_flags();
-#endif
-
 /* slurmd contact information */
 void pmixp_info_srv_usock_set(char *path, int fd);
 const char *pmixp_info_srv_usock_path(void);
 int pmixp_info_srv_usock_fd(void);
 bool pmixp_info_same_arch(void);
 bool pmixp_info_srv_direct_conn(void);
-bool pmixp_info_srv_direct_conn_early(void);
+bool pmixp_info_srv_wireup_early(void);
+bool pmixp_info_srv_wireup_threaded(void);
 bool pmixp_info_srv_direct_conn_ucx(void);
 int pmixp_info_srv_fence_coll_type(void);
 bool pmixp_info_srv_fence_coll_barrier(void);
@@ -132,21 +125,16 @@ static inline char *pmixp_info_tmpdir_lib(void)
 	return _pmixp_job_info.lib_tmpdir;
 }
 
-/* client Lib tempdir */
-static inline char *_pmixp_info_client_tmpdir_lib(void)
-{
-	if (_pmixp_job_info.client_lib_tmpdir)
-		return _pmixp_job_info.client_lib_tmpdir;
-	else
-		return pmixp_info_tmpdir_lib();
-}
+/* Profiling setting */
+bool pmixp_info_prof_delayed(void);
+size_t pmixp_info_prof_bufsize(void);
 
 /* Dealing with I/O */
 void pmixp_info_io_set(eio_handle_t *h);
 eio_handle_t *pmixp_info_io(void);
 
 /* Job information */
-int pmixp_info_set(const stepd_step_rec_t *step, char ***env);
+int pmixp_info_set(const stepd_step_rec_t *job, char ***env);
 int pmixp_info_free(void);
 
 static inline uint32_t pmixp_info_jobuid(void)
@@ -290,7 +278,7 @@ static inline char *pmixp_info_task_map(void)
 	return _pmixp_job_info.task_map_packed;
 }
 
-static inline hostlist_t *pmixp_info_step_hostlist(void)
+static inline hostlist_t pmixp_info_step_hostlist(void)
 {
 	return _pmixp_job_info.step_hl;
 }

@@ -1,7 +1,8 @@
 /*****************************************************************************\
  *  job_functions.c - Interface to functions dealing with jobs in the database.
  ******************************************************************************
- *  Copyright (C) SchedMD LLC.
+ *  Copyright (C) 2017 SchedMD LLC
+ *  Written by Danny Auble da@schedmd.com, et. al.
  *
  *  This file is part of Slurm, a resource management program.
  *  For details, see <https://slurm.schedmd.com/>.
@@ -37,8 +38,8 @@
 #include "slurm/slurm_errno.h"
 #include "slurm/slurmdb.h"
 
-#include "src/interfaces/accounting_storage.h"
-#include "src/interfaces/jobcomp.h"
+#include "src/common/slurm_accounting_storage.h"
+#include "src/common/slurm_jobcomp.h"
 
 /*
  * modify existing job in the accounting system
@@ -83,9 +84,9 @@ extern int slurmdb_jobs_fix_runaway(void *db_conn, List jobs)
 }
 
 /* initialization of job completion logging */
-extern int slurmdb_jobcomp_init(void)
+extern int slurmdb_jobcomp_init(char *jobcomp_loc)
 {
-	return jobcomp_g_init();
+	return jobcomp_g_init(jobcomp_loc);
 }
 
 /* terminate pthreads and free, general clean-up for termination */

@@ -1,7 +1,8 @@
 /*****************************************************************************\
  *  cgroup_v1.h - Cgroup v1 plugin
  *****************************************************************************
- *  Copyright (C) SchedMD LLC.
+ *  Copyright (C) 2021 SchedMD LLC
+ *  Written by Felip Moll <felip.moll@schedmd.com>
  *
  *  This file is part of Slurm, a resource management program.
  *  For details, see <https://slurm.schedmd.com/>.
@@ -38,15 +39,15 @@
 
 #define _GNU_SOURCE		/* For POLLRDHUP, O_CLOEXEC on older glibc */
 #include <poll.h>
-#include <sys/eventfd.h>
 
 #include "slurm/slurm.h"
 #include "slurm/slurm_errno.h"
 
 #include "src/common/bitstring.h"
+#include "src/common/cgroup.h"
 #include "src/common/list.h"
 #include "src/common/log.h"
-#include "src/interfaces/jobacct_gather.h"
+#include "src/common/slurm_jobacct_gather.h"
 #include "src/common/xassert.h"
 #include "src/common/xmalloc.h"
 #include "src/common/xstring.h"
@@ -55,5 +56,18 @@
 #include "src/plugins/cgroup/common/cgroup_common.h"
 
 #include "xcgroup.h"
+
+// http://lists.debian.org/debian-boot/2012/04/msg00047.html
+#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__NetBSD__)
+#define POLLRDHUP POLLHUP
+#define	MS_NOSUID MNT_NOSUID
+#define	MS_NOEXEC MNT_NOEXEC
+#define	MS_NODEV 0
+#define	umount(d) unmount(d, 0)
+#else
+#include <sys/eventfd.h>
+#endif
+
+#define MAX_MOVE_WAIT 5000
 
 #endif /* !_CGROUP_V1_H */

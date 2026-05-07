@@ -105,13 +105,12 @@
  *   right - right value for rightmost app process in subtree
  */
 
-#include <signal.h>
 #include <stdlib.h>
 #include <unistd.h>
 
 #include "src/common/slurm_xlator.h"
+#include "src/common/slurm_protocol_interface.h"
 #include "src/common/slurm_protocol_api.h"
-#include "src/common/slurm_protocol_socket.h"
 #include "src/common/xmalloc.h"
 
 #include "pmi.h"
@@ -159,7 +158,7 @@ static int pmix_stepd_width = 16;
 static int pmix_stepd_children = 0;
 
 /* we allocate a hostlist in init and destroy it in finalize */
-static hostlist_t *pmix_stepd_hostlist = NULL;
+static hostlist_t pmix_stepd_hostlist = NULL;
 
 /* return rank of our parent in stepd tree,
  * returns -1 if we're the root */
@@ -232,7 +231,7 @@ static int pmix_stepd_send(const char* buf, uint32_t size, int rank)
 			/* cancel the step to avoid tasks hang */
 			slurm_kill_job_step(job_info.step_id.job_id,
 					    job_info.step_id.step_id,
-					    SIGKILL, 0);
+					    SIGKILL);
 		}
 
 		/* didn't succeeded, but we'll retry again,
@@ -339,7 +338,9 @@ int pmix_ring_finalize()
 	}
 
 	/* free host list */
-	FREE_NULL_HOSTLIST(pmix_stepd_hostlist);
+	if (pmix_stepd_hostlist != NULL) {
+		hostlist_destroy(pmix_stepd_hostlist);
+        }
 
 	return rc;
 }
@@ -435,7 +436,7 @@ int pmix_ring_out(int count, char* left, char* right)
 		/* TODO: use tmp_rc here to catch any failure */
 
 		/* free message */
-		FREE_NULL_BUFFER(buf);
+		free_buf(buf);
 	}
 
 	/* now send messages to children app procs,
@@ -566,7 +567,7 @@ int pmix_ring_in(int ring_id, int count, char* left, char* right)
 			/* TODO: use tmp_rc here to catch any failure */
 
 			/* free message */
-			FREE_NULL_BUFFER(buf);
+			free_buf(buf);
 		} else {
 			/* we're the root of the tree, send values back down */
 

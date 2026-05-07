@@ -171,9 +171,9 @@ static int spank_option_image(int val, const char *optarg, int remote)
 
 int add_mount(const char *source, const char *target, const char *flags)
 {
-	int ret = 0;
+	int ret;
 	char *entry = NULL;
-	const char *default_flags = NULL;
+	const char *default_flags;
 	int rv = -1;
 
 	if (strspn(source, "./") > 0) {
@@ -222,9 +222,9 @@ void remove_all_mounts(void)
 
 static int parse_mount_option(const char *option)
 {
-	int ret = 0;
+	int ret;
 	char *option_dup = NULL;
-	char *remainder, *src = NULL, *dst = NULL, *flags = NULL;
+	char *remainder, *src, *dst, *flags = NULL;
 	int rv = -1;
 
 	if (option == NULL)
@@ -277,7 +277,7 @@ static int spank_option_mount(int val, const char *optarg, int remote)
 {
 	int ret;
 	char *optarg_dup = NULL;
-	char *args = NULL, *arg = NULL;
+	char *args, *arg;
 	int rv = -1;
 
 	if (optarg == NULL || *optarg == '\0') {
@@ -329,7 +329,7 @@ static int spank_option_workdir(int val, const char *optarg, int remote)
 static int spank_option_container_name(int val, const char *optarg, int remote)
 {
 	char *optarg_dup = NULL;
-	char *name = NULL, *flags = NULL;
+	char *name, *flags;
 	int rv = -1;
 
 	if (optarg == NULL || *optarg == '\0') {
@@ -455,7 +455,7 @@ static int spank_option_container_env(int val, const char *optarg, int remote)
 {
 	int ret;
 	char *optarg_dup = NULL;
-	char *args = NULL, *arg = NULL;
+	char *args, *arg;
 	int rv = -1;
 
 	if (optarg == NULL || *optarg == '\0') {

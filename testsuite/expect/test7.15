@@ -44,7 +44,15 @@ exec $bin_cc -O -o $file_prog ${file_prog}.c
 #   is intermittent.
 #
 set have_runjob 0
-set nnodes [llength [get_nodes_by_state]]
+if {[get_config_param "LaunchType"] eq "launch/runjob"} {
+	set have_runjob 1
+}
+
+if {$have_runjob} {
+	set nnodes 1
+} else {
+	set nnodes [llength [get_nodes_by_state]]
+}
 
 #
 #  Run the test_prog to ensure that no signals are blocked by

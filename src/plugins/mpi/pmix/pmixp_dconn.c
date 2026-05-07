@@ -86,7 +86,7 @@ int pmixp_dconn_init(int node_cnt, pmixp_p2p_data_t direct_hdr)
 	return SLURM_SUCCESS;
 }
 
-void pmixp_dconn_fini(void)
+void pmixp_dconn_fini()
 {
 	int i;
 #ifdef HAVE_UCX
@@ -118,27 +118,27 @@ int pmixp_dconn_connect_do(pmixp_dconn_t *dconn, void *ep_data,
 	return _pmixp_dconn_h.connect(dconn->priv, ep_data, ep_len, init_msg);
 }
 
-pmixp_dconn_progress_type_t pmixp_dconn_progress_type(void)
+pmixp_dconn_progress_type_t pmixp_dconn_progress_type()
 {
 	return _progress_type;
 }
 
-pmixp_dconn_conn_type_t pmixp_dconn_connect_type(void)
+pmixp_dconn_conn_type_t pmixp_dconn_connect_type()
 {
 	return _conn_type;
 }
 
-int pmixp_dconn_poll_fd(void)
+int pmixp_dconn_poll_fd()
 {
 	return _poll_fd;
 }
 
-size_t pmixp_dconn_ep_len(void)
+size_t pmixp_dconn_ep_len()
 {
 	return ep_len;
 }
 
-char *pmixp_dconn_ep_data(void)
+char *pmixp_dconn_ep_data()
 {
 	return ep_data;
 }

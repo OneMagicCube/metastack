@@ -1,5 +1,5 @@
 /****************************************************************************\
- *  sdiag.h - Utility for getting information about slurmctld behavior
+ *  sdiag.h - Utility for getting information about slurmctld behaviour
  *****************************************************************************
  *  Copyright (C) 2019 UT-Battelle, LLC
  *  Produced at Oak Ridge National Laboratory, June 2019
@@ -42,9 +42,6 @@ struct sdiag_parameters {
 	int mode;
 	int sort;
 	List clusters;
-	char *cluster_names;
-	char *mimetype; /* --yaml or --json */
-	char *data_parser; /* data_parser args */
 };
 
 typedef enum {

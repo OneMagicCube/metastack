@@ -67,19 +67,17 @@ struct squeue_parameters {
 	bool all_flag;
 	bool all_states;
 	bool array_flag;
-	bool detail_flag;
-	bool expand_patterns;
+	bool array_unique_flag;
 	bool federation_flag;
 	int  iterate;
 	bool job_flag;
 	bool local_flag;
-	bool notme_flag;
 	bool sibling_flag;
 	bool start_flag;
 	bool step_flag;
 #ifdef __METASTACK_OPT_CACHE_QUERY
 	bool cache_query;
-	bool nocache_query;		
+    bool nocache_query;		
 #endif
 	bool long_format;
 	bool long_list;
@@ -90,15 +88,12 @@ struct squeue_parameters {
 	char* accounts;
 	List clusters;
 	uint32_t cluster_flags;
-	char *cluster_names;
 	char* format;
 	char* format_long;
 	char* jobs;
 	char *mimetype; /* --yaml or --json */
-	char *data_parser; /* data_parser args */
 	char* names;
-	hostset_t *nodes;
-	bool only_state; /* limit query to only job states */
+	hostset_t nodes;
 	char* licenses;
 	char* partitions;
 	char* qoss;
@@ -128,31 +123,9 @@ struct squeue_parameters {
 	bool format_field_flag;
 	bool right_flag;
 #endif
-#ifdef __METASTACK_OPT_APP  
-	List app_source_list;  /* list of uint8_t* values to filter by app_source */  
-	List app_name_list;    /* list of char* app names to filter by app_name */ 
-#endif 
 };
 
 extern struct squeue_parameters params;
-
-
-/* Flags for fmt_data_job_t, fmt_data_step_t */
-#define FMT_FLAG_HIDDEN		SLURM_BIT(0)
-
-typedef struct fmt_data_job {
-	char *name;		/* long format name */
-	char c;			/* short format character, prefixed by '%' */
-	int (*fn)(job_info_t *job, int width, bool right, char *suffix);
-	uint32_t flags;		/* FMT_FLAG_* */
-} fmt_data_job_t;
-
-typedef struct fmt_data_step {
-	char *name;		/* long format name */
-	char c;			/* short format character, prefixed by '%' */
-	int (*fn)(job_step_info_t *step, int width, bool right, char *suffix);
-	uint32_t flags;		/* FMT_FLAG_* */
-} fmt_data_step_t;
 
 extern void parse_command_line( int argc, char* *argv );
 extern int  parse_format( char* format );

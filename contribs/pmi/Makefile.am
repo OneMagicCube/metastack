@@ -2,7 +2,7 @@
 #
 
 AUTOMAKE_OPTIONS = foreign
-AM_CPPFLAGS = -fPIC -I$(top_srcdir)
+AM_CPPFLAGS = -fPIC -I$(top_srcdir) -I$(top_srcdir)/src/common
 
 if WITH_GNU_LD
 PMI_VERSION_SCRIPT = \

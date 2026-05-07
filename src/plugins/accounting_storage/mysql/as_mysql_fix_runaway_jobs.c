@@ -1,7 +1,8 @@
 /*****************************************************************************\
  *  as_mysql_fix_runaway_jobs.c - functions dealing with runaway jobs.
  *****************************************************************************
- *  Copyright (C) SchedMD LLC.
+ *  Copyright (C) 2016 SchedMD LLC.
+ *  Written by Nathan Yee <nyee32@schedmd.com>
  *
  *  This file is part of Slurm, a resource management program.
  *  For details, see <https://slurm.schedmd.com/>.
@@ -105,7 +106,7 @@ extern int as_mysql_fix_runaway_jobs(mysql_conn_t *mysql_conn, uint32_t uid,
 {
 	char *query = NULL, *job_ids = NULL;
 	slurmdb_job_rec_t *job = NULL;
-	list_itr_t *iter = NULL;
+	ListIterator iter = NULL;
 	int rc = SLURM_SUCCESS;
 	slurmdb_job_rec_t *first_job;
 	char *temp_cluster_name = mysql_conn->cluster_name;

@@ -1,7 +1,8 @@
 /*****************************************************************************\
  *  run_in_daemon.c - functions to determine if you are a given daemon or not
  *****************************************************************************
- *  Copyright (C) SchedMD LLC.
+ *  Copyright (C) 2020 SchedMD LLC
+ *  Written by Danny Auble <da@schedmd.com>
  *
  *  This file is part of Slurm, a resource management program.
  *  For details, see <https://slurm.schedmd.com/>.
@@ -41,7 +42,6 @@
 
 strong_alias(run_in_daemon, slurm_run_in_daemon);
 strong_alias(running_in_daemon, slurm_running_in_daemon);
-strong_alias(running_in_sackd, slurm_running_in_sackd);
 strong_alias(running_in_slurmctld, slurm_running_in_slurmctld);
 strong_alias(running_in_slurmd, slurm_running_in_slurmd);
 strong_alias(running_in_slurmdbd, slurm_running_in_slurmdbd);
@@ -90,13 +90,7 @@ extern bool running_in_daemon(void)
 {
 	static bool run = false, set = false;
 	return run_in_daemon(&run, &set,
-			     "sackd,slurmctld,slurmd,slurmdbd,slurmstepd,slurmrestd");
-}
-
-extern bool running_in_sackd(void)
-{
-	static bool run = false, set = false;
-	return run_in_daemon(&run, &set, "sackd");
+			     "slurmctld,slurmd,slurmdbd,slurmstepd,slurmrestd");
 }
 
 static bool _running_in_slurmctld(bool reset)

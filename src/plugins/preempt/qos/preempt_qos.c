@@ -3,7 +3,7 @@
  *  jobs based upon their Quality Of Service (QOS).
  *****************************************************************************
  *  Copyright (C) 2009-2010 Lawrence Livermore National Security.
- *  Copyright (C) SchedMD LLC.
+ *  Portions Copyright (C) 2010 SchedMD <https://www.schedmd.com>.
  *  Produced at Lawrence Livermore National Laboratory (cf, DISCLAIMER).
  *  Written by Morris jette <jette1@llnl.gov>
  *  CODE-OCEC-09-009. All rights reserved.
@@ -47,10 +47,8 @@
 #include "src/common/log.h"
 #include "src/common/plugin.h"
 #include "src/common/xstring.h"
-
-#include "src/interfaces/accounting_storage.h"
-#include "src/interfaces/preempt.h"
-
+#include "src/common/slurm_accounting_storage.h"
+#include "src/slurmctld/preempt.h"
 #include "src/slurmctld/slurmctld.h"
 #include "src/slurmctld/job_scheduler.h"
 #include "src/slurmctld/acct_policy.h"

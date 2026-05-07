@@ -2,6 +2,7 @@
 
 SUBDIRS = \
 	all_partitions \
+	cray_aries \
 	defaults \
 	logging \
 	lua \

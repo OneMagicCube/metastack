@@ -3,7 +3,7 @@
  *                     slurmctld functions for scontrol.
  *****************************************************************************
  *  Copyright (C) 2004 CSCS
- *  Copyright (C) SchedMD LLC.
+ *  Copyright (C) 2015 SchedMD LLC
  *  Written by Stephen Trofinoff and Danny Auble
  *
  *  This file is part of Slurm, a resource management program.
@@ -37,12 +37,7 @@
 \*****************************************************************************/
 
 #include "scontrol.h"
-#include "src/common/uid.h"
 #include "src/common/xstring.h"
-
-#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
-#include "src/common/assoc_mgr.h"
-#endif
 
 static uint32_t tres_cnt = 0;
 static char **tres_names = NULL;
@@ -120,17 +115,17 @@ static int _print_used_acct_limit(slurmdb_used_limits_t *used_limit,
 			 qos_rec->max_tres_pa_ctld,
 			 used_limit->tres, 0);
 
-	/* NEW LINE */
-	printf("%s", new_line_char);
-
-	_print_tres_line("MaxTRESRunMinsPA",
-			 qos_rec->max_tres_run_mins_pa_ctld,
-			 used_limit->tres_run_secs, 60);
-
 	if (one_liner)
 		printf("}");
 
+	/* MaxTRESRunMinsPA doesn't do anything yet, if/when it does
+	 * change the last param in the print_tres_line to 0. */
+
 	/* printf("%s", one_liner ? "" : "    "); */
+	/* _print_tres_line("MaxTRESRunMinsPA", */
+	/* 		 qos_rec->max_tres_run_mins_pa_ctld, */
+	/* 		 used_limit->tres_run_mins, 60, 1); */
+
 
 	return SLURM_SUCCESS;
 }
@@ -139,14 +134,11 @@ static int _print_used_user_limit(slurmdb_used_limits_t *used_limit,
 				  slurmdb_qos_rec_t *qos_rec)
 {
 	char *new_line_char = one_liner ? " " : "\n        ";
-	char *user_name = uid_to_string(used_limit->uid);
 
-	printf("%s%s(%d)%s",
+	printf("%s%d%s",
 	       one_liner ? " " : "\n      ",
-	       user_name,
 	       used_limit->uid,
 	       one_liner ? "={" : new_line_char);
-	xfree(user_name);
 
 	printf("MaxJobsPU=");
 	if (qos_rec->max_jobs_pu != INFINITE)
@@ -173,28 +165,26 @@ static int _print_used_user_limit(slurmdb_used_limits_t *used_limit,
 			 qos_rec->max_tres_pu_ctld,
 			 used_limit->tres, 0);
 
-	/* NEW LINE */
-	printf("%s", new_line_char);
-
-	_print_tres_line("MaxTRESRunMinsPU",
-			 qos_rec->max_tres_run_mins_pu_ctld,
-			 used_limit->tres_run_secs, 60);
-
 	if (one_liner)
 		printf("}");
 
+	/* MaxTRESRunMinsPU doesn't do anything yet, if/when it does
+	 * change the last param in the print_tres_line to 0. */
+
 	/* printf("%s", one_liner ? "" : "    "); */
+	/* _print_tres_line("MaxTRESRunMinsPU", */
+	/* 		 qos_rec->max_tres_run_mins_pu_ctld, */
+	/* 		 used_limit->tres_run_mins, 60, 1); */
 
 	return SLURM_SUCCESS;
 }
-
 #ifdef __METASTACK_OPT_RPC_USER_FIX
 static void _print_assoc_mgr_info(assoc_mgr_info_msg_t *msg, bool flags)
 #else
 static void _print_assoc_mgr_info(assoc_mgr_info_msg_t *msg)
 #endif
 {
-	list_itr_t *itr;
+	ListIterator itr;
 	slurmdb_user_rec_t *user_rec;
 	slurmdb_assoc_rec_t *assoc_rec;
 	slurmdb_qos_rec_t *qos_rec;
@@ -241,7 +231,7 @@ static void _print_assoc_mgr_info(assoc_mgr_info_msg_t *msg)
 			/* if flags is true,indicates that the slurmctld server has sorted assoc_list,
 			after acquire assoc_list, No need to repeat sorting */
 			slurmdb_sort_hierarchical_assoc_list(
-				msg->assoc_list);
+				msg->assoc_list, true);
 		}
 #endif
 		itr = list_iterator_create(msg->assoc_list);
@@ -294,8 +284,8 @@ static void _print_assoc_mgr_info(assoc_mgr_info_msg_t *msg)
 			/* rgt isn't always valid coming from the
 			 * association manager (so don't print it).
 			 */
-			printf("Lineage=%s DefAssoc=%s%s",
-			       assoc_rec->lineage,
+			printf("Lft=%u DefAssoc=%s%s",
+			       assoc_rec->lft,
 			       assoc_rec->is_def ? "Yes" : "No",
 			       new_line_char);
 
@@ -418,11 +408,6 @@ static void _print_assoc_mgr_info(assoc_mgr_info_msg_t *msg)
 				       assoc_rec->min_prio_thresh);
 			else
 				printf("MinPrioThresh=");
-
-			/* NEW LINE */
-			printf("%s", new_line_char);
-
-			printf("Comment=%s", assoc_rec->comment);
 
 			/* NEW LINE */
 			printf("\n");
@@ -623,52 +608,12 @@ static void _print_assoc_mgr_info(assoc_mgr_info_msg_t *msg)
 	}
 }
 
-#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
-static bool validate_read_only_user_uid(uid_t uid)
-{
-    assoc_mgr_info_request_msg_t req;
-    assoc_mgr_info_msg_t *msg = NULL;
-    char *user = NULL;
-    int cc = 0;
-    list_itr_t *itr = NULL;
-    slurmdb_user_rec_t *user_rec = NULL;
-	slurmdb_admin_level_t level = SLURMDB_ADMIN_NOTSET;
-
-    memset(&req, 0, sizeof(assoc_mgr_info_request_msg_t));
-
-
-    user = uid_to_string(uid);
-    req.flags |= ASSOC_MGR_INFO_FLAG_USERS;
-    req.user_list = list_create(xfree_ptr);
-    slurm_addto_char_list_with_case(req.user_list, user, 0);
-
-    cc = slurm_load_assoc_mgr_info(&req, &msg);
-    if (cc == SLURM_SUCCESS && msg->user_list && list_count(msg->user_list)) {
-        itr = list_iterator_create(msg->user_list);
-        while ((user_rec = list_next(itr))) {
-            level =  user_rec->admin_level;
-        }
-		list_iterator_destroy(itr);
-    }
-	
-	xfree(user);
-	slurm_free_assoc_mgr_info_msg(msg);
-	slurm_free_assoc_mgr_info_request_members(&req);
-
-	if (level >= SLURMDB_ADMIN_READ_ONLY)
-		return true;
-	else
-		return false;
-}
-#endif
-
 /* scontrol_print_assoc_mgr_info()
  *
  * Retrieve and display the association manager information
  * from the controller
  *
  */
-
 #ifdef __METASTACK_OPT_RPC_USER_FIX
 extern void scontrol_print_assoc_mgr_info(int argc, char **argv, bool flag)
 #else
@@ -738,30 +683,6 @@ extern void scontrol_print_assoc_mgr_info(int argc, char **argv)
 		}
 	}
 
-#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
-	/**
-	 * fix bug 103731
-	 * For slurmctld security, users with read-only admin privileges or above are prohibited from performing full queries. 
-	 */
-	uid_t uid = getuid();
-	if (((uid == 0) || (uid == slurm_conf.slurm_user_id)|| validate_read_only_user_uid(uid)) &&
-#else
-	if ((geteuid() == 0) && 
-#endif
-		((!req.acct_list || !list_count(req.acct_list)) || !(req.flags & ASSOC_MGR_INFO_FLAG_ASSOC)) && 
-		((!req.qos_list || !list_count(req.qos_list)) || !(req.flags & ASSOC_MGR_INFO_FLAG_QOS))&& 
-		((!req.user_list || !list_count(req.user_list)) || !(req.flags & ASSOC_MGR_INFO_FLAG_USERS))) {
-		exit_code = 1;
-		if (quiet_flag != 1) {
-			fprintf(stderr, "Error: Users with read-only admin privileges or above must explicitly specify the query target.\n");
-			fprintf(stderr, "Usage examples:\n"
-							"  scontrol show assoc flags=assoc accounts=<account_name>\n"
-							"  scontrol show assoc flags=users users=<user_name>\n"
-							"  scontrol show assoc flags=qos qos=<qos_name>\n");
-		}
-		goto endit;
-	}
-
 	if (!req.flags)
 		req.flags = ASSOC_MGR_INFO_FLAG_ASSOC |
 			ASSOC_MGR_INFO_FLAG_USERS |
@@ -776,8 +697,9 @@ extern void scontrol_print_assoc_mgr_info(int argc, char **argv)
 		/* print the info
 		 */
 #ifdef __METASTACK_OPT_RPC_USER_FIX
-		/* Add a flag to control whether to sort */
 		_print_assoc_mgr_info(msg, flag);
+#else
+		_print_assoc_mgr_info(msg);
 #endif
 	} else {
 		/* Hosed, crap out. */

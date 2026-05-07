@@ -44,7 +44,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-#ifndef POLLRDHUP
+#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__NetBSD__)
 #define POLLRDHUP POLLHUP
 #endif
 
@@ -53,7 +53,6 @@
 #include "src/common/log.h"
 #include "src/common/list.h"
 #include "src/common/net.h"
-#include "src/common/run_in_daemon.h"
 #include "src/common/slurm_protocol_api.h"
 #include "src/common/xassert.h"
 #include "src/common/xmalloc.h"
@@ -183,7 +182,7 @@ int eio_message_socket_accept(eio_obj_t *obj, List objs)
 		    (errno == EWOULDBLOCK)) {
 			return SLURM_SUCCESS;
 		}
-		error_in_daemon("Error on msg accept socket: %m");
+		error("Error on msg accept socket: %m");
 		if ((errno == EMFILE)  ||
 		    (errno == ENFILE)  ||
 		    (errno == ENOBUFS) ||
@@ -206,8 +205,7 @@ again:
 	if (slurm_receive_msg(fd, msg, obj->ops->timeout) != 0) {
 		if (errno == EINTR)
 			goto again;
-		error_in_daemon("%s: slurm_receive_msg[%pA]: %m",
-				__func__, &addr);
+		error("%s: slurm_receive_msg[%pA]: %m", __func__, &addr);
 		goto cleanup;
 	}
 
@@ -215,7 +213,7 @@ again:
 
 cleanup:
 	if ((msg->conn_fd >= STDERR_FILENO) && (close(msg->conn_fd) < 0))
-		error_in_daemon("%s: close(%d): %m", __func__, msg->conn_fd);
+		error("%s: close(%d): %m", __func__, msg->conn_fd);
 	slurm_free_msg(msg);
 
 	return SLURM_SUCCESS;
@@ -294,7 +292,8 @@ int eio_handle_mainloop(eio_handle_t *eio)
 		if (!pollfds)  /* Fix for CLANG false positive */
 			goto done;
 
-		debug4("eio: handling events for %u objects", n);
+		debug4("eio: handling events for %d objects",
+		       list_count(eio->obj_list));
 		nfds = _poll_setup_pollfds(pollfds, map, eio->obj_list);
 		if (nfds <= 0)
 			goto done;

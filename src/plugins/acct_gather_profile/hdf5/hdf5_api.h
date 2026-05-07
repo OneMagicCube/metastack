@@ -6,7 +6,8 @@
  *
  *  Written by Rod Schultz <rod.schultz@bull.com>
  *
- *  Copyright (C) SchedMD LLC.
+ *  Portions Copyright (C) 2013 SchedMD LLC.
+ *  Written by Danny Auble <da@schedmd.com>
  *
  *  Provide support for acct_gather_profile plugins based on HDF5 files.
  *
@@ -48,6 +49,7 @@
 #include <hdf5.h>
 #include <hdf5_hl.h>
 
+#define MAX_PROFILE_PATH 1024
 #define MAX_ATTR_NAME 64
 #define MAX_GROUP_NAME 64
 

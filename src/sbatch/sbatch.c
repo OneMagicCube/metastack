@@ -3,7 +3,7 @@
  *****************************************************************************
  *  Copyright (C) 2006-2007 The Regents of the University of California.
  *  Copyright (C) 2008-2010 Lawrence Livermore National Security.
- *  Copyright (C) SchedMD LLC.
+ *  Copyright (C) 2010-2017 SchedMD LLC.
  *  Produced at Lawrence Livermore National Laboratory (cf, DISCLAIMER).
  *  Written by Christopher J. Morrone <morrone2@llnl.gov>
  *  CODE-OCEC-09-009. All rights reserved.
@@ -39,28 +39,29 @@
 \*****************************************************************************/
 
 #include <fcntl.h>
-#include <limits.h>
 #include <pwd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/param.h>               /* MAXPATHLEN */
 #include <sys/resource.h> /* for RLIMIT_NOFILE */
 
 #include "slurm/slurm.h"
 
-#include "src/interfaces/cli_filter.h"
+#include "src/common/cli_filter.h"
 #include "src/common/cpu_frequency.h"
 #include "src/common/env.h"
-#include "src/interfaces/gres.h"
+#include "src/common/gres.h"
 #include "src/common/pack.h"
+#include "src/common/plugstack.h"
 #include "src/common/proc_args.h"
 #include "src/common/read_config.h"
 #include "src/common/run_command.h"
-#include "src/interfaces/auth.h"
+#include "src/common/select.h"
+#include "src/common/slurm_auth.h"
 #include "src/common/slurm_rlimits_info.h"
-#include "src/common/spank.h"
 #include "src/common/xstring.h"
 #include "src/common/xmalloc.h"
 
@@ -68,14 +69,13 @@
 
 #define MAX_RETRIES 15
 #define MAX_WAIT_SLEEP_TIME 32
-#ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
-#define  JOB_SUBMIT_SBATCH 0x001
-#endif
+
 static int   _fill_job_desc_from_opts(job_desc_msg_t *desc);
 static void *_get_script_buffer(const char *filename, int *size);
 static int   _job_wait(uint32_t job_id);
 static char *_script_wrap(char *command_string);
 static void  _set_exit_code(void);
+static void  _set_prio_process_env(void);
 static int   _set_rlimit_env(void);
 static void  _set_spank_env(void);
 static void  _set_submit_dir_env(void);
@@ -102,11 +102,8 @@ int main(int argc, char **argv)
 	if (!isatty(STDERR_FILENO))
 		setvbuf(stderr, NULL, _IOLBF, 0);
 
-	slurm_init(NULL);
+	slurm_conf_init(NULL);
 	log_init(xbasename(argv[0]), logopt, 0, NULL);
-
-	if (cli_filter_init() != SLURM_SUCCESS)
-		fatal("failed to initialize cli_filter plugin");
 
 	_set_exit_code();
 	if (spank_init_allocator() < 0) {
@@ -131,23 +128,7 @@ int main(int argc, char **argv)
 		logopt.prefix_level = 1;
 		log_alter(logopt, 0, NULL);
 	}
-#ifdef __METASTACK_OPT_APP  
-	/* Handle --app=list: print preset app list and exit.  
-	 * Must be before _get_script_buffer() which blocks on STDIN  
-	 * when no script file is given. */  
-	/* Handle --app=list */  
-	if (opt.app && !xstrcasecmp(opt.app, "list")) {  
-		slurm_ctl_conf_info_msg_app_t *app_info = NULL;  
-		if (slurm_load_app((time_t)0, &app_info) == SLURM_SUCCESS  
-			&& app_info) {  
-			slurm_print_app_list(app_info);  
-			slurm_free_app_info_msg(app_info);  
-		} else {  
-			error("Unable to load app configuration");  
-		}  
-		exit(0);  
-	}
-#endif 
+
 	if (sbopt.wrap != NULL) {
 		script_body = _script_wrap(sbopt.wrap);
 	} else {
@@ -156,7 +137,7 @@ int main(int argc, char **argv)
 	if (script_body == NULL)
 		exit(error_exit);
 
-	het_job_argc = argc - opt.argc;
+	het_job_argc = argc - sbopt.script_argc;
 	het_job_argv = argv;
 	for (het_job_inx = 0; !het_job_fini; het_job_inx++) {
 		bool more_het_comps = false;
@@ -190,7 +171,7 @@ int main(int argc, char **argv)
 			}
 			run_command_add_to_script(&script_body,
 						  get_buf_data(buf));
-			FREE_NULL_BUFFER(buf);
+			free_buf(buf);
 		}
 
 		if (spank_init_post_opt() < 0) {
@@ -212,7 +193,7 @@ int main(int argc, char **argv)
 		if (sbopt.export_file != NULL)
 			env_unset_environment();
 
-		set_prio_process_env();
+		_set_prio_process_env();
 		_set_spank_env();
 		_set_submit_dir_env();
 		_set_umask_env();
@@ -226,11 +207,6 @@ int main(int argc, char **argv)
 		memcpy(local_env, &het_job_env, sizeof(sbatch_env_t));
 
 		desc = slurm_opt_create_job_desc(&opt, true);
-#ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
-		/*which stepd, 0x001 is sbatch submit, 0x010 is srun submit, 0x100 is salloc submit*/
-		if(desc)
-			desc->style_step = JOB_SUBMIT_SBATCH;
-#endif
 		if (_fill_job_desc_from_opts(desc) == -1)
 			exit(error_exit);
 		if (!first_desc)
@@ -254,7 +230,7 @@ int main(int argc, char **argv)
 	}
 
 	if (job_env_list) {
-		list_itr_t *desc_iter, *env_iter;
+		ListIterator desc_iter, env_iter;
 		i = 0;
 		desc_iter = list_iterator_create(job_req_list);
 		env_iter  = list_iterator_create(job_env_list);
@@ -316,8 +292,7 @@ int main(int argc, char **argv)
 			break;
 		if (errno == ESLURM_ERROR_ON_DESC_TO_RECORD_COPY) {
 			msg = "Slurm job queue full, sleeping and retrying";
-		} else if ((errno == ESLURM_NODES_BUSY) ||
-			   (errno == ESLURM_PORTS_BUSY)) {
+		} else if (errno == ESLURM_NODES_BUSY) {
 			msg = "Job creation temporarily disabled, retrying";
 		} else if (errno == EAGAIN) {
 			msg = "Slurm temporarily unable to accept job, "
@@ -327,19 +302,18 @@ int main(int argc, char **argv)
 		if ((msg == NULL) || (retries >= MAX_RETRIES)) {
 			error("Batch job submission failed: %m");
 #ifdef __METASTACK_OPT_MSG_OUTPUT
-			char *tmp_msg = get_err_msg(slurm_conf.extra_msg_file, errno);
-			if (tmp_msg) {
-				info("======= Tips: %s =======", tmp_msg);
-				xfree(tmp_msg);
-			}
+            char *tmp_msg = get_err_msg(slurm_conf.extra_msg_file, errno);
+            if (tmp_msg) {
+                info("======= Tips: %s =======", tmp_msg);
+                xfree(tmp_msg);
+            }
 #endif
 			exit(error_exit);
 		}
 
 		if (retries)
 			debug("%s", msg);
-		else if ((errno == ESLURM_NODES_BUSY) ||
-			 (errno == ESLURM_PORTS_BUSY))
+		else if (errno == ESLURM_NODES_BUSY)
 			info("%s", msg); /* Not an error, powering up nodes */
 		else
 			error("%s", msg);
@@ -377,9 +351,9 @@ int main(int argc, char **argv)
 		rc = _job_wait(resp->job_id);
 
 #ifdef MEMORY_LEAK_DEBUG
-	cli_filter_fini();
+	select_g_fini();
 	slurm_reset_all_options(&opt, false);
-	auth_g_fini();
+	slurm_auth_fini();
 	slurm_conf_destroy();
 	log_fini();
 #endif /* MEMORY_LEAK_DEBUG */
@@ -412,7 +386,8 @@ static int _job_wait(uint32_t job_id)
 		rc = slurm_load_job(&resp, job_id, SHOW_ALL);
 		if (rc == SLURM_SUCCESS) {
 			for (i = 0, job_ptr = resp->job_array;
-			     (i < resp->record_count); i++, job_ptr++) {
+			     (i < resp->record_count) && complete;
+			     i++, job_ptr++) {
 				if (IS_JOB_FINISHED(job_ptr)) {
 					if (WIFEXITED(job_ptr->exit_code)) {
 						ec2 = WEXITSTATUS(job_ptr->
@@ -455,8 +430,6 @@ static int _fill_job_desc_from_opts(job_desc_msg_t *desc)
 	desc->array_inx = sbopt.array_inx;
 	desc->batch_features = sbopt.batch_features;
 	desc->container = xstrdup(opt.container);
-	xfree(desc->container_id);
-	desc->container_id = xstrdup(opt.container_id);
 
 	desc->wait_all_nodes = sbopt.wait_all_nodes;
 
@@ -470,14 +443,10 @@ static int _fill_job_desc_from_opts(job_desc_msg_t *desc)
 		env_array_merge(&desc->environment, (const char **) environ);
 	} else if (!xstrcasecmp(opt.export_env, "ALL")) {
 		env_array_merge(&desc->environment, (const char **) environ);
-	} else if (!xstrcasecmp(opt.export_env, "NIL")) {
-		desc->environment = env_array_create();
-		env_array_merge_slurm_spank(&desc->environment,
-					    (const char **) environ);
 	} else if (!xstrcasecmp(opt.export_env, "NONE")) {
 		desc->environment = env_array_create();
-		env_array_merge_slurm_spank(&desc->environment,
-					    (const char **) environ);
+		env_array_merge_slurm(&desc->environment,
+				      (const char **)environ);
 		opt.get_user_env_time = 0;
 	} else {
 		env_merge_filter(&opt, desc);
@@ -496,8 +465,8 @@ static int _fill_job_desc_from_opts(job_desc_msg_t *desc)
 
 	desc->env_size = envcount(desc->environment);
 
-	desc->argc     = opt.argc;
-	desc->argv     = opt.argv;
+	desc->argc     = sbopt.script_argc;
+	desc->argv     = sbopt.script_argv;
 	desc->std_err  = xstrdup(opt.efname);
 	desc->std_in   = xstrdup(opt.ifname);
 	desc->std_out  = xstrdup(opt.ofname);
@@ -539,9 +508,9 @@ static void _set_spank_env(void)
  * current state */
 static void _set_submit_dir_env(void)
 {
-	char buf[PATH_MAX], host[256];
+	char buf[MAXPATHLEN + 1], host[256];
 
-	if ((getcwd(buf, PATH_MAX)) == NULL)
+	if ((getcwd(buf, MAXPATHLEN)) == NULL)
 		error("getcwd failed: %m");
 	else if (setenvf(NULL, "SLURM_SUBMIT_DIR", "%s", buf) < 0)
 		error("unable to set SLURM_SUBMIT_DIR in environment");
@@ -576,6 +545,34 @@ static int _set_umask_env(void)
 	}
 	debug ("propagating UMASK=%s", mask_char);
 	return SLURM_SUCCESS;
+}
+
+/*
+ * _set_prio_process_env
+ *
+ * Set the internal SLURM_PRIO_PROCESS environment variable to support
+ * the propagation of the users nice value and the "PropagatePrioProcess"
+ * config keyword.
+ */
+static void  _set_prio_process_env(void)
+{
+	int retval;
+
+	errno = 0; /* needed to detect a real failure since prio can be -1 */
+
+	if ((retval = getpriority (PRIO_PROCESS, 0)) == -1)  {
+		if (errno) {
+			error ("getpriority(PRIO_PROCESS): %m");
+			return;
+		}
+	}
+
+	if (setenvf (NULL, "SLURM_PRIO_PROCESS", "%d", retval) < 0) {
+		error ("unable to set SLURM_PRIO_PROCESS in environment");
+		return;
+	}
+
+	debug ("propagating SLURM_PRIO_PROCESS=%d", retval);
 }
 
 /*
@@ -653,20 +650,10 @@ static void *_get_script_buffer(const char *filename, int *size)
 			error("Unable to open file %s", filename);
 			goto fail;
 		}
-		/* Quick check against absurdly large file sizes */
-		if (fd != STDIN_FILENO) {
-			struct stat st;
-			if (fstat(fd, &st) == -1)
-				fatal("Cannot stat %s: %m", filename);
-			if (st.st_size > MAX_BATCH_SCRIPT_SIZE)
-				fatal("Script file %s is too large",
-				      filename);
-			buf_size = st.st_size + 1;
-		}
 	}
 
 	/*
-	 * Then read in the script, in chunks of BUFSIZE bytes.
+	 * Then read in the script.
 	 */
 	buf = ptr = xmalloc(buf_size);
 	buf_left = buf_size;
@@ -674,24 +661,7 @@ static void *_get_script_buffer(const char *filename, int *size)
 		buf_left -= tmp_size;
 		script_size += tmp_size;
 		if (buf_left == 0) {
-			if (buf_size >= MAX_BATCH_SCRIPT_SIZE) {
-				if (filename)
-					close(fd);
-				xfree(buf);
-				if (filename)
-					fatal("Script %s is too big, read %d > %d bytes.",
-					      filename, script_size,
-					      MAX_BATCH_SCRIPT_SIZE);
-				else
-					fatal("Script from STDIN is too big, read %d > %d bytes.",
-					      script_size,
-					      MAX_BATCH_SCRIPT_SIZE);
-			}
-
-			if (buf_size < (MAX_BATCH_SCRIPT_SIZE - BUFSIZ))
-				buf_size += BUFSIZ;
-			else
-				buf_size = MAX_BATCH_SCRIPT_SIZE;
+			buf_size += BUFSIZ;
 			xrealloc(buf, buf_size);
 		}
 		ptr = buf + script_size;

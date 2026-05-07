@@ -3,7 +3,7 @@
  *****************************************************************************
  *  Copyright (C) 2002-2007 The Regents of the University of California.
  *  Copyright (C) 2008-2010 Lawrence Livermore National Security.
- *  Copyright (C) SchedMD LLC.
+ *  Portions Copyright (C) 2010-2017 SchedMD <https://www.schedmd.com>.
  *  Produced at Lawrence Livermore National Laboratory (cf, DISCLAIMER).
  *  Written by Joey Ekstrom <ekstrom1@llnl.gov>, Morris Jette <jette1@llnl.gov>
  *  CODE-OCEC-09-009. All rights reserved.
@@ -41,11 +41,10 @@
 #include "slurm/slurmdb.h"
 #include "src/common/xstring.h"
 #include "src/common/macros.h"
-#include "src/interfaces/select.h"
+#include "src/common/select.h"
 #include "src/common/slurm_time.h"
 #include "src/sinfo/sinfo.h"
 #include "src/sinfo/print.h"
-#include "src/interfaces/data_parser.h"
 #ifdef __METASTACK_OPT_CACHE_QUERY
 #include "src/common/read_config.h"
 #endif
@@ -79,6 +78,8 @@ static pthread_mutex_t sinfo_list_mutex = PTHREAD_MUTEX_INITIALIZER;
 /*************
  * Functions *
  *************/
+extern int dump_data(int argc, char **argv);
+
 static void _free_sinfo_format(void *object);
 static void _free_params(void);
 void *      _build_part_info(void *args);
@@ -89,8 +90,8 @@ static sinfo_data_t *_create_sinfo(partition_info_t* part_ptr,
 				   uint16_t part_inx, node_info_t *node_ptr);
 static int  _find_part_list(void *x, void *key);
 static bool _filter_out(node_info_t *node_ptr);
-static int _get_info(bool clear_old, slurmdb_federation_rec_t *fed,
-		     char *cluster_name, int argc, char **argv);
+static int  _get_info(bool clear_old, slurmdb_federation_rec_t *fed,
+		      char *cluster_name);
 static int  _insert_node_ptr(List sinfo_list, uint16_t part_num,
 			     partition_info_t *part_ptr,
 			     node_info_t *node_ptr);
@@ -98,7 +99,7 @@ static int  _load_resv(reserve_info_msg_t ** reserv_pptr, bool clear_old);
 static bool _match_node_data(sinfo_data_t *sinfo_ptr, node_info_t *node_ptr);
 static bool _match_part_data(sinfo_data_t *sinfo_ptr,
 			     partition_info_t* part_ptr);
-static int _multi_cluster(List clusters, int argc, char **argv);
+static int  _multi_cluster(List clusters);
 static void _node_list_delete(void *data);
 static void _part_list_delete(void *data);
 static List _query_fed_servers(slurmdb_federation_rec_t *fed,
@@ -116,7 +117,7 @@ int main(int argc, char **argv)
 	log_options_t opts = LOG_OPTS_STDERR_ONLY;
 	int rc = 0;
 
-	slurm_init(NULL);
+	slurm_conf_init(NULL);
 	log_init(xbasename(argv[0]), opts, SYSLOG_FACILITY_USER, NULL);
 	memset(&params, 0, sizeof(params));
 	params.format_list = list_create(_free_sinfo_format);
@@ -126,15 +127,18 @@ int main(int argc, char **argv)
 		log_alter(opts, SYSLOG_FACILITY_USER, NULL);
 	}
 
+	if (params.mimetype)
+		exit(dump_data(argc, argv));
+
 	while (1) {
-		if (!params.no_header && !params.mimetype &&
+		if ((!params.no_header) &&
 		    (params.iterate || params.verbose || params.long_output))
 			print_date();
 
 		if (!params.clusters) {
-			if (_get_info(false, params.fed, NULL, argc, argv))
+			if (_get_info(false, params.fed, NULL))
 				rc = 1;
-		} else if (_multi_cluster(params.clusters, argc, argv))
+		} else if (_multi_cluster(params.clusters) != 0)
 			rc = 1;
 		if (params.iterate) {
 			printf("\n");
@@ -185,12 +189,12 @@ static void prepend_cluster_name(void)
 	if (list_find_first(params.format_list, _list_find_func,
 			    _print_cluster_name))
 		return;
-	format_prepend_cluster_name(params.format_list, 8, false, NULL);
+	format_prepend_cluster_name(params.format_list, 8, false, "");
 }
 
-static int _multi_cluster(List clusters, int argc, char **argv)
+static int _multi_cluster(List clusters)
 {
-	list_itr_t *itr;
+	ListIterator itr;
 	bool first = true;
 	int rc = 0, rc2;
 
@@ -206,8 +210,7 @@ static int _multi_cluster(List clusters, int argc, char **argv)
 				printf("\n");
 			printf("CLUSTER: %s\n", working_cluster_rec->name);
 		}
-		rc2 = _get_info(true, NULL, working_cluster_rec->name, argc,
-				argv);
+		rc2 = _get_info(true, NULL, working_cluster_rec->name);
 		if (rc2)
 			rc = 1;
 	}
@@ -229,7 +232,7 @@ static int _set_cluster_name(void *x, void *arg)
  * fed IN - information about other clusters in this federation
  */
 static int _get_info(bool clear_old, slurmdb_federation_rec_t *fed,
-		     char *cluster_name, int argc, char **argv)
+		     char *cluster_name)
 {
 	List node_info_msg_list = NULL, part_info_msg_list = NULL;
 	reserve_info_msg_t *reserv_msg = NULL;
@@ -261,22 +264,12 @@ static int _get_info(bool clear_old, slurmdb_federation_rec_t *fed,
 	}
 
 	sort_sinfo_list(sinfo_list);
-	if (params.mimetype)
-		if (is_data_parser_deprecated(params.data_parser))
-			DATA_DUMP_CLI_DEPRECATED(SINFO_DATA_LIST, sinfo_list,
-						 "sinfo", argc, argv, NULL,
-						 params.mimetype, rc);
-		else
-			DATA_DUMP_CLI_SINGLE(OPENAPI_SINFO_RESP, sinfo_list,
-					     argc, argv, NULL, params.mimetype,
-					     params.data_parser, rc);
-	else
-		rc = print_sinfo_list(sinfo_list);
+	print_sinfo_list(sinfo_list);
 
 	FREE_NULL_LIST(node_info_msg_list);
 	FREE_NULL_LIST(part_info_msg_list);
 	FREE_NULL_LIST(sinfo_list);
-	return rc;
+	return SLURM_SUCCESS;
 }
 
 /*
@@ -344,19 +337,20 @@ static List _query_server(bool clear_old)
 	static partition_info_msg_t *old_part_ptr = NULL, *new_part_ptr;
 	static node_info_msg_t *old_node_ptr = NULL, *new_node_ptr;
 	int error_code;
-	uint16_t show_flags = SHOW_MIXED;
+	uint16_t show_flags = 0;
+	int cc;
+	node_info_t *node_ptr;
 	List sinfo_list = NULL;
-
-	if (params.all_flag)
-		show_flags |= SHOW_ALL;
-	if (params.future_flag)
-		show_flags |= SHOW_FUTURE;
-		
+	
 #ifdef __METASTACK_OPT_CACHE_QUERY
 	if(update_client_port(params.cache_query, params.nocache_query)){
 		return NULL;
 	}
 #endif
+
+
+	if (params.all_flag)
+		show_flags |= SHOW_ALL;
 
 	if (old_part_ptr) {
 		if (clear_old)
@@ -380,7 +374,7 @@ static List _query_server(bool clear_old)
 	old_part_ptr = new_part_ptr;
 
 	/* GRES used is only populated on nodes with detail flag */
-	if (params.match_flags & MATCH_FLAG_GRES_USED)
+	if (params.match_flags.gres_used_flag)
 		show_flags |= SHOW_DETAIL;
 
 	if (old_node_ptr) {
@@ -413,6 +407,28 @@ static List _query_server(bool clear_old)
 	}
 	old_node_ptr = new_node_ptr;
 
+	/* Set the node state as NODE_STATE_MIXED. */
+	for (cc = 0; cc < new_node_ptr->record_count; cc++) {
+		node_ptr = &(new_node_ptr->node_array[cc]);
+		if (IS_NODE_DRAIN(node_ptr)) {
+			/* don't worry about mixed since the
+			 * whole node is being drained. */
+		} else {
+			uint16_t alloc_cpus = 0, idle_cpus;
+
+			select_g_select_nodeinfo_get(node_ptr->select_nodeinfo,
+						     SELECT_NODEDATA_SUBCNT,
+						     NODE_STATE_ALLOCATED,
+						     &alloc_cpus);
+			idle_cpus = node_ptr->cpus_efctv - alloc_cpus;
+
+			if (idle_cpus && (idle_cpus != node_ptr->cpus_efctv)) {
+				node_ptr->node_state &= NODE_STATE_FLAGS;
+				node_ptr->node_state |= NODE_STATE_MIXED;
+			}
+		}
+	}
+
 	sinfo_list = list_create(_sinfo_list_delete);
 	_build_sinfo_data(sinfo_list, new_part_ptr, new_node_ptr);
 
@@ -422,27 +438,27 @@ static List _query_server(bool clear_old)
 static void *_load_job_prio_thread(void *args)
 {
 	load_info_struct_t *load_args = (load_info_struct_t *) args;
-	uint16_t show_flags = SHOW_MIXED;
+	uint16_t show_flags = 0;
 	char *node_name = NULL;
 	slurmdb_cluster_rec_t *cluster = load_args->cluster;
 	int error_code;
 	partition_info_msg_t *new_part_ptr;
 	node_info_msg_t *new_node_ptr;
+	int cc;
+	node_info_t *node_ptr;
 	List sinfo_list = NULL;
 
 	if (params.node_name_single)
 		node_name = params.nodes;
 	if (params.all_flag)
 		show_flags |= SHOW_ALL;
-	if (params.future_flag)
-		show_flags |= SHOW_FUTURE;
 
 	error_code = slurm_load_partitions2((time_t) NULL, &new_part_ptr,
 					    show_flags, cluster);
 	if (error_code) {
 		slurm_perror("slurm_load_partitions");
 		xfree(args);
-		return NULL;
+		return (void *) NULL;
 	}
 	list_append(load_args->part_info_msg_list, new_part_ptr);
 
@@ -456,25 +472,47 @@ static void *_load_job_prio_thread(void *args)
 	if (error_code) {
 		slurm_perror("slurm_load_node");
 		xfree(args);
-		return NULL;
+		return (void *) NULL;
 	}
 	list_append(load_args->node_info_msg_list, new_node_ptr);
+
+	/* Set the node state as NODE_STATE_MIXED. */
+	for (cc = 0; cc < new_node_ptr->record_count; cc++) {
+		node_ptr = &(new_node_ptr->node_array[cc]);
+		if (IS_NODE_DRAIN(node_ptr)) {
+			/* don't worry about mixed since the
+			 * whole node is being drained. */
+		} else {
+			uint16_t alloc_cpus = 0, idle_cpus;
+
+			select_g_select_nodeinfo_get(node_ptr->select_nodeinfo,
+						     SELECT_NODEDATA_SUBCNT,
+						     NODE_STATE_ALLOCATED,
+						     &alloc_cpus);
+			idle_cpus = node_ptr->cpus_efctv - alloc_cpus;
+
+			if (idle_cpus && (idle_cpus != node_ptr->cpus_efctv)) {
+				node_ptr->node_state &= NODE_STATE_FLAGS;
+				node_ptr->node_state |= NODE_STATE_MIXED;
+			}
+		}
+	}
 
 	sinfo_list = list_create(_sinfo_list_delete);
 	_build_sinfo_data(sinfo_list, new_part_ptr, new_node_ptr);
 	if (sinfo_list) {
 		sinfo_data_t *sinfo_ptr;
-		list_itr_t *iter;
+		ListIterator iter;
 		iter = list_iterator_create(sinfo_list);
 		while ((sinfo_ptr = (sinfo_data_t *) list_next(iter)))
 			sinfo_ptr->cluster_name = cluster->name;
 		list_iterator_destroy(iter);
 		list_transfer(load_args->resp_msg_list, sinfo_list);
-		FREE_NULL_LIST(sinfo_list);
+		list_destroy(sinfo_list);
 	}
 
 	xfree(args);
-	return NULL;
+	return (void *) NULL;
 }
 
 /*
@@ -490,7 +528,7 @@ static List _query_fed_servers(slurmdb_federation_rec_t *fed,
 	List resp_msg_list;
 	int pthread_count = 0;
 	pthread_t *load_thread = 0;
-	list_itr_t *iter;
+	ListIterator iter;
 	slurmdb_cluster_rec_t *cluster;
 	load_info_struct_t *load_args;
 	int i;
@@ -518,7 +556,7 @@ static List _query_fed_servers(slurmdb_federation_rec_t *fed,
 
 	/* Wait for all pthreads to complete */
 	for (i = 0; i < pthread_count; i++)
-		slurm_thread_join(load_thread[i]);
+		pthread_join(load_thread[i], NULL);
 	xfree(load_thread);
 
 	return resp_msg_list;
@@ -561,7 +599,6 @@ void *_build_part_info(void *args)
 				continue;
 			}
 #endif
-
 			_insert_node_ptr(sinfo_list, part_num,
 					 part_ptr, node_ptr);
 		}
@@ -601,7 +638,7 @@ static int _build_sinfo_data(List sinfo_list,
 	int j;
 
 	/* by default every partition is shown, even if no nodes */
-	if ((!params.node_flag) && (params.match_flags & MATCH_FLAG_PARTITION)){
+	if ((!params.node_flag) && params.match_flags.partition_flag) {
 		part_ptr = partition_msg->partition_array;
 		for (j = 0; j < partition_msg->record_count; j++, part_ptr++) {
 			if ((!params.part_list) ||
@@ -634,7 +671,7 @@ static int _build_sinfo_data(List sinfo_list,
 
 		if (node_msg->record_count == 1) { /* node_name_single */
 			int pos = -1;
-			hostlist_t *hl;
+			hostlist_t hl;
 
 			node_ptr = &(node_msg->node_array[0]);
 			if ((node_ptr->name == NULL) ||
@@ -661,7 +698,7 @@ static int _build_sinfo_data(List sinfo_list,
 		sinfo_cnt++;
 		slurm_mutex_unlock(&sinfo_cnt_mutex);
 
-		slurm_thread_create_detached(_build_part_info,
+		slurm_thread_create_detached(NULL, _build_part_info,
 					     build_struct_ptr);
 	}
 
@@ -683,7 +720,7 @@ static int _build_sinfo_data(List sinfo_list,
  */
 static bool _filter_out(node_info_t *node_ptr)
 {
-	static hostlist_t *host_list = NULL;
+	static hostlist_t host_list = NULL;
 
 	if (params.nodes) {
 		if (host_list == NULL)
@@ -702,7 +739,7 @@ static bool _filter_out(node_info_t *node_ptr)
 		int *node_state;
 		bool match = false;
 		uint32_t base_state;
-		list_itr_t *iterator;
+		ListIterator iterator;
 		uint16_t cpus = 0;
 		node_info_t tmp_node, *tmp_node_ptr = &tmp_node;
 
@@ -764,7 +801,7 @@ static bool _filter_out(node_info_t *node_ptr)
 
 static void _sort_hostlist(List sinfo_list)
 {
-	list_itr_t *i;
+	ListIterator i;
 	sinfo_data_t *sinfo_ptr;
 
 	i = list_iterator_create(sinfo_list);
@@ -782,67 +819,62 @@ static bool _match_node_data(sinfo_data_t *sinfo_ptr, node_info_t *node_ptr)
 	if (params.node_flag)
 		return false;
 
-	if ((params.match_flags & MATCH_FLAG_HOSTNAMES) &&
+	if (params.match_flags.hostnames_flag &&
 	    (hostlist_find(sinfo_ptr->hostnames,
 			   node_ptr->node_hostname) == -1))
 		return false;
 
-	if ((params.match_flags & MATCH_FLAG_NODE_ADDR) &&
+	if (params.match_flags.node_addr_flag &&
 	    (hostlist_find(sinfo_ptr->node_addr, node_ptr->node_addr) == -1))
 		return false;
 
 	if (sinfo_ptr->nodes &&
-	    (params.match_flags & MATCH_FLAG_EXTRA) &&
+	    params.match_flags.extra_flag &&
 	    (xstrcmp(node_ptr->extra, sinfo_ptr->extra)))
 		return false;
 
 	if (sinfo_ptr->nodes &&
-	    (params.match_flags & MATCH_FLAG_FEATURES) &&
+	    params.match_flags.features_flag &&
 	    (xstrcmp(node_ptr->features, sinfo_ptr->features)))
 		return false;
 
 	if (sinfo_ptr->nodes &&
-	    (params.match_flags & MATCH_FLAG_FEATURES_ACT) &&
+	    params.match_flags.features_act_flag &&
 	    (xstrcmp(node_ptr->features_act, sinfo_ptr->features_act)))
 		return false;
 
 	if (sinfo_ptr->nodes &&
-	    (params.match_flags & MATCH_FLAG_GRES) &&
+	    params.match_flags.gres_flag &&
 	    (xstrcmp(node_ptr->gres, sinfo_ptr->gres)))
 		return false;
 
 	if (sinfo_ptr->nodes &&
-	    (params.match_flags & MATCH_FLAG_GRES_USED) &&
+	    params.match_flags.gres_used_flag &&
 	    (xstrcmp(node_ptr->gres_used, sinfo_ptr->gres_used)))
 		return false;
 
 	if (sinfo_ptr->nodes &&
-	    (params.match_flags & MATCH_FLAG_COMMENT) &&
+	    params.match_flags.comment_flag &&
 	    (xstrcmp(node_ptr->comment, sinfo_ptr->comment)))
 		return false;
 
 	if (sinfo_ptr->nodes &&
-	    (params.match_flags & MATCH_FLAG_REASON) &&
+	    params.match_flags.reason_flag &&
 	    (xstrcmp(node_ptr->reason, sinfo_ptr->reason)))
 		return false;
 
 	if (sinfo_ptr->nodes &&
-	    (params.match_flags & MATCH_FLAG_REASON_TIMESTAMP) &&
+	    params.match_flags.reason_timestamp_flag &&
 	    (node_ptr->reason_time != sinfo_ptr->reason_time))
 		return false;
 
 	if (sinfo_ptr->nodes &&
-	    (params.match_flags & MATCH_FLAG_REASON_USER) &&
+	    params.match_flags.reason_user_flag &&
 	    node_ptr->reason_uid != sinfo_ptr->reason_uid) {
 		return false;
 	}
 
-	if (sinfo_ptr->nodes &&
-	    (params.match_flags & MATCH_FLAG_RESV_NAME) &&
-	    xstrcmp(node_ptr->resv_name, sinfo_ptr->resv_name))
-		return false;
-
-	if ((params.match_flags & MATCH_FLAG_STATE)) {
+	if (params.match_flags.state_flag) {
 		char *state1, *state2;
 		state1 = node_state_string(node_ptr->node_state);
 		state2 = node_state_string(sinfo_ptr->node_state);
@@ -850,7 +882,7 @@ static bool _match_node_data(sinfo_data_t *sinfo_ptr, node_info_t *node_ptr)
 			return false;
 	}
 
-	if ((params.match_flags & MATCH_FLAG_STATE_COMPLETE)) {
+	if (params.match_flags.statecomplete_flag) {
 		char *state1, *state2;
 		int rc = true;
 		state1 = node_state_string_complete(node_ptr->node_state);
@@ -867,7 +899,7 @@ static bool _match_node_data(sinfo_data_t *sinfo_ptr, node_info_t *node_ptr)
 				     SELECT_NODEDATA_MEM_ALLOC,
 				     NODE_STATE_ALLOCATED,
 				     &tmp);
-	if ((params.match_flags & MATCH_FLAG_ALLOC_MEM) &&
+	if (params.match_flags.alloc_mem_flag &&
 	    (tmp != sinfo_ptr->alloc_memory))
 		return false;
 
@@ -876,43 +908,43 @@ static bool _match_node_data(sinfo_data_t *sinfo_ptr, node_info_t *node_ptr)
 	if (!params.exact_match)
 		return true;
 
-	if ((params.match_flags & MATCH_FLAG_CPUS) &&
+	if (params.match_flags.cpus_flag &&
 	    (node_ptr->cpus        != sinfo_ptr->min_cpus))
 		return false;
 
-	if ((params.match_flags & MATCH_FLAG_SOCKETS) &&
+	if (params.match_flags.sockets_flag &&
 	    (node_ptr->sockets     != sinfo_ptr->min_sockets))
 		return false;
-	if ((params.match_flags & MATCH_FLAG_CORES) &&
+	if (params.match_flags.cores_flag &&
 	    (node_ptr->cores       != sinfo_ptr->min_cores))
 		return false;
-	if ((params.match_flags & MATCH_FLAG_THREADS) &&
+	if (params.match_flags.threads_flag &&
 	    (node_ptr->threads     != sinfo_ptr->min_threads))
 		return false;
-	if ((params.match_flags & MATCH_FLAG_SCT) &&
+	if (params.match_flags.sct_flag &&
 	    ((node_ptr->sockets     != sinfo_ptr->min_sockets) ||
 	     (node_ptr->cores       != sinfo_ptr->min_cores) ||
 	     (node_ptr->threads     != sinfo_ptr->min_threads)))
 		return false;
-	if ((params.match_flags & MATCH_FLAG_DISK) &&
+	if (params.match_flags.disk_flag &&
 	    (node_ptr->tmp_disk    != sinfo_ptr->min_disk))
 		return false;
-	if ((params.match_flags & MATCH_FLAG_MEMORY) &&
+	if (params.match_flags.memory_flag &&
 	    (node_ptr->real_memory != sinfo_ptr->min_mem))
 		return false;
-	if ((params.match_flags & MATCH_FLAG_WEIGHT) &&
+	if (params.match_flags.weight_flag &&
 	    (node_ptr->weight      != sinfo_ptr->min_weight))
 		return false;
-	if ((params.match_flags & MATCH_FLAG_CPU_LOAD) &&
+	if (params.match_flags.cpu_load_flag &&
 	    (node_ptr->cpu_load        != sinfo_ptr->min_cpu_load))
 		return false;
-	if ((params.match_flags & MATCH_FLAG_FREE_MEM) &&
+	if (params.match_flags.free_mem_flag &&
 	    (node_ptr->free_mem        != sinfo_ptr->min_free_mem))
 		return false;
-	if ((params.match_flags & MATCH_FLAG_PORT) &&
+	if (params.match_flags.port_flag &&
 	    (node_ptr->port != sinfo_ptr->port))
 		return false;
-	if ((params.match_flags & MATCH_FLAG_VERSION) &&
+	if (params.match_flags.version_flag &&
 	    (node_ptr->version     != sinfo_ptr->version))
 		return false;
 
@@ -926,8 +958,7 @@ static bool _serial_part_data(void)
 {
 	if (params.list_reasons)	/* Don't care about partition */
 		return true;
-	/* Match partition name */
-	if ((params.match_flags & MATCH_FLAG_PARTITION))
+	if (params.match_flags.partition_flag)	/* Match partition name */
 		return false;
 	return true;
 }
@@ -942,58 +973,58 @@ static bool _match_part_data(sinfo_data_t *sinfo_ptr,
 	if ((part_ptr == NULL) || (sinfo_ptr->part_info == NULL))
 		return false;
 
-	if ((params.match_flags & MATCH_FLAG_PARTITION)
+	if (params.match_flags.partition_flag
 	    && (xstrcmp(part_ptr->name, sinfo_ptr->part_info->name)))
 		return false;
 
-	if ((params.match_flags & MATCH_FLAG_AVAIL) &&
+	if (params.match_flags.avail_flag &&
 	    (part_ptr->state_up != sinfo_ptr->part_info->state_up))
 		return false;
 
-	if ((params.match_flags & MATCH_FLAG_GROUPS) &&
+	if (params.match_flags.groups_flag &&
 	    (xstrcmp(part_ptr->allow_groups,
 		     sinfo_ptr->part_info->allow_groups)))
 		return false;
 
-	if ((params.match_flags & MATCH_FLAG_JOB_SIZE) &&
+	if (params.match_flags.job_size_flag &&
 	    (part_ptr->min_nodes != sinfo_ptr->part_info->min_nodes))
 		return false;
 
-	if ((params.match_flags & MATCH_FLAG_JOB_SIZE) &&
+	if (params.match_flags.job_size_flag &&
 	    (part_ptr->max_nodes != sinfo_ptr->part_info->max_nodes))
 		return false;
 
-	if ((params.match_flags & MATCH_FLAG_DEFAULT_TIME) &&
+	if (params.match_flags.default_time_flag &&
 	    (part_ptr->default_time != sinfo_ptr->part_info->default_time))
 		return false;
 
-	if ((params.match_flags & MATCH_FLAG_MAX_TIME) &&
+	if (params.match_flags.max_time_flag &&
 	    (part_ptr->max_time != sinfo_ptr->part_info->max_time))
 		return false;
 
-	if ((params.match_flags & MATCH_FLAG_ROOT) &&
+	if (params.match_flags.root_flag &&
 	    ((part_ptr->flags & PART_FLAG_ROOT_ONLY) !=
 	     (sinfo_ptr->part_info->flags & PART_FLAG_ROOT_ONLY)))
 		return false;
 
-	if ((params.match_flags & MATCH_FLAG_OVERSUBSCRIBE) &&
+	if (params.match_flags.oversubscribe_flag &&
 	    (part_ptr->max_share != sinfo_ptr->part_info->max_share))
 		return false;
 
-	if ((params.match_flags & MATCH_FLAG_PREEMPT_MODE) &&
+	if (params.match_flags.preempt_mode_flag &&
 	    (part_ptr->preempt_mode != sinfo_ptr->part_info->preempt_mode))
 		return false;
 
-	if ((params.match_flags & MATCH_FLAG_PRIORITY_TIER) &&
+	if (params.match_flags.priority_tier_flag &&
 	    (part_ptr->priority_tier != sinfo_ptr->part_info->priority_tier))
 		return false;
 
-	if ((params.match_flags & MATCH_FLAG_PRIORITY_JOB_FACTOR) &&
+	if (params.match_flags.priority_job_factor_flag &&
 	    (part_ptr->priority_job_factor !=
 	     sinfo_ptr->part_info->priority_job_factor))
 		return false;
 
-	if ((params.match_flags & MATCH_FLAG_MAX_CPUS_PER_NODE) &&
+	if (params.match_flags.max_cpus_per_node_flag &&
 	    (part_ptr->max_cpus_per_node !=
 	     sinfo_ptr->part_info->max_cpus_per_node))
 		return false;
@@ -1027,7 +1058,6 @@ static void _update_sinfo(sinfo_data_t *sinfo_ptr, node_info_t *node_ptr)
 		sinfo_ptr->reason     = node_ptr->reason;
 		sinfo_ptr->reason_time= node_ptr->reason_time;
 		sinfo_ptr->reason_uid = node_ptr->reason_uid;
-		sinfo_ptr->resv_name  = node_ptr->resv_name;
 		sinfo_ptr->min_cpus    = node_ptr->cpus;
 		sinfo_ptr->max_cpus    = node_ptr->cpus;
 		sinfo_ptr->min_sockets = node_ptr->sockets;
@@ -1103,10 +1133,10 @@ static void _update_sinfo(sinfo_data_t *sinfo_ptr, node_info_t *node_ptr)
 
 	if (hostlist_find(sinfo_ptr->nodes, node_ptr->name) == -1)
 		hostlist_push_host(sinfo_ptr->nodes, node_ptr->name);
-	if ((params.match_flags & MATCH_FLAG_NODE_ADDR) &&
+	if (params.match_flags.node_addr_flag &&
 	    (hostlist_find(sinfo_ptr->node_addr, node_ptr->node_addr) == -1))
 		hostlist_push_host(sinfo_ptr->node_addr, node_ptr->node_addr);
-	if ((params.match_flags & MATCH_FLAG_HOSTNAMES) &&
+	if (params.match_flags.hostnames_flag &&
 	    (hostlist_find(sinfo_ptr->hostnames, node_ptr->node_hostname) == -1))
 		hostlist_push_host(sinfo_ptr->hostnames, node_ptr->node_hostname);
 
@@ -1127,9 +1157,9 @@ static void _update_sinfo(sinfo_data_t *sinfo_ptr, node_info_t *node_ptr)
 		sinfo_ptr->nodes_alloc++;
 	else if (IS_NODE_DRAIN(node_ptr)
 #ifdef __METASTACK_BUG_IDLE_SINFO
-		|| (base_state == NODE_STATE_DOWN) || (base_state == NODE_STATE_UNKNOWN))
+ 		 || (base_state == NODE_STATE_DOWN) || (base_state == NODE_STATE_UNKNOWN))
 #else
-   		|| (base_state == NODE_STATE_DOWN))
+		 || (base_state == NODE_STATE_DOWN))
 #endif
 		sinfo_ptr->nodes_other++;
 	else
@@ -1141,6 +1171,7 @@ static void _update_sinfo(sinfo_data_t *sinfo_ptr, node_info_t *node_ptr)
 	sinfo_ptr->cpus_total += total_cpus;
 	total_cpus -= used_cpus;
 	sinfo_ptr->alloc_memory = alloc_mem;
+
 #ifdef __METASTACK_BUG_IDLE_SINFO
     if (IS_NODE_DRAIN(node_ptr) || (base_state == NODE_STATE_DOWN) || (base_state == NODE_STATE_UNKNOWN)) {
 #else
@@ -1157,7 +1188,7 @@ static int _insert_node_ptr(List sinfo_list, uint16_t part_num,
 {
 	int rc = SLURM_SUCCESS;
 	sinfo_data_t *sinfo_ptr = NULL;
-	list_itr_t *itr = NULL;
+	ListIterator itr = NULL;
 
 	itr = list_iterator_create(sinfo_list);
 	while ((sinfo_ptr = list_next(itr))) {

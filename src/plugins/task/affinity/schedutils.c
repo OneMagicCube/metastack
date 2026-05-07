@@ -89,6 +89,7 @@ int str_to_cnt(const char* str)
 			cnt++;
 		if (val & 8)
 			cnt++;
+		len--;
 		ptr--;
 	}
 

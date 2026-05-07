@@ -58,12 +58,12 @@
 #include "src/common/xstring.h"
 #include "src/common/list.h"
 #include "src/common/hostlist.h"
-#include "src/interfaces/jobacct_gather.h"
-#include "src/interfaces/jobcomp.h"
+#include "src/common/slurm_jobacct_gather.h"
+#include "src/common/slurm_jobcomp.h"
 #include "src/common/print_fields.h"
 
 #ifdef __METASTACK_OPT_SSTAT_CPUUTIL
-#define STAT_FIELDS "jobid,maxvmsize,maxvmsizenode,maxvmsizetask,avevmsize,maxrss,maxrssnode,maxrsstask,averss,maxpages,maxpagesnode,maxpagestask,avepages,mincpu,mincpunode,mincputask,avecpu,ntasks,avecpufreq,reqcpufreqmin,reqcpufreqmax,reqcpufreqgov,consumedenergy,maxdiskread,maxdiskreadnode,maxdiskreadtask,avediskread,maxdiskwrite,maxdiskwritenode,maxdiskwritetask,avediskwrite,tresusageinave,tresusageinmax,tresusageinmaxn,tresusageinmaxt,tresusageinmin,tresusageinminn,tresusageinmint,tresusageintot,tresusageoutave,tresusageoutmax,tresusageoutmaxn,tresusageoutmaxt,tresusageoutmin,tresusageoutminn,tresusageoutmint,tresusageouttot,cpuutil,avecpuutil,maxcpuutil,mincpuutil,totalrss,gpuutil,maxgpuutil,mingpuutil,gpumem,maxgpumem,mingpumem"
+#define STAT_FIELDS "jobid,maxvmsize,maxvmsizenode,maxvmsizetask,avevmsize,maxrss,maxrssnode,maxrsstask,averss,maxpages,maxpagesnode,maxpagestask,avepages,mincpu,mincpunode,mincputask,avecpu,ntasks,avecpufreq,reqcpufreqmin,reqcpufreqmax,reqcpufreqgov,consumedenergy,maxdiskread,maxdiskreadnode,maxdiskreadtask,avediskread,maxdiskwrite,maxdiskwritenode,maxdiskwritetask,avediskwrite,tresusageinave,tresusageinmax,tresusageinmaxn,tresusageinmaxt,tresusageinmin,tresusageinminn,tresusageinmint,tresusageintot,tresusageoutave,tresusageoutmax,tresusageoutmaxn,tresusageoutmaxt,tresusageoutmin,tresusageoutminn,tresusageoutmint,tresusageouttot,cpuutil,avecpuutil,maxcpuutil,mincpuutil,totalrss"
 #else  
 #define STAT_FIELDS "jobid,maxvmsize,maxvmsizenode,maxvmsizetask,avevmsize,maxrss,maxrssnode,maxrsstask,averss,maxpages,maxpagesnode,maxpagestask,avepages,mincpu,mincpunode,mincputask,avecpu,ntasks,avecpufreq,reqcpufreqmin,reqcpufreqmax,reqcpufreqgov,consumedenergy,maxdiskread,maxdiskreadnode,maxdiskreadtask,avediskread,maxdiskwrite,maxdiskwritenode,maxdiskwritetask,avediskwrite,tresusageinave,tresusageinmax,tresusageinmaxn,tresusageinmaxt,tresusageinmin,tresusageinminn,tresusageinmint,tresusageintot,tresusageoutave,tresusageoutmax,tresusageoutmaxn,tresusageoutmaxt,tresusageoutmin,tresusageoutminn,tresusageoutmint,tresusageouttot"
 #endif
@@ -130,14 +130,6 @@ typedef enum {
         PRINT_MINCPUUTIL,
 		PRINT_TOTALRSS,
 #endif
-#ifdef __METASTACK_NEW_GRES_GATHER_DCU
-		PRINT_DCUREALUTIL,
-		PRINT_MAXDCUUTIL,
-		PRINT_MINDCUUTIL,
-		PRINT_DCUREALMEM,
-		PRINT_MAXDCUMEM,
-		PRINT_MINDCUMEM,
-#endif
 } sstat_print_types_t;
 
 
@@ -145,7 +137,7 @@ typedef struct {
 	int opt_all_steps;	/* --allsteps */
 	char *opt_field_list;	/* --fields= */
 	int opt_help;		/* --help */
-#ifdef __METASTACK_NEW_LOAD_ABNORMAL
+#ifdef __METASTACK_LOAD_ABNORMAL
 	int opt_event;     /* exception event output parameters */
 #endif
 	List opt_job_list;	/* --jobs */
@@ -157,28 +149,12 @@ typedef struct {
 } sstat_parameters_t;
 
 extern List print_fields_list;
-extern list_itr_t *print_fields_itr;
+extern ListIterator print_fields_itr;
 extern print_field_t fields[];
 extern sstat_parameters_t params;
 extern int field_count;
 #ifdef __METASTACK_OPT_SSTAT_CPUUTIL
-extern int tran_util_readable;
-#endif
-#ifdef __METASTACK_NEW_LOAD_ABNORMAL
-typedef struct {
-	double all_task_mem_tmp;
-	double all_task_vmem_tmp;
-	double all_task_mem_tmp_max;
-	double all_task_mem_tmp_min;
-	double all_task_vmem_tmp_max;
-	double all_task_vmem_tmp_min;
-#ifdef __METASTACK_NEW_GRES_GATHER_DCU
-	double all_task_dcu_mem_max;
-	double all_task_dcu_mem_min;
-	double all_task_dcu_mem_real;
-#endif
-} sstat_print_t;
-extern sstat_print_t print_resource;
+extern int cpu_util_readable;
 #endif
 extern List jobs;
 

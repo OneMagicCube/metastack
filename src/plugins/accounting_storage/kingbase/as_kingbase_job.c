@@ -42,10 +42,10 @@
 #include "as_kingbase_wckey.h"
 
 #include "src/common/assoc_mgr.h"
-#include "src/interfaces/gres.h"
+#include "src/common/gres.h"
 #include "src/common/parse_time.h"
-#include "src/interfaces/select.h"
-#include "src/interfaces/jobacct_gather.h"
+#include "src/common/select.h"
+#include "src/common/slurm_jobacct_gather.h"
 #include "src/common/slurm_time.h"
 
 #define MAX_FLUSH_JOBS 500
@@ -263,9 +263,7 @@ static uint32_t _get_wckeyid(kingbase_conn_t *kingbase_conn, char **name,
 			                        slurm_conf.slurm_user_id,
 			                        wckey_list)
 			    == SLURM_SUCCESS)
-#ifdef __METASTACK_BUG_CTLD_RESTART_POLL_HANG_FIX
-				acct_storage_p_commit(kingbase_conn, 1, false);
-#endif
+				acct_storage_p_commit(kingbase_conn, 1);
 			/* If that worked lets get it */
 			assoc_mgr_fill_in_wckey(kingbase_conn, &wckey_rec,
 						ACCOUNTING_ENFORCE_WCKEYS,
@@ -286,8 +284,8 @@ static uint64_t _get_hash_inx(kingbase_conn_t *kingbase_conn,
 			      job_record_t *job_ptr,
 			      uint64_t flag)
 {
-	char *query = NULL, *hash = NULL;
-	char *hash_col = NULL, *type_table = NULL;
+	char *query, *hash;
+	char *hash_col = NULL, *type_col = NULL, *type_table = NULL;
 	KCIResult *result = NULL;
 	fetch_flag_t* fetch_flag = NULL;
 	fetch_result_t* data_rt = NULL;
@@ -296,11 +294,13 @@ static uint64_t _get_hash_inx(kingbase_conn_t *kingbase_conn,
 	switch (flag) {
 	case JOB_SEND_ENV:
 		hash_col = "env_hash";
+		type_col = "env_vars";
 		type_table = job_env_table;
 		hash = job_ptr->details->env_hash;
 		break;
 	case JOB_SEND_SCRIPT:
 		hash_col = "script_hash";
+		type_col = "batch_script";
 		type_table = job_script_table;
 		hash = job_ptr->details->script_hash;
 		break;
@@ -314,33 +314,50 @@ static uint64_t _get_hash_inx(kingbase_conn_t *kingbase_conn,
 		return 0;
 
 	query = xstrdup_printf(
-		"insert into `%s_%s` (%s) values ('%s') "
-		"on duplicate key update last_used=VALUES(last_used); ",
-		// "hash_inx=LAST_INSERT_ID(hash_inx);",
+		"select hash_inx from `%s_%s` where %s = '%s';",
 		kingbase_conn->cluster_name, type_table,
 		hash_col, hash);
 
-	char *query2 = NULL;
-	query2 = xstrdup_printf(
-		"insert into `%s_%s` (%s) values ('%s') "
-		"on duplicate key update last_used=VALUES(last_used) returning hash_inx; ",
-		// "hash_inx=LAST_INSERT_ID(hash_inx);",
-		kingbase_conn->cluster_name, type_table,
-		hash_col, hash);
-	fetch_flag = set_fetch_flag(true, false, true);
-	data_rt = xmalloc(sizeof(fetch_result_t));
-	
-	kingbase_for_fetch2(kingbase_conn, query,fetch_flag, data_rt, query2);
-	hash_inx = data_rt->insert_ret_id;
-	
-	if (!hash_inx)
-		hash_inx = NO_VAL64;
-	else
-		job_ptr->bit_flags |= flag;
+	if (!(result = kingbase_db_query_ret(kingbase_conn, query, 0))) {
+		xfree(query);
+		return NO_VAL64;
+	}
+
 	xfree(query);
-	xfree(query2);
-	free_res_data(data_rt, fetch_flag);
 
+	if (KCIResultGetRowCount(result) != 0) {
+		debug3("%u has an %s we have already seen, no need to add again",
+		       job_ptr->job_id, type_col);
+		hash_inx = slurm_atoull(KCIResultGetColumnValue(result, 0, 0));
+	} else {
+		query = xstrdup_printf(
+			"insert into `%s_%s` (%s) values ('%s') "
+			"on duplicate key update last_used=VALUES(last_used); ",
+			// "hash_inx=LAST_INSERT_ID(hash_inx);",
+			kingbase_conn->cluster_name, type_table,
+			hash_col, hash);
+
+		char *query2 = NULL;
+		query2 = xstrdup_printf(
+			"insert into `%s_%s` (%s) values ('%s') "
+			"on duplicate key update last_used=VALUES(last_used) returning hash_inx; ",
+			// "hash_inx=LAST_INSERT_ID(hash_inx);",
+			kingbase_conn->cluster_name, type_table,
+			hash_col, hash);
+		fetch_flag = set_fetch_flag(true, false, true);
+		data_rt = xmalloc(sizeof(fetch_result_t));
+		
+		kingbase_for_fetch2(kingbase_conn, query,fetch_flag, data_rt, query2);
+		hash_inx = data_rt->insert_ret_id;
+		
+		if (!hash_inx)
+			hash_inx = NO_VAL64;
+		else
+			job_ptr->bit_flags |= flag;
+		xfree(query);
+		xfree(query2);
+		free_res_data(data_rt, fetch_flag);
+	}
 	KCIResultDealloc(result);
 
 	return hash_inx;
@@ -378,7 +395,7 @@ extern int as_kingbase_job_start(kingbase_conn_t *kingbase_conn, job_record_t *j
 	if (check_connection(kingbase_conn) != SLURM_SUCCESS)
 		return ESLURM_DB_CONNECTION;
 
-	debug2("called");
+	debug2("%s: called", __func__);
 
 	job_state = job_ptr->job_state;
 
@@ -401,9 +418,20 @@ extern int as_kingbase_job_start(kingbase_conn_t *kingbase_conn, job_record_t *j
 		begin_time = INFINITE;
 
 	/*
-	 * Strip the RESIZING flag and end the job if there was a db_index.
+	 * Strip the RESIZING flag and end the job if there was a db_index.  In
+	 * 21.08 we reset the db_index on the slurmctld side, previously it was
+	 * done here.
 	 */
 	if (IS_JOB_RESIZING(job_ptr)) {
+		/*
+		 * If we have a db_index lets end the previous record.
+		 * This should only need to be around 2 versions after 21.08.
+		 */
+		if (job_ptr->db_index) {
+			as_kingbase_job_complete(kingbase_conn, job_ptr);
+			job_ptr->db_index = 0;
+		}
+			
 		job_state &= (~JOB_RESIZING);
 	}
 
@@ -525,7 +553,7 @@ no_rollup_change:
 	if (!partition)
 		partition = "";
 
-	/* Mark the database so we know we have received the start record. */
+	/* Mark the database so we know we have recieved the start record. */
 	job_ptr->db_flags |= SLURMDB_JOB_FLAG_START_R;
 		
 	if (!job_ptr->db_index) {
@@ -596,18 +624,10 @@ no_rollup_change:
 			xstrcat(query, ", work_dir");
 		if (job_ptr->details->features)
 			xstrcat(query, ", constraints");
-		if (job_ptr->details->std_err)
-			xstrcat(query, ", std_err");
-		if (job_ptr->details->std_in)
-			xstrcat(query, ", std_in");
-		if (job_ptr->details->std_out)
-			xstrcat(query, ", std_out");
 		if (job_ptr->details->submit_line)
 			xstrcat(query, ", submit_line");
 		if (job_ptr->container)
 			xstrcat(query, ", container");
-		if (job_ptr->licenses)
-			xstrcat(query, ", licenses");
 
 		xstrfmtcat(query,
 			   ") values (%u, UNIX_TIMESTAMP(), "
@@ -660,24 +680,12 @@ no_rollup_change:
 		if (job_ptr->details->features)
 			xstrfmtcat(query, ", '%s'",
 				   job_ptr->details->features);
-		if (job_ptr->details->std_err)
-			xstrfmtcat(query, ", '%s'",
-				   job_ptr->details->std_err);
-		if (job_ptr->details->std_in)
-			xstrfmtcat(query, ", '%s'",
-				   job_ptr->details->std_in);
-		if (job_ptr->details->std_out)
-			xstrfmtcat(query, ", '%s'",
-				   job_ptr->details->std_out);
 		if (job_ptr->details->submit_line)
 			xstrfmtcat(query, ", '%s'",
 				   job_ptr->details->submit_line);
 		if (job_ptr->container)
 			xstrfmtcat(query, ", '%s'",
 				   job_ptr->container);
-		if (job_ptr->licenses)
-			xstrfmtcat(query, ", '%s'",
-				   job_ptr->licenses);
 
 		xstrfmtcat(query,
 			   ") on duplicate key update "
@@ -742,24 +750,13 @@ no_rollup_change:
 		if (job_ptr->details->features)
 			xstrfmtcat(query, ", constraints='%s'",
 				   job_ptr->details->features);
-		if (job_ptr->details->std_err)
-			xstrfmtcat(query, ", std_err='%s'",
-				   job_ptr->details->std_err);
-		if (job_ptr->details->std_in)
-			xstrfmtcat(query, ", std_in='%s'",
-				   job_ptr->details->std_in);
-		if (job_ptr->details->std_out)
-			xstrfmtcat(query, ", std_out='%s'",
-				   job_ptr->details->std_out);
+
 		if (job_ptr->details->submit_line)
 			xstrfmtcat(query, ", submit_line='%s'",
 				   job_ptr->details->submit_line);
 		if (job_ptr->container)
 			xstrfmtcat(query, ", container='%s'",
 				   job_ptr->container);
-		if (job_ptr->licenses)
-			xstrfmtcat(query, ", licenses='%s'",
-				   job_ptr->licenses);
 
 		DB_DEBUG(DB_JOB, kingbase_conn->conn, "query\n%s", query);
 //try_again:
@@ -866,24 +863,13 @@ no_rollup_change:
 		if (job_ptr->details->features)
 			xstrfmtcat(query, "constraints='%s', ",
 				   job_ptr->details->features);
-		if (job_ptr->details->std_err)
-			xstrfmtcat(query, "std_err='%s', ",
-				   job_ptr->details->std_err);
-		if (job_ptr->details->std_in)
-			xstrfmtcat(query, "std_in='%s', ",
-				   job_ptr->details->std_in);
-		if (job_ptr->details->std_out)
-			xstrfmtcat(query, "std_out='%s', ",
-				   job_ptr->details->std_out);
+
 		if (job_ptr->details->submit_line)
 			xstrfmtcat(query, "submit_line='%s', ",
 				   job_ptr->details->submit_line);
 		if (job_ptr->container)
 			xstrfmtcat(query, "container='%s', ",
 				   job_ptr->container);
-		if (job_ptr->licenses)
-			xstrfmtcat(query, "licenses='%s', ",
-				   job_ptr->licenses);
 
 		xstrfmtcat(query, "time_start=%ld, job_name='%s', "
 			   "state=greatest(state, %u), "
@@ -918,47 +904,6 @@ no_rollup_change:
 
 	xfree(query);
 
-#ifdef __METASTACK_OPT_APP  
-	/* Insert/update apptype record into job_app_table */  
-	if (rc == SLURM_SUCCESS && job_ptr->db_index  
-	    && job_ptr->app_name && job_ptr->app_name[0]) {  
-		char *esc_app_name = slurm_add_slash_to_quotes(job_ptr->app_name);  
-		char *esc_app_version = slurm_add_slash_to_quotes(job_ptr->app_version);  
-  
-		query = xstrdup_printf(  
-			"insert into `%s_%s` "  
-			"(job_db_inx, app_name, app_version, app_source, mod_time) "  
-			"values (%"PRIu64", '%s', '%s', %u, "  
-			"extract(epoch from now())::bigint) "  
-			"on duplicate key update "  
-			"app_name='%s', app_version='%s', "  
-			"app_source=%u, mod_time=extract(epoch from now())::bigint",  
-			kingbase_conn->cluster_name, job_app_table,  
-			job_ptr->db_index,  
-			esc_app_name ? esc_app_name : "",  
-			esc_app_version ? esc_app_version : "",  
-			job_ptr->app_source,  
-			esc_app_name ? esc_app_name : "",  
-			esc_app_version ? esc_app_version : "",  
-			job_ptr->app_source);  
-  
-		xfree(esc_app_name);  
-		xfree(esc_app_version);  
-  
-		DB_DEBUG(DB_JOB, kingbase_conn->conn,  
-			 "app query\n%s", query);  
-  
-		fetch_flag_t *fetch_flag = set_fetch_flag(false, false, false);  
-		fetch_result_t *data_rt = xmalloc(sizeof(fetch_result_t));  
-		int app_rc = kingbase_for_fetch(kingbase_conn, query, fetch_flag, data_rt);    
-		if (app_rc != SLURM_SUCCESS)    
-			error("Failed to insert app info for job db_index %"PRIu64,    
-			      job_ptr->db_index);  
-		free_res_data(data_rt, fetch_flag);  
-		xfree(query);  
-	}  
-#endif
-
 	if (rc != SLURM_SUCCESS)
 		return rc;
 
@@ -978,14 +923,14 @@ extern int as_kingbase_job_heavy(kingbase_conn_t *kingbase_conn, job_record_t *j
 {
 	char *query = NULL, *pos = NULL;
 	int rc = SLURM_SUCCESS;
-	job_details_t *details = job_ptr->details;
+	struct job_details *details = job_ptr->details;
 
 	if (check_connection(kingbase_conn) != SLURM_SUCCESS)
 		return ESLURM_DB_CONNECTION;
 
 	xassert(details);
 
-	debug2("called");
+	debug2("%s() called", __func__);
 
 	/*
 	 * make sure we handle any quotes that may be in the comment
@@ -1027,7 +972,7 @@ extern List as_kingbase_modify_job(kingbase_conn_t *kingbase_conn, uint32_t uid,
 	char *user_name = NULL;
 	List job_list = NULL;
 	slurmdb_job_rec_t *job_rec;
-	list_itr_t *itr;
+	ListIterator itr;
 	List id_switch_list = NULL;
 	id_switch_t *id_switch;
 	bool is_admin;
@@ -1058,9 +1003,6 @@ extern List as_kingbase_modify_job(kingbase_conn_t *kingbase_conn, uint32_t uid,
 	if (job->system_comment)
 		xstrfmtcat(vals, ", system_comment='%s'", job->system_comment);
 
-	if (job->extra)
-		xstrfmtcat(vals, ", extra='%s'", job->extra);
-
 	if (job->wckey)
 		xstrfmtcat(vals, ", wckey='%s'", job->wckey);
 
@@ -1087,7 +1029,7 @@ extern List as_kingbase_modify_job(kingbase_conn_t *kingbase_conn, uint32_t uid,
 
 	itr = list_iterator_create(job_list);
 	while ((job_rec = list_next(itr))) {
-		char tmp_char[256];
+		char tmp_char[25];
 		char *vals_mod = NULL;
 
 		if ((uid != job_rec->uid) && !is_admin) {
@@ -1280,29 +1222,6 @@ endit:
 	return ret_list;
 }
 
-/*
- * Get update format for setting derived_ec on the dbd side.
- *
- * stepmgr jobs don't update the controller job's derived_ec so we update as the
- * step and job come into the dbd.
- */
-static char *_get_derived_ec_update_str(uint32_t exit_code)
-{
-	char *derived_str = NULL;
-
-	/*
-	 * Sync with _internal_step_complete() for setting derived_ec on the
-	 * contoller.
-	 */
-	if (exit_code == SIG_OOM)
-		derived_str = xstrdup_printf("%u", exit_code);
-	else
-		derived_str = xstrdup_printf("GREATEST(%u, derived_ec)",
-					     exit_code);
-
-	return derived_str;
-}
-
 extern int as_kingbase_job_complete(kingbase_conn_t *kingbase_conn,
 				 job_record_t *job_ptr)
 {
@@ -1322,7 +1241,7 @@ extern int as_kingbase_job_complete(kingbase_conn_t *kingbase_conn,
 	if (check_connection(kingbase_conn) != SLURM_SUCCESS)
 		return ESLURM_DB_CONNECTION;
 
-	debug2("called");
+	debug2("%s() called", __func__);
 
 	if (job_ptr->resize_time)
 		submit_time = job_ptr->resize_time;
@@ -1399,12 +1318,8 @@ extern int as_kingbase_job_complete(kingbase_conn_t *kingbase_conn,
 			       kingbase_conn->cluster_name, job_table,
 			       end_time, job_state);
 
-	if (job_ptr->derived_ec != NO_VAL) {
-		char *derived_ec_str =
-			_get_derived_ec_update_str(job_ptr->derived_ec);
-		xstrfmtcat(query, ", derived_ec=%s", derived_ec_str);
-		xfree(derived_ec_str);
-	}
+	if (job_ptr->derived_ec != NO_VAL)
+		xstrfmtcat(query, ", derived_ec=%u", job_ptr->derived_ec);
 
 	if (job_ptr->tres_alloc_str)
 		xstrfmtcat(query, ", tres_alloc='%s'", job_ptr->tres_alloc_str);
@@ -1418,10 +1333,10 @@ extern int as_kingbase_job_complete(kingbase_conn_t *kingbase_conn,
 #endif
 #ifdef __METASTACK_OPT_SACCT_OUTPUT
 	if (job_ptr->details->std_out)
-		xstrfmtcat(query, ", std_out='%s'", job_ptr->details->std_out);
+		xstrfmtcat(query, ", stdout='%s'", job_ptr->details->std_out);
 	//	xstrfmtcat(query, ", stdout='%s'", job_ptr->stdout);
 	if (job_ptr->details->std_err)
-		xstrfmtcat(query, ", std_err='%s'", job_ptr->details->std_err);
+		xstrfmtcat(query, ", stderr='%s'", job_ptr->details->std_err);
 	//	xstrfmtcat(query, ", stderr='%s'", job_ptr->stderr);
 #endif
 
@@ -1437,12 +1352,6 @@ extern int as_kingbase_job_complete(kingbase_conn_t *kingbase_conn,
 	if (job_ptr->system_comment)
 		xstrfmtcat(query, ", system_comment='%s'",
 			   job_ptr->system_comment);
-
-	if (job_ptr->extra)
-		xstrfmtcat(query, ", extra='%s'", job_ptr->extra);
-
-	if (job_ptr->failed_node)
-		xstrfmtcat(query, ", failed_node='%s'", job_ptr->failed_node);
 
 	exit_code = job_ptr->exit_code;
 	if (exit_code == 1) {
@@ -1902,12 +1811,11 @@ extern int as_kingbase_step_complete(kingbase_conn_t *kingbase_conn,
 
 	/* set the energy for the entire job. */
 	if (step_ptr->job_ptr->tres_alloc_str) {
-		char *derived_ec_str = _get_derived_ec_update_str(exit_code);
 		query = xstrdup_printf(
-			"update `%s_%s` set tres_alloc='%s', derived_ec=%s where "
+			"update `%s_%s` set tres_alloc='%s' where "
 			"job_db_inx=%"PRIu64,
 			kingbase_conn->cluster_name, job_table,
-			step_ptr->job_ptr->tres_alloc_str, derived_ec_str,
+			step_ptr->job_ptr->tres_alloc_str,
 			step_ptr->job_ptr->db_index);
 		DB_DEBUG(DB_STEP, kingbase_conn->conn, "query\n%s", query);
 		//info("[query] line %d, %s: query: %s", __LINE__, __func__, query);
@@ -1919,25 +1827,6 @@ extern int as_kingbase_step_complete(kingbase_conn_t *kingbase_conn,
 		rc = kingbase_for_fetch(kingbase_conn, query, fetch_flag, data_rt);
 		free_res_data(data_rt, fetch_flag);
 		xfree(query);
-		xfree(derived_ec_str);
-	} else if (exit_code &&
-		   (step_ptr->step_id.step_id != SLURM_BATCH_SCRIPT) &&
-		   (step_ptr->step_id.step_id != SLURM_EXTERN_CONT)) {
-		char *derived_ec_str = _get_derived_ec_update_str(exit_code);
-		query = xstrdup_printf(
-			"update `%s_%s` set derived_ec=%s where "
-			"job_db_inx=%"PRIu64,
-			kingbase_conn->cluster_name, job_table, derived_ec_str,
-			step_ptr->job_ptr->db_index);
-		DB_DEBUG(DB_STEP, kingbase_conn->conn, "query\n%s", query);
-		fetch_flag_t *fetch_flag = NULL;
-		fetch_result_t *data_rt = NULL;
-		fetch_flag = set_fetch_flag(false, false, false);
-		data_rt = xmalloc(sizeof(fetch_result_t));
-		rc = kingbase_for_fetch(kingbase_conn, query, fetch_flag, data_rt);
-		free_res_data(data_rt, fetch_flag);
-		xfree(query);
-		xfree(derived_ec_str);
 	}
 
 	return rc;
@@ -2069,7 +1958,7 @@ again:
 	 * the suspend table and the step table
 	 */
 	query = xstrdup_printf(
-		"select distinct t1.job_db_inx, t1.state, t1.time_suspended from `%s_%s` "
+		"select distinct t1.job_db_inx, t1.state from `%s_%s` "
 		"as t1 where t1.time_end=0 LIMIT %u;",
 		kingbase_conn->cluster_name, job_table, MAX_FLUSH_JOBS);
 	DB_DEBUG(DB_JOB, kingbase_conn->conn, "query\n%s", query);
@@ -2087,10 +1976,6 @@ again:
     for(i = 0 ; i < count ; i++){
         int state = slurm_atoul(KCIResultGetColumnValue(result,i,1));
 		if (state == JOB_SUSPENDED) {
-			time_t time_suspended = slurm_atoull(KCIResultGetColumnValue(result,i,2));
-			/* To avoid underflow, use the latest time_suspended. */
-			if (event_time < time_suspended)
-				event_time = time_suspended;
 			if (suspended_char)
 				xstrfmtcat(suspended_char,
 					   ", %s", KCIResultGetColumnValue(result,i,0));

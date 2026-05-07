@@ -1,7 +1,7 @@
 /****************************************************************************\
  *  file_bcast.h - definitions used for file broadcast functions
  *****************************************************************************
- *  Copyright (C) SchedMD LLC.
+ *  Copyright (C) 2015-2016 SchedMD LLC.
  *
  *  This file is part of Slurm, a resource management program.
  *  For details, see <https://slurm.schedmd.com/>.
@@ -50,13 +50,12 @@ struct bcast_parameters {
 	uint16_t compress;
 	char *exclude;
 	char *dst_fname;
-	char *exe_fname;
+	int fanout;
 	uint16_t flags;
 	slurm_selected_step_t *selected_step;
 	char *src_fname;
 	uint32_t step_id;
 	int timeout;
-	int tree_width;
 	int verbose;
 };
 

@@ -1,7 +1,8 @@
 /*****************************************************************************\
  *  x11_forwarding.h - setup ssh port forwarding
  *****************************************************************************
- *  Copyright (C) SchedMD LLC.
+ *  Copyright (C) 2017 SchedMD LLC.
+ *  Written by Tim Wickberg <tim@schedmd.com>
  *
  *  This file is part of Slurm, a resource management program.
  *  For details, see <https://slurm.schedmd.com/>.
@@ -36,7 +37,7 @@
 #ifndef _X11_FORWARDING_H_
 #define _X11_FORWARDING_H_
 
-extern int setup_x11_forward(stepd_step_rec_t *step);
-extern int shutdown_x11_forward(stepd_step_rec_t *step);
+extern int setup_x11_forward(stepd_step_rec_t *job);
+extern int shutdown_x11_forward(stepd_step_rec_t *job);
 
 #endif /* _X11_FORWARDING_H_ */

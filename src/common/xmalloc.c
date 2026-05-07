@@ -165,7 +165,7 @@ extern void * slurm_xrecalloc(void **item, size_t count, size_t size,
 		}
 		xassert(p[0] == XMALLOC_MAGIC);
 	} else {
-		/* Initialize new memory */
+		/* Initalize new memory */
 		if (clear)
 			p = calloc(1, total_size);
 		else

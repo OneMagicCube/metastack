@@ -57,7 +57,6 @@
 #include <dirent.h>
 #include <inttypes.h>
 #include <libgen.h>
-#include <limits.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
@@ -214,12 +213,11 @@ static int _find_inode_in_fddir(pid_t pid, ino_t inode)
 	DIR *dirp;
 	struct dirent *entryp;
 	char dirpath[1024];
-	char fdpath[PATH_MAX];
+	char fdpath[2048];
 	int rc = SLURM_ERROR;
 	struct stat statbuf;
 
-	if (snprintf(dirpath, 1024, "/proc/%d/fd", (pid_t)pid) >= 1024)
-		return SLURM_ERROR;
+	snprintf(dirpath, 1024, "/proc/%d/fd", (pid_t)pid);
 	if ((dirp = opendir(dirpath)) == NULL) {
 		return SLURM_ERROR;
 	}
@@ -232,10 +230,7 @@ static int _find_inode_in_fddir(pid_t pid, ino_t inode)
 			continue;
 
 		/* This is a symlink. Follow it to get destination's inode. */
-		if (snprintf(fdpath, sizeof(fdpath), "%s/%s", dirpath,
-			     entryp->d_name) >= sizeof(fdpath))
-			continue;
-
+		snprintf(fdpath, sizeof(fdpath), "%s/%s", dirpath, entryp->d_name);
 		if (stat(fdpath, &statbuf) != 0)
 			continue;
 		if (statbuf.st_ino == inode) {
@@ -344,7 +339,7 @@ extern int callerid_get_own_netinfo (callerid_conn_t *conn)
 	DIR *dirp;
 	struct dirent *entryp;
 	char *dirpath = "/proc/self/fd";
-	char fdpath[PATH_MAX];
+	char fdpath[1024];
 	int rc = SLURM_ERROR;
 	struct stat statbuf;
 
@@ -361,9 +356,7 @@ extern int callerid_get_own_netinfo (callerid_conn_t *conn)
 		else if (!xstrncmp(entryp->d_name, ".", 1))
 			continue;
 
-		if (snprintf(fdpath, PATH_MAX, "%s/%s", dirpath,
-			     entryp->d_name) >= PATH_MAX)
-			continue;
+		snprintf(fdpath, 1024, "%s/%s", dirpath, entryp->d_name);
 		debug3("callerid_get_own_netinfo: checking %s", fdpath);
 		/* This is a symlink. Follow it to get destination's inode. */
 		if (stat(fdpath, &statbuf) != 0) {

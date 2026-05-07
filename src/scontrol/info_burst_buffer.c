@@ -1,7 +1,8 @@
 /*****************************************************************************\
  *  info_burst_buffer.c - Burst buffer information functions for scontrol.
  *****************************************************************************
- *  Copyright (C) SchedMD LLC.
+ *  Copyright (C) 2014-2017 SchedMD LLC <https://www.schedmd.com/>.
+ *  Written by Morris Jette <jette@schedmd.com>
  *
  *  This file is part of Slurm, a resource management program.
  *  For details, see <https://slurm.schedmd.com/>.

@@ -55,16 +55,19 @@
 #define SLURM_IO_ALLSTDIN 3
 #define SLURM_IO_CONNECTION_TEST 4
 
+#define IO_PROTOCOL_VERSION 0xb001
+
 typedef struct {
 	uint16_t      version;
 	char          *io_key;
+	uint32_t      io_key_len;
 	uint32_t      nodeid;
 	uint32_t      stdout_objs;
 	uint32_t      stderr_objs;
 } io_init_msg_t;
 
 
-typedef struct {
+typedef struct slurm_io_header {
 	uint16_t      type;
 	uint16_t      gtaskid;
 	uint16_t      ltaskid;
@@ -84,7 +87,7 @@ int io_hdr_read_fd(int fd, io_hdr_t *hdr);
 /*
  * Validate io init msg
  */
-int io_init_msg_validate(io_init_msg_t *msg, const char *sig);
+int io_init_msg_validate(io_init_msg_t *msg, const char *sig, uint32_t sig_len);
 int io_init_msg_write_to_fd(int fd, io_init_msg_t *msg);
 int io_init_msg_read_from_fd(int fd, io_init_msg_t *msg);
 

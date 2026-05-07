@@ -45,10 +45,10 @@ static int _setup_assoc_cond_limits(
 	char **extra, bool user_query)
 {
 	int set = 0;
-	list_itr_t *itr = NULL;
+	ListIterator itr = NULL;
 	char *object = NULL;
 
-	xstrfmtcat(*extra, "where t1.deleted=0");
+	xstrfmtcat(*extra, "where deleted=0");
 
 	if (!assoc_cond)
 		return 0;
@@ -60,7 +60,7 @@ static int _setup_assoc_cond_limits(
 		while ((object = list_next(itr))) {
 			if (set)
 				xstrcat(*extra, " or ");
-			xstrfmtcat(*extra, "t1.acct='%s'", object);
+			xstrfmtcat(*extra, "acct='%s'", object);
 			set = 1;
 		}
 		list_iterator_destroy(itr);
@@ -74,7 +74,7 @@ static int _setup_assoc_cond_limits(
 		while ((object = list_next(itr))) {
 			if (set)
 				xstrcat(*extra, " or ");
-			xstrfmtcat(*extra, "t1.`user`='%s'", object);
+			xstrfmtcat(*extra, "`user`='%s'", object);
 			set = 1;
 		}
 		list_iterator_destroy(itr);
@@ -82,7 +82,7 @@ static int _setup_assoc_cond_limits(
 	} else if (user_query) {
 		/* we want all the users, but no non-user associations */
 		set = 1;
-		xstrcat(*extra, " and (t1.`user`!='')");
+		xstrcat(*extra, " and (`user`!='')");
 	}
 
 	if (assoc_cond->partition_list
@@ -93,7 +93,7 @@ static int _setup_assoc_cond_limits(
 		while ((object = list_next(itr))) {
 			if (set)
 				xstrcat(*extra, " or ");
-			xstrfmtcat(*extra, "t1.partition='%s'", object);
+			xstrfmtcat(*extra, "partition='%s'", object);
 			set = 1;
 		}
 		list_iterator_destroy(itr);
@@ -112,7 +112,7 @@ extern int as_kingbase_acct_no_assocs(kingbase_conn_t *kingbase_conn,
 	char *query = NULL;
 	KCIResult *result = NULL;
 	List use_cluster_list = NULL;
-	list_itr_t *itr = NULL;
+	ListIterator itr = NULL;
 	char *cluster_name = NULL;
 	bool locked = false;
 
@@ -123,7 +123,7 @@ extern int as_kingbase_acct_no_assocs(kingbase_conn_t *kingbase_conn,
 	if (assoc_cond &&
 	    assoc_cond->acct_list && list_count(assoc_cond->acct_list)) {
 		int set = 0;
-		list_itr_t *itr = NULL;
+		ListIterator itr = NULL;
 		char *object = NULL;
 		xstrcat(query, " and (");
 		itr = list_iterator_create(assoc_cond->acct_list);
@@ -141,7 +141,7 @@ extern int as_kingbase_acct_no_assocs(kingbase_conn_t *kingbase_conn,
 	xfree(query);
 	if (KCIResultGetStatusCode(result) != EXECUTE_TUPLES_OK) {
 		KCIResultDealloc(result);
-		return ESLURM_BAD_SQL;
+		return SLURM_ERROR;
 	}
 
 	if (assoc_cond &&
@@ -177,7 +177,7 @@ extern int as_kingbase_acct_no_assocs(kingbase_conn_t *kingbase_conn,
 		xfree(query);
 		if (KCIResultGetStatusCode(result2) != EXECUTE_TUPLES_OK) {
 			KCIResultDealloc(result2);
-			rc = ESLURM_BAD_SQL;
+			rc = SLURM_ERROR;
 			break;
 		}
 
@@ -214,8 +214,8 @@ extern int as_kingbase_acct_no_users(kingbase_conn_t *kingbase_conn,
 	int i = 0;
 	KCIResult *result = NULL;
 	List use_cluster_list = NULL;
-	list_itr_t *itr = NULL;
-	char *cluster_name = NULL;
+	ListIterator itr = NULL;
+	char *cluster_name;
 	bool locked = false;
 
 	xassert(ret_list);
@@ -240,9 +240,9 @@ extern int as_kingbase_acct_no_users(kingbase_conn_t *kingbase_conn,
 	};
 
 	xfree(tmp);
-	xstrfmtcat(tmp, "t1.%s", assoc_req_inx[i]);
+	xstrfmtcat(tmp, "%s", assoc_req_inx[i]);
 	for(i=1; i<ASSOC_REQ_COUNT; i++) {
-		xstrfmtcat(tmp, ", t1.%s", assoc_req_inx[i]);
+		xstrfmtcat(tmp, ", %s", assoc_req_inx[i]);
 	}
 
 	if (assoc_cond &&
@@ -256,16 +256,12 @@ extern int as_kingbase_acct_no_users(kingbase_conn_t *kingbase_conn,
 
 	itr = list_iterator_create(use_cluster_list);
 	while ((cluster_name = list_next(itr))) {
-		/*
-		 * Only get the account associations that don't have an
-		 * associated row with a user in it
-		 */
+		/* only get the account associations */
 		if (query)
 			xstrcat(query, " union ");
-
-		xstrfmtcat(query, "select distinct %s, '%s' as cluster from `%s_%s` as t1 left join `%s_%s` as t2 on t2.lineage like concat(t1.lineage, '0-%%') %s and t1.`user`='' and t2.lineage is NULL",
+		xstrfmtcat(query, "select distinct %s, '%s' as cluster "
+			   "from `%s_%s` %s and `user`='' and lft=(rgt-1) ",
 			   tmp, cluster_name, cluster_name,
-			   assoc_table, cluster_name,
 			   assoc_table, extra);
 	}
 	list_iterator_destroy(itr);
@@ -283,7 +279,7 @@ extern int as_kingbase_acct_no_users(kingbase_conn_t *kingbase_conn,
 	xfree(query);
 	if (KCIResultGetStatusCode(result) != EXECUTE_TUPLES_OK) {
 		KCIResultDealloc(result);
-		return ESLURM_BAD_SQL;
+		return SLURM_ERROR;
 	}
 
 	for(int i = 0; i < KCIResultGetRowCount(result); i++) {
@@ -319,7 +315,7 @@ extern int as_kingbase_user_no_assocs_or_no_uid(
 	char *query = NULL;
 	KCIResult *result = NULL;
 	List use_cluster_list = NULL;
-	list_itr_t *itr = NULL;
+	ListIterator itr = NULL;
 	char *cluster_name = NULL;
 	bool locked = false;
 
@@ -347,7 +343,7 @@ extern int as_kingbase_user_no_assocs_or_no_uid(
 	xfree(query);
 	if (KCIResultGetStatusCode(result) != EXECUTE_TUPLES_OK) {
 		KCIResultDealloc(result);
-		return ESLURM_BAD_SQL;
+		return SLURM_ERROR;
 	}
 
 	if (assoc_cond &&
@@ -395,7 +391,7 @@ extern int as_kingbase_user_no_assocs_or_no_uid(
 		xfree(query);
 		if (KCIResultGetStatusCode(result2) != EXECUTE_TUPLES_OK) {
 			KCIResultDealloc(result2);
-			rc = ESLURM_BAD_SQL;
+			rc = SLURM_ERROR;
 			break;
 		}
 

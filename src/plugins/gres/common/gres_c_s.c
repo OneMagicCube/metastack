@@ -1,7 +1,8 @@
 /*****************************************************************************\
  *  gres_c_s.c - common functions for shared gres plugins
  *****************************************************************************
- *  Copyright (C) SchedMD LLC.
+ *  Copyright (C) 2021 SchedMD LLC
+ *  Written by Danny Auble <da@schedmd.com>
  *
  *  This file is part of Slurm, a resource management program.
  *  For details, see <https://slurm.schedmd.com/>.
@@ -229,7 +230,7 @@ static uint64_t _build_shared_dev_info(List gres_conf_list)
 	uint64_t shared_count = 0;
 	gres_slurmd_conf_t *gres_slurmd_conf;
 	shared_dev_info_t *shared_conf;
-	list_itr_t *iter;
+	ListIterator iter;
 
 	FREE_NULL_LIST(shared_info);
 	shared_info = list_create(xfree_ptr);
@@ -268,10 +269,10 @@ static int _remove_shared_recs(void *x, void *arg)
  */
 static List _build_sharing_list(List gres_list, char *sharing_name)
 {
-	list_itr_t *itr;
+	ListIterator itr;
 	gres_slurmd_conf_t *gres_slurmd_conf, *sharing_record;
 	List sharing_list;
-	hostlist_t *hl;
+	hostlist_t hl;
 	char *f_name;
 	bool log_fname = true;
 
@@ -288,18 +289,6 @@ static List _build_sharing_list(List gres_list, char *sharing_name)
 				error("SHARING configuration lacks \"File\" specification");
 				log_fname = false;
 			}
-			continue;
-		}
-
-		/*
-		 * Do not split up gres records with MultipleFiles, e.g. MIGs.
-		 * With MultipleFiles, all files correspond to the same gres
-		 * device, as opposed to File=nvidia[0-3] which corresponds to
-		 * four separate gres devices.
-		 */
-		if (gres_slurmd_conf->config_flags & GRES_CONF_HAS_MULT) {
-			list_append(sharing_list, gres_slurmd_conf);
-			list_remove(itr);
 			continue;
 		}
 		hl = hostlist_create(gres_slurmd_conf->file);
@@ -347,10 +336,10 @@ static List _build_sharing_list(List gres_list, char *sharing_name)
  */
 static List _build_shared_list(List gres_list, char *shared_name)
 {
-	list_itr_t *itr;
+	ListIterator itr;
 	gres_slurmd_conf_t *gres_slurmd_conf, *shared_record;
 	List shared_list;
-	hostlist_t *hl;
+	hostlist_t hl;
 	char *f_name;
 	uint64_t count_per_file;
 	int shared_no_file_recs = 0, shared_file_recs = 0;
@@ -450,7 +439,8 @@ extern void gres_c_s_fini(void)
 extern int gres_c_s_init_share_devices(List gres_conf_list,
 				       List *share_devices,
 				       node_config_load_t *config,
-				       char *sharing_name)
+				       char *sharing_name,
+				       char *shared_name)
 {
 	int rc = SLURM_SUCCESS;
 	List sharing_conf_list, shared_conf_list;
@@ -467,7 +457,7 @@ extern int gres_c_s_init_share_devices(List gres_conf_list,
 		FREE_NULL_LIST(*share_devices);
 	}
 
-	log_flag(GRES, "Initialized gres.conf list");
+	log_flag(GRES, "Initalized gres.conf list");
 	print_gres_list(gres_conf_list, log_lvl);
 
 	/*
@@ -486,26 +476,26 @@ extern int gres_c_s_init_share_devices(List gres_conf_list,
 
 	/* Now move SHARED records to new List, each with unique device file */
 	shared_conf_list = _build_shared_list(
-		gres_conf_list, config->gres_name);
+		gres_conf_list, shared_name);
 
 	/*
 	 * Merge SHARED records back to original list, updating and reordering
 	 * as needed.
 	 */
 	rc = _merge_lists(gres_conf_list, sharing_conf_list, shared_conf_list,
-			  config->gres_name);
+			  shared_name);
 	FREE_NULL_LIST(sharing_conf_list);
 	FREE_NULL_LIST(shared_conf_list);
 	if (rc != SLURM_SUCCESS)
 		fatal("failed to merge SHARED and SHARING configuration");
 
-	rc = gres_node_config_load(gres_conf_list, config, share_devices);
-
+	rc = common_node_config_load(gres_conf_list, shared_name, config,
+				     share_devices);
 	if (rc != SLURM_SUCCESS)
 		fatal("failed to load configuration");
 	if (!_build_shared_dev_info(gres_conf_list) && gres_conf_list)
 		(void) list_delete_all(gres_conf_list, _remove_shared_recs,
-				       config->gres_name);
+				       shared_name);
 
 	log_var(log_lvl, "Final gres.conf list:");
 	print_gres_list(gres_conf_list, log_lvl);
@@ -523,7 +513,7 @@ extern void gres_c_s_send_stepd(buf_t *buffer)
 {
 	uint32_t shared_cnt;
 	shared_dev_info_t *shared_ptr;
-	list_itr_t *itr;
+	ListIterator itr;
 
 	if (!shared_info) {
 		shared_cnt = 0;

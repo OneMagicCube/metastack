@@ -20,30 +20,16 @@ end
 
 function slurm_cli_setup_defaults(options, early_pass)
 
-		return slurm.SUCCESS
+        return slurm.SUCCESS
 end
 
 function slurm_cli_post_submit(offset, job_id, step_id)
 
-		return slurm.SUCCESS
+        return slurm.SUCCESS
 end
 
 -- 加载预测工具
 function load_prediction_tool(options, pack_offset)
-
-	local array_inx = options["array"]
-
-	if array_inx ~= nil and array_inx ~= "invalid-context" then
-		options["predict-job"] = -1
-		return
-	end
-
-	local sig = options["signal"]
-
-	if sig ~= '0@0' then
-		options["predict-job"] = -1
-		return
-	end
 
 	-- 默认关闭预测功能
 	predictionFunction = "0"  
@@ -148,11 +134,11 @@ function load_prediction_tool(options, pack_offset)
 		-- 将异构作业offset不等于0的作业在此重置一次time_min的标识
 		if (pack_offset ~= 0) then
 
-			time_min = -2
+			time_min = -1
 		end
 
 		-- 判断作业是否已指定TimeMin，若未指定走预测流程
-		if (time_min == -2) then
+		if (time_min == -1) then
 			
 			-- 预测功能校验用户，若为预测功能用户，执行时间预测模块
 			if (checkValueInFile(predictUsers_file, user_name) == 1) then
@@ -165,16 +151,15 @@ function load_prediction_tool(options, pack_offset)
 	
 			-- 若不为预测功能用户，直接跳过预测模块
 			else
-			
+				
 				options["predict-job"] = -1
-
+				-- slurm.log_info("The user %s is not in the prediction userlist.", user_name)
 			end
 	
 		-- 若已指定TimeMin，直接跳过预测模块
 		else
-
 			options["predict-job"] = -1
-
+			-- slurm.log_info("User %s job has TimeMin, skipping the predictive function.", user_name)
 		end
 
 	-- 为所有用户开启预测功能
@@ -189,11 +174,11 @@ function load_prediction_tool(options, pack_offset)
 		-- 将异构作业offset不等于0的作业在此重置一次time_min的标识
 		if (pack_offset ~= 0) then
 
-			time_min = -2
+			time_min = -1
 		end
 
 		-- 判断作业是否已指定TimeMin，若未指定走预测流程
-		if (time_min == -2) then
+		if (time_min == -1) then
 
 			-- 加载预测工具
 			dofile(predictionTool_file)
@@ -203,15 +188,15 @@ function load_prediction_tool(options, pack_offset)
 
 		-- 若已指定TimeMin，直接跳过预测模块
 		else
-
 			options["predict-job"] = -1
-
+			-- slurm.log_info("User %s job has TimeMin, skipping the predictive function.", user_name)
 		end
 
 	-- 未开启预测功能
 	else
 
 		options["predict-job"] = -1
+		-- slurm.log_info("The prediction function is not enabled and the prediction flag is reset to 0.")
 
 	end
 
@@ -221,6 +206,10 @@ end
 function get_config_value(key)
 
 	local file = io.open(configuration_path, "r")
+
+	if not file then
+		-- slurm.log_info("Could not open config file: %s", configuration_path)
+	end
 
 	for line in file:lines() do
 
@@ -250,20 +239,16 @@ function checkValueInFile(filename,value)
 
 	-- 若文件不存在，直接返回0
 	if(file==nil) then
-
+		-- slurm.log_info("%s not exist!", filename)
 		return 0
 	end
 
 	-- 文件存在，进行解析
 	for line in file:lines() do
-
 		if(line == tostring(value)) then
-
 			result = 1
-
 			break
 		end
-
 	end
 
 	file:close()
@@ -297,6 +282,16 @@ function read_properties(file_path)
 	file:close()
 
 	return hash_table
+end
+
+
+-- Define a function to resolve the script path
+function resolve_path(work_dir, script)
+	if script:sub(1, 1) == "/" then
+		return script -- Absolute path, return directly
+	else
+		return work_dir .. "/" .. script -- Relative path, append the working directory
+	end
 end
 
 -- Process the script file and match using the hash table
@@ -335,7 +330,7 @@ function process_script(script_path, hash_table)
 						end
 					else
 						-- Third-level tokenization: Split by ".", "-", "=", "_", "+"
-						for fine_word in slash_word:gmatch("[^%.%-=_%+,:]+") do
+						for fine_word in slash_word:gmatch("[^%.%-=_%+]+") do
 							local lower_fine_word = fine_word:lower() -- Convert token to lowercase
 							if hash_table[lower_fine_word] then
 								local value = hash_table[lower_fine_word]
@@ -444,9 +439,7 @@ function get_apptype(options)
 	-- 1. Retrieve submit_line, work_dir, and apptype
 	local submit_line = options["submit-line"]
 	local work_dir = options["chdir"] or ""
-	local apptype = options["apptype"]
-	local argv = options["argv"]
-	local script_path = argv and argv[1]
+	local apptype = options["apptype"] 
 
 	if apptype ~= nil and apptype == "unset" then
 		return "unset"
@@ -455,7 +448,7 @@ function get_apptype(options)
 	-- 2. Get the properties file path and construct the hash table
 	local hash_table = read_properties(properties_path)
 	if not hash_table then return nil end
-
+    
 	-- 3. Determine the job submission type
 	if not submit_line then return nil end
 	local submit_type = check_command_type(submit_line)
@@ -474,9 +467,11 @@ function get_apptype(options)
 
 	-- 5. Handle different submission methods
 	if submit_type == 0 then
-		if not script_path then
-			return nil
-		end
+		-- Extract the script path
+		local script = submit_line:match("%S+$")
+		-- Construct the script path using workdir
+		if not work_dir then return nil end
+		local script_path = resolve_path(work_dir, script)
 		-- Process the script and return the application type
 		local result = process_script(script_path, hash_table)
 		-- Log the application type

@@ -1,7 +1,8 @@
 /*****************************************************************************\
  *  hash_k12.c -  KangarooTwelve hash plugin
 *****************************************************************************
- *  Copyright (C) SchedMD LLC.
+ *  Copyright (C) 2021 SchedMD LLC
+ *  Written by Dominik Bartkiewicz <bart@schedmd.com>
  *
  *  This file is part of Slurm, a resource management program.
  *  For details, see <https://slurm.schedmd.com/>.
@@ -37,10 +38,10 @@
 
 #include "src/common/slurm_xlator.h"
 
-#include "src/interfaces/hash.h"
+#include "src/common/hash.h"
 #include "src/common/log.h"
 
-#include "src/plugins/hash/common_xkcp/KangarooTwelve.h"
+#include "KangarooTwelve.h"
 
 /*
  * These variables are required by the generic plugin interface.  If they

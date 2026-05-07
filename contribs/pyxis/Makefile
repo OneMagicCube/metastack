@@ -3,7 +3,6 @@ libdir      ?= $(PREFIX)
 
 PLUGINDIR := $(abspath $(DESTDIR)/$(libdir)/slurm)
 CONFDIR   := $(abspath $(DESTDIR)/$(PREFIX)/etc)
-TOP_BUILD_DIR := $(shell dirname $(shell dirname $(shell pwd)))
 
 ARCH      ?= $(shell uname -m)
 VERSION   ?= 0.20.0
@@ -14,7 +13,7 @@ CONF   := plugstack.conf
 .PHONY: all install uninstall clean deb rpm
 
 CPPFLAGS := -D_GNU_SOURCE -D_FORTIFY_SOURCE=2 -DPYXIS_VERSION=\"$(VERSION)\" $(CPPFLAGS)
-CFLAGS := -std=gnu11 -g -Wall -Wunused-variable -fstack-protector-strong -fpic -I$(TOP_BUILD_DIR) $(CFLAGS) -O2
+CFLAGS := -std=gnu11 -O2 -g -Wall -Wunused-variable -fstack-protector-strong -fpic $(CFLAGS)
 LDFLAGS := -Wl,-znoexecstack -Wl,-zrelro -Wl,-znow $(LDFLAGS)
 
 C_SRCS := common.c args.c pyxis_slurmstepd.c pyxis_slurmd.c pyxis_srun.c pyxis_alloc.c pyxis_dispatch.c config.c enroot.c

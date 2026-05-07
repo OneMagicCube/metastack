@@ -1,5 +1,1 @@
-SUBDIRS = lua nss_slurm openlava pam perlapi pmi pmi2 pyxis seff sgather sjobexit torque sjinfo spank
-
-if LINUX_BUILD
-SUBDIRS += pam_slurm_adopt
-endif
+SUBDIRS = cray lua nss_slurm openlava pam pam_slurm_adopt perlapi pmi pmi2 pyxis seff sgather sgi sjobexit torque spank sjinfo

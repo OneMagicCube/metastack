@@ -36,7 +36,6 @@
  *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301  USA.
 \*****************************************************************************/
 
-#include "src/interfaces/data_parser.h"
 #include "scontrol.h"
 
 /* Load current reservation table information into *res_buffer_pptr */
@@ -79,12 +78,12 @@ scontrol_load_reservations(reserve_info_msg_t **res_buffer_pptr)
  * scontrol_print_res - print the specified reservation's information
  * IN reservation_name - NULL to print information about all reservations
  */
-extern void scontrol_print_res(char *reservation_name, int argc, char **argv)
+extern void
+scontrol_print_res (char *reservation_name)
 {
-	int error_code, print_cnt = 0;
+	int error_code, i, print_cnt = 0;
 	reserve_info_msg_t *res_info_ptr = NULL;
 	reserve_info_t *res_ptr = NULL;
-	reserve_info_t **resvs = NULL;
 
 	error_code = scontrol_load_reservations(&res_info_ptr);
 	if (error_code) {
@@ -94,62 +93,27 @@ extern void scontrol_print_res(char *reservation_name, int argc, char **argv)
 		return;
 	}
 
-	if (!mime_type && (quiet_flag == -1)) {
-		char time_str[256];
+	if (quiet_flag == -1) {
+		char time_str[32];
 		slurm_make_time_str ((time_t *)&res_info_ptr->last_update,
 			       time_str, sizeof(time_str));
 		printf ("last_update_time=%s, records=%d\n",
 			time_str, res_info_ptr->record_count);
 	}
 
-	resvs = xcalloc(res_info_ptr->record_count + 1, sizeof(*resvs));
 	res_ptr = res_info_ptr->reservation_array;
-	for (int i = 0; i < res_info_ptr->record_count; i++) {
+	for (i = 0; i < res_info_ptr->record_count; i++) {
 		if (reservation_name &&
 		    xstrcmp (reservation_name, res_ptr[i].name) != 0)
 			continue;
-		resvs[print_cnt] = &res_ptr[i];
 		print_cnt++;
+		slurm_print_reservation_info (stdout, & res_ptr[i],
+		                              one_liner ) ;
 		if (reservation_name)
 			break;
 	}
 
-	if (mime_type) {
-		int rc;
-		reserve_info_msg_t msg = {
-			.last_update = res_info_ptr->last_update,
-			.record_count = print_cnt,
-			.reservation_array = NULL,
-		};
-		openapi_resp_reserve_info_msg_t resp = {
-			.reservations = &msg,
-			.last_update = res_info_ptr->last_update,
-		};
-
-		msg.reservation_array =
-			xcalloc(print_cnt, sizeof(*msg.reservation_array));
-		for (int i = 0; i < print_cnt; i++)
-			msg.reservation_array[i] = *resvs[i];
-
-		if (is_data_parser_deprecated(data_parser))
-			DATA_DUMP_CLI_DEPRECATED(RESERVATION_INFO_MSG, msg,
-						 "reservations", argc, argv,
-						 NULL, mime_type, rc);
-		else
-			DATA_DUMP_CLI(OPENAPI_RESERVATION_RESP, resp, argc,
-				      argv, NULL, mime_type, data_parser, rc);
-
-		if (rc)
-			exit_code = 1;
-
-		xfree(msg.reservation_array);
-	} else {
-		for (int i = 0; resvs[i]; i++)
-			slurm_print_reservation_info(stdout, resvs[i],
-						     one_liner);
-	}
-
-	if (!mime_type && !print_cnt) {
+	if (print_cnt == 0) {
 		if (reservation_name) {
 			exit_code = 1;
 			if (quiet_flag != 1)
@@ -158,6 +122,4 @@ extern void scontrol_print_res(char *reservation_name, int argc, char **argv)
 		} else if (quiet_flag != 1)
 			printf ("No reservations in the system\n");
 	}
-
-	xfree(resvs);
 }

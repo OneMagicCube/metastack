@@ -138,33 +138,30 @@ subtest {$have_job_ids == 2} "Check the squeue format output via SQUEUE_FORMAT e
 # Wait for the job step to appear
 #
 
-if {[param_contains [get_config_param "SlurmctldParameters"] "enable_stepmgr"]} {
-	subskip "squeue --steps doesn't work with stepmgr enabled jobs"
-} else {
-	spawn $squeue --iterate=5 --steps -j $job_id1
-	set iteration  0
-	set step_found 0
-	expect {
-		-re "($eol) *($job_id1\\.$step_id) " {
-			set step_found 1
+spawn $squeue --iterate=5 --steps
+set iteration  0
+set step_found 0
+expect {
+	-re "($eol) *($job_id1\\.$step_id) " {
+		set step_found 1
+		set squeue_pid [exp_pid]
+		exec $bin_kill -TERM $squeue_pid
+		exp_continue
+	}
+	-re "PARTITION" {
+		incr iteration
+		if {$iteration >= 3} {
 			set squeue_pid [exp_pid]
 			exec $bin_kill -TERM $squeue_pid
-			exp_continue
 		}
-		-re "PARTITION" {
-			incr iteration
-			if {$iteration >= 3} {
-				set squeue_pid [exp_pid]
-				exec $bin_kill -TERM $squeue_pid
-			}
-			exp_continue
-		}
-		timeout {
-			fail "squeue not responding"
-		}
-		eof {
-			wait
-		}
+		exp_continue
 	}
-	subtest {$step_found != 0} "Wait for the job step to appear" "squeue step format error"
+	timeout {
+		fail "squeue not responding"
+	}
+	eof {
+		wait
+	}
 }
+
+subtest {$step_found != 0} "Wait for the job step to appear" "squeue step format error"

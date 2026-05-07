@@ -1,7 +1,7 @@
 /****************************************************************************\
  *  slurmdbd_defs.c - functions for use with Slurm DBD RPCs
  *****************************************************************************
- *  Copyright (C) SchedMD LLC.
+ *  Copyright (C) 2011-2018 SchedMD LLC.
  *  Copyright (C) 2008-2010 Lawrence Livermore National Security.
  *  Produced at Lawrence Livermore National Laboratory (cf, DISCLAIMER).
  *  Written by Morris Jette <jette1@llnl.gov>
@@ -38,7 +38,7 @@
 \*****************************************************************************/
 
 #include "src/common/slurmdbd_defs.h"
-#include "src/interfaces/jobacct_gather.h"
+#include "src/common/slurm_jobacct_gather.h"
 
 /*
  * Define slurm-specific aliases for use by plugins, see slurm_xlator.h
@@ -57,8 +57,6 @@ extern slurmdbd_msg_type_t str_2_slurmdbd_msg_type(char *msg_type)
 		return DBD_FINI;
 	} else if (!xstrcasecmp(msg_type, "Add Accounts")) {
 		return DBD_ADD_ACCOUNTS;
-	} else if (!xstrcasecmp(msg_type, "Add Accounts Cond")) {
-		return DBD_ADD_ACCOUNTS_COND;
 	} else if (!xstrcasecmp(msg_type, "Add Account Coord")) {
 		return DBD_ADD_ACCOUNT_COORDS;
 	} else if (!xstrcasecmp(msg_type, "Add TRES")) {
@@ -73,8 +71,6 @@ extern slurmdbd_msg_type_t str_2_slurmdbd_msg_type(char *msg_type)
 		return DBD_ADD_RES;
 	} else if (!xstrcasecmp(msg_type, "Add Users")) {
 		return DBD_ADD_USERS;
-	} else if (!xstrcasecmp(msg_type, "Add Users Cond")) {
-		return DBD_ADD_USERS_COND;
 	} else if (!xstrcasecmp(msg_type, "Cluster TRES")) {
 		return DBD_CLUSTER_TRES;
 	} else if (!xstrcasecmp(msg_type, "Flush Jobs")) {
@@ -103,8 +99,6 @@ extern slurmdbd_msg_type_t str_2_slurmdbd_msg_type(char *msg_type)
 #endif
 	} else if (!xstrcasecmp(msg_type, "Get Federations")) {
 		return DBD_GET_FEDERATIONS;
-	} else if (!xstrcasecmp(msg_type, "Get Instances")) {
-		return DBD_GET_INSTANCES;
 	} else if (!xstrcasecmp(msg_type, "Reconfigure")) {
 		return DBD_RECONFIG;
 	} else if (!xstrcasecmp(msg_type, "Get Problems")) {
@@ -129,8 +123,6 @@ extern slurmdbd_msg_type_t str_2_slurmdbd_msg_type(char *msg_type)
 		return DBD_GOT_EVENTS;
 	} else if (!xstrcasecmp(msg_type, "Got Federations")) {
 		return DBD_GOT_FEDERATIONS;
-	} else if (!xstrcasecmp(msg_type, "Got Instances")) {
-		return DBD_GOT_INSTANCES;
 	} else if (!xstrcasecmp(msg_type, "Got Jobs")) {
 		return DBD_GOT_JOBS;
 	} else if (!xstrcasecmp(msg_type, "Got List")) {
@@ -246,35 +238,6 @@ extern slurmdbd_msg_type_t str_2_slurmdbd_msg_type(char *msg_type)
 	} else if (!xstrcasecmp(msg_type,
 				"Persistent Connection Initialization")) {
 		return SLURM_PERSIST_INIT;
-	} else if (!xstrcasecmp(msg_type,
-				"Persistent TLS Connection Initialization")) {
-		return SLURM_PERSIST_INIT_TLS;
-#ifdef __METASTACK_OPT_APP  
-	} else if (!xstrcasecmp(msg_type, "Got Job App")) {  
-		return DBD_GOT_JOB_APP;  
-#endif
-#ifdef __METASTACK_OPT_USER_DEACTIVATE
-	} else if (!xstrcasecmp(msg_type, "Activate Accounts")) {
-		return DBD_ACTIVATE_ACCOUNTS;
-	} else if (!xstrcasecmp(msg_type, "Activate Users")) {
-		return DBD_ACTIVATE_USERS;
-	} else if (!xstrcasecmp(msg_type, "Activate Associations")) {
-		return DBD_ACTIVATE_ASSOCS;
-	} else if (!xstrcasecmp(msg_type, "Activate Account Coords")) {
-		return DBD_ACTIVATE_ACCOUNT_COORDS;
-	} else if (!xstrcasecmp(msg_type, "Activate Wckeys")) {
-		return DBD_ACTIVATE_WCKEYS;
-	} else if (!xstrcasecmp(msg_type, "Deactivate Accounts")) {
-		return DBD_DEACTIVATE_ACCOUNTS;
-	} else if (!xstrcasecmp(msg_type, "Deactivate Users")) {
-		return DBD_DEACTIVATE_USERS;
-	} else if (!xstrcasecmp(msg_type, "Deactivate Associations")) {
-		return DBD_DEACTIVATE_ASSOCS;
-	} else if (!xstrcasecmp(msg_type, "Deactivate Account Coords")) {
-		return DBD_DEACTIVATE_ACCOUNT_COORDS;
-	} else if (!xstrcasecmp(msg_type, "Deactivate Wckeys")) {
-		return DBD_DEACTIVATE_WCKEYS;
-#endif
 	} else {
 		return NO_VAL;
 	}
@@ -298,12 +261,6 @@ extern char *slurmdbd_msg_type_2_str(slurmdbd_msg_type_t msg_type, int get_enum)
 			return "DBD_ADD_ACCOUNTS";
 		} else
 			return "Add Accounts";
-		break;
-	case DBD_ADD_ACCOUNTS_COND:
-		if (get_enum) {
-			return "DBD_ADD_ACCOUNTS_COND";
-		} else
-			return "Add Accounts Cond";
 		break;
 	case DBD_ADD_ACCOUNT_COORDS:
 		if (get_enum) {
@@ -346,12 +303,6 @@ extern char *slurmdbd_msg_type_2_str(slurmdbd_msg_type_t msg_type, int get_enum)
 			return "DBD_ADD_USERS";
 		} else
 			return "Add Users";
-		break;
-	case DBD_ADD_USERS_COND:
-		if (get_enum) {
-			return "DBD_ADD_USERS_COND";
-		} else
-			return "Add Users Cond";
 		break;
 	case DBD_CLUSTER_TRES:
 		if (get_enum) {
@@ -433,12 +384,6 @@ extern char *slurmdbd_msg_type_2_str(slurmdbd_msg_type_t msg_type, int get_enum)
 		} else
 			return "Get Federations";
 		break;
-	case DBD_GET_INSTANCES:
-		if (get_enum) {
-			return "DBD_GET_INSTANCES";
-		} else
-			return "Get Instances";
-		break;
 	case DBD_RECONFIG:
 		if (get_enum) {
 			return "DBD_RECONFIG";
@@ -511,26 +456,12 @@ extern char *slurmdbd_msg_type_2_str(slurmdbd_msg_type_t msg_type, int get_enum)
 		} else
 			return "Got Federations";
 		break;
-	case DBD_GOT_INSTANCES:
-		if (get_enum) {
-			return "DBD_GOT_INSTANCES";
-		} else
-			return "Got Instances";
-		break;
 	case DBD_GOT_JOBS:
 		if (get_enum) {
 			return "DBD_GOT_JOBS";
 		} else
 			return "Got Jobs";
 		break;
-#ifdef __METASTACK_OPT_APP  
-	case DBD_GOT_JOB_APP:  
-		if (get_enum) {  
-			return "DBD_GOT_JOB_APP";  
-		} else  
-			return "Got Job App";  
-		break;  
-#endif 
 	case DBD_GOT_LIST:
 		if (get_enum) {
 			return "DBD_GOT_LIST";
@@ -891,74 +822,6 @@ extern char *slurmdbd_msg_type_2_str(slurmdbd_msg_type_t msg_type, int get_enum)
 		} else
 			return "Persistent Connection Initialization";
 		break;
-	case SLURM_PERSIST_INIT_TLS:
-		if (get_enum) {
-			return "SLURM_PERSIST_INIT_TLS";
-		} else
-			return "Persistent TLS Connection Initialization";
-		break;
-#ifdef __METASTACK_OPT_USER_DEACTIVATE
-	case DBD_ACTIVATE_ACCOUNTS:
-		if (get_enum) {
-			return "DBD_ACTIVATE_ACCOUNTS";
-		} else
-			return "Activate Accounts";
-		break;
-	case DBD_ACTIVATE_USERS:
-		if (get_enum) {
-			return "DBD_ACTIVATE_USERS";
-		} else
-			return "Activate Users";
-		break;	
-	case DBD_ACTIVATE_ASSOCS:
-		if (get_enum) {
-			return "DBD_ACTIVATE_ASSOCS";
-		} else
-			return "Activate Associations";
-		break;
-	case DBD_ACTIVATE_ACCOUNT_COORDS:
-		if (get_enum) {
-			return "DBD_ACTIVATE_ACCOUNT_COORDS";
-		} else
-			return "Activate Account Coords";
-		break;	
-	case DBD_ACTIVATE_WCKEYS:
-		if (get_enum) {
-			return "DBD_ACTIVATE_WCKEYS";
-		} else
-			return "Activate Wckeys";
-		break;
-	case DBD_DEACTIVATE_ACCOUNTS:
-		if (get_enum) {
-			return "DBD_DEACTIVATE_ACCOUNTS";
-		} else
-			return "Deactivate Accounts";
-		break;	
-	case DBD_DEACTIVATE_USERS:
-		if (get_enum) {
-			return "DBD_DEACTIVATE_USERS";
-		} else
-			return "Deactivate Users";
-		break;
-	case DBD_DEACTIVATE_ASSOCS:
-		if (get_enum) {
-			return "DBD_DEACTIVATE_ASSOCS";
-		} else
-			return "Deactivate Associations";
-		break;	
-	case DBD_DEACTIVATE_ACCOUNT_COORDS:
-		if (get_enum) {
-			return "DBD_DEACTIVATE_ACCOUNT_COORDS";
-		} else
-			return "Deactivate Account Coords";
-		break;
-	case DBD_DEACTIVATE_WCKEYS:
-		if (get_enum) {
-			return "DBD_DEACTIVATE_WCKEYS";
-		} else
-			return "Deactivate Wckeys";
-		break;
-#endif
 	default:
 		snprintf(unk_str, sizeof(unk_str), "MsgType=%d", msg_type);
 		return unk_str;
@@ -973,7 +836,8 @@ extern char *slurmdbd_msg_type_2_str(slurmdbd_msg_type_t msg_type, int get_enum)
 extern void slurmdbd_free_buffer(void *x)
 {
 	buf_t *buffer = (buf_t *) x;
-	FREE_NULL_BUFFER(buffer);
+	if (buffer)
+		free_buf(buffer);
 }
 
 extern void slurmdbd_free_acct_coord_msg(dbd_acct_coord_msg_t *msg)
@@ -1010,7 +874,6 @@ extern void slurmdbd_free_msg(persist_msg_t *msg)
 	case DBD_GOT_CLUSTERS:
 	case DBD_GOT_EVENTS:
 	case DBD_GOT_FEDERATIONS:
-	case DBD_GOT_INSTANCES:
 	case DBD_GOT_JOBS:
 	case DBD_GOT_LIST:
 	case DBD_GOT_PROBS:
@@ -1029,17 +892,12 @@ extern void slurmdbd_free_msg(persist_msg_t *msg)
 	case DBD_GOT_MULT_MSG:
 	case DBD_FIX_RUNAWAY_JOB:
 #ifdef __METASTACK_NEW_AUTO_SUPPLEMENT_AVAIL_NODES
-	case DBD_FIX_BORROWAWAY_NODE:
 	case DBD_GOT_BORROW:
 #endif
 		slurmdbd_free_list_msg(msg->data);
 		break;
 	case DBD_ADD_ACCOUNT_COORDS:
 	case DBD_REMOVE_ACCOUNT_COORDS:
-#ifdef __METASTACK_OPT_USER_DEACTIVATE
-	case DBD_ACTIVATE_ACCOUNT_COORDS:
-	case DBD_DEACTIVATE_ACCOUNT_COORDS:
-#endif
 		slurmdbd_free_acct_coord_msg(msg->data);
 		break;
 	case DBD_ARCHIVE_LOAD:
@@ -1055,7 +913,6 @@ extern void slurmdbd_free_msg(persist_msg_t *msg)
 	case DBD_GET_CLUSTERS:
 	case DBD_GET_EVENTS:
 	case DBD_GET_FEDERATIONS:
-	case DBD_GET_INSTANCES:
 	case DBD_GET_JOBS_COND:
 	case DBD_GET_PROBS:
 	case DBD_GET_QOS:
@@ -1072,12 +929,6 @@ extern void slurmdbd_free_msg(persist_msg_t *msg)
 	case DBD_REMOVE_RES:
 	case DBD_REMOVE_WCKEYS:
 	case DBD_REMOVE_USERS:
-#ifdef __METASTACK_OPT_USER_DEACTIVATE
-	case DBD_DEACTIVATE_ACCOUNTS:
-	case DBD_DEACTIVATE_ASSOCS:
-	case DBD_DEACTIVATE_USERS:
-	case DBD_DEACTIVATE_WCKEYS:
-#endif
 	case DBD_ARCHIVE_DUMP:
 #ifdef __METASTACK_NEW_AUTO_SUPPLEMENT_AVAIL_NODES
 	case DBD_GET_BORROW:
@@ -1107,8 +958,6 @@ extern void slurmdbd_free_msg(persist_msg_t *msg)
 	case DBD_JOB_SUSPEND:
 		slurmdbd_free_job_suspend_msg(msg->data);
 		break;
-	case DBD_ADD_ACCOUNTS_COND:
-	case DBD_ADD_USERS_COND:
 	case DBD_MODIFY_ACCOUNTS:
 	case DBD_MODIFY_ASSOCS:
 	case DBD_MODIFY_CLUSTERS:
@@ -1117,11 +966,6 @@ extern void slurmdbd_free_msg(persist_msg_t *msg)
 	case DBD_MODIFY_QOS:
 	case DBD_MODIFY_RES:
 	case DBD_MODIFY_USERS:
-#ifdef __METASTACK_OPT_USER_DEACTIVATE
-	case DBD_ACTIVATE_ACCOUNTS:
-	case DBD_ACTIVATE_USERS:
-	case DBD_ACTIVATE_ASSOCS:
-#endif
 		slurmdbd_free_modify_msg(msg->data, msg->msg_type);
 		break;
 	case DBD_NODE_STATE:
@@ -1156,7 +1000,6 @@ extern void slurmdbd_free_msg(persist_msg_t *msg)
 	case DBD_SHUTDOWN:
 		break;
 	case SLURM_PERSIST_INIT:
-	case SLURM_PERSIST_INIT_TLS:
 		slurm_free_msg(msg->data);
 		break;
 	default:
@@ -1198,9 +1041,6 @@ extern void slurmdbd_free_cond_msg(dbd_cond_msg_t *msg,
 		switch (type) {
 		case DBD_GET_ACCOUNTS:
 		case DBD_REMOVE_ACCOUNTS:
-#ifdef __METASTACK_OPT_USER_DEACTIVATE
-		case DBD_DEACTIVATE_ACCOUNTS:
-#endif
 			my_destroy = slurmdb_destroy_account_cond;
 			break;
 		case DBD_GET_TRES:
@@ -1209,9 +1049,6 @@ extern void slurmdbd_free_cond_msg(dbd_cond_msg_t *msg,
 		case DBD_GET_ASSOCS:
 		case DBD_GET_PROBS:
 		case DBD_REMOVE_ASSOCS:
-#ifdef __METASTACK_OPT_USER_DEACTIVATE
-		case DBD_DEACTIVATE_ASSOCS:
-#endif
 			my_destroy = slurmdb_destroy_assoc_cond;
 			break;
 		case DBD_GET_CLUSTERS:
@@ -1235,9 +1072,6 @@ extern void slurmdbd_free_cond_msg(dbd_cond_msg_t *msg,
 			break;
 		case DBD_GET_WCKEYS:
 		case DBD_REMOVE_WCKEYS:
-#ifdef __METASTACK_OPT_USER_DEACTIVATE
-		case DBD_DEACTIVATE_WCKEYS:
-#endif
 			my_destroy = slurmdb_destroy_wckey_cond;
 			break;
 		case DBD_GET_TXN:
@@ -1245,9 +1079,6 @@ extern void slurmdbd_free_cond_msg(dbd_cond_msg_t *msg,
 			break;
 		case DBD_GET_USERS:
 		case DBD_REMOVE_USERS:
-#ifdef __METASTACK_OPT_USER_DEACTIVATE	
-		case DBD_DEACTIVATE_USERS:
-#endif
 			my_destroy = slurmdb_destroy_user_cond;
 			break;
 		case DBD_ARCHIVE_DUMP:
@@ -1264,9 +1095,6 @@ extern void slurmdbd_free_cond_msg(dbd_cond_msg_t *msg,
 			my_destroy = slurmdb_destroy_borrow_cond;
 			break;
 #endif
-		case DBD_GET_INSTANCES:
-			my_destroy = slurmdb_destroy_instance_cond;
-			break;
 		default:
 			fatal("Unknown cond type");
 			return;
@@ -1287,8 +1115,6 @@ extern void slurmdbd_free_job_complete_msg(dbd_job_comp_msg_t *msg)
 	if (msg) {
 		xfree(msg->admin_comment);
 		xfree(msg->comment);
-		xfree(msg->extra);
-		xfree(msg->failed_node);
 		xfree(msg->nodes);
 		xfree(msg->system_comment);
 		xfree(msg->tres_alloc_str);
@@ -1316,25 +1142,17 @@ extern void slurmdbd_free_job_start_msg(void *in)
 		xfree(msg->container);
 		xfree(msg->env_hash);
 		xfree(msg->gres_used);
-		xfree(msg->licenses);
 		xfree(msg->mcs_label);
 		xfree(msg->name);
 		xfree(msg->nodes);
 		xfree(msg->node_inx);
 		xfree(msg->partition);
 		xfree(msg->script_hash);
-		xfree(msg->std_err);
-		xfree(msg->std_in);
-		xfree(msg->std_out);
 		xfree(msg->submit_line);
 		xfree(msg->tres_alloc_str);
 		xfree(msg->tres_req_str);
 		xfree(msg->wckey);
 		xfree(msg->work_dir);
-#ifdef __METASTACK_OPT_APP 
-		xfree(msg->app_name);  
-		xfree(msg->app_version);  
-#endif
 		xfree(msg);
 	}
 }
@@ -1381,25 +1199,11 @@ extern void slurmdbd_free_modify_msg(dbd_modify_msg_t *msg,
 
 	if (msg) {
 		switch (type) {
-		case DBD_ADD_ACCOUNTS_COND:
-			destroy_cond = slurmdb_destroy_add_assoc_cond;
-			destroy_rec = slurmdb_destroy_account_rec;
-			break;
-		case DBD_ADD_USERS_COND:
-			destroy_cond = slurmdb_destroy_add_assoc_cond;
-			destroy_rec = slurmdb_destroy_user_rec;
-			break;
 		case DBD_MODIFY_ACCOUNTS:
-#ifdef __METASTACK_OPT_USER_DEACTIVATE
-		case DBD_ACTIVATE_ACCOUNTS:
-#endif
 			destroy_cond = slurmdb_destroy_account_cond;
 			destroy_rec = slurmdb_destroy_account_rec;
 			break;
 		case DBD_MODIFY_ASSOCS:
-#ifdef __METASTACK_OPT_USER_DEACTIVATE
-		case DBD_ACTIVATE_ASSOCS:
-#endif
 			destroy_cond = slurmdb_destroy_assoc_cond;
 			destroy_rec = slurmdb_destroy_assoc_rec;
 			break;
@@ -1424,9 +1228,6 @@ extern void slurmdbd_free_modify_msg(dbd_modify_msg_t *msg,
 			destroy_rec = slurmdb_destroy_res_rec;
 			break;
 		case DBD_MODIFY_USERS:
-#ifdef __METASTACK_OPT_USER_DEACTIVATE
-		case DBD_ACTIVATE_USERS:
-#endif
 			destroy_cond = slurmdb_destroy_user_cond;
 			destroy_rec = slurmdb_destroy_user_rec;
 			break;
@@ -1458,9 +1259,6 @@ extern void slurmdbd_free_node_state_msg(dbd_node_state_msg_t *msg)
 {
 	if (msg) {
 		xfree(msg->hostlist);
-		xfree(msg->extra);
-		xfree(msg->instance_id);
-		xfree(msg->instance_type);
 		xfree(msg->reason);
 		xfree(msg->tres_str);
 		xfree(msg);

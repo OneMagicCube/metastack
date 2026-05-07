@@ -2,7 +2,8 @@
  *  reservation_functions.c - functions dealing with RESERVATION in the
  *                        accounting system.
  *****************************************************************************
- *  Copyright (C) SchedMD LLC.
+ *  Copyright (C) 2015 SchedMD LLC.
+ *  Written by David Bigagli <david@schedmd.com>
  *
  *  This file is part of Slurm, a resource management program.
  *  For details, see <https://slurm.schedmd.com/>.
@@ -144,8 +145,8 @@ static int _set_cond(int *start, int argc, char **argv,
 int sacctmgr_list_reservation(int argc, char **argv)
 {
         List reservation_list;
-	list_itr_t *itr;
-	list_itr_t *itr2;
+        ListIterator itr;
+	ListIterator itr2;
 	List format_list;
 	List print_fields_list;
         slurmdb_reservation_cond_t *reservation_cond =
@@ -285,7 +286,7 @@ int sacctmgr_list_reservation(int argc, char **argv)
 			}
 			case PRINT_ID:
 				field->print_routine(field,
-						     &reservation->id,
+						     reservation->id,
 						     (curr_inx == field_count));
 				break;
 			case PRINT_NAME:
@@ -308,13 +309,13 @@ int sacctmgr_list_reservation(int argc, char **argv)
 			case PRINT_TIMEEND:
 				field->print_routine(
 					field,
-					&reservation->time_end,
+					reservation->time_end,
 					(curr_inx == field_count));
 				break;
 			case PRINT_TIMESTART:
 				field->print_routine(
 					field,
-					&reservation->time_start,
+					reservation->time_start,
 					(curr_inx == field_count));
 				break;
 			case PRINT_TRES:
@@ -329,16 +330,10 @@ int sacctmgr_list_reservation(int argc, char **argv)
 						     (curr_inx == field_count));
 				xfree(tmp_char);
 				break;
-			case PRINT_COMMENT:
-				field->print_routine(
-					field,
-					reservation->comment,
-					(curr_inx == field_count));
-				break;
 			case PRINT_UNUSED:
 				field->print_routine(
 					field,
-					&reservation->unused_wall,
+					reservation->unused_wall,
 					(curr_inx == field_count));
 				break;
 			}

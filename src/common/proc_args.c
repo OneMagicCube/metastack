@@ -2,7 +2,7 @@
  *  proc_args.c - helper functions for command argument processing
  *****************************************************************************
  *  Copyright (C) 2007 Hewlett-Packard Development Company, L.P.
- *  Copyright (C) SchedMD LLC.
+ *  Portions Copyright (C) 2010-2015 SchedMD LLC <https://www.schedmd.com>.
  *  Written by Christopher Holmes <cholmes@hp.com>, who borrowed heavily
  *  from existing Slurm source code, particularly src/srun/opt.c
  *
@@ -43,23 +43,24 @@
 #include <ctype.h>		/* isdigit    */
 #include <fcntl.h>
 #include <limits.h>
-#include <signal.h>
+#include <pwd.h>		/* getpwuid   */
 #include <stdarg.h>		/* va_start   */
 #include <stdio.h>
 #include <stdlib.h>		/* getenv, strtoll */
 #include <string.h>		/* strcpy */
+#include <sys/param.h>		/* MAXPATHLEN */
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/utsname.h>
 #include <unistd.h>
 
-#include "src/interfaces/gres.h"
+#include "src/common/gres.h"
 #include "src/common/list.h"
 #include "src/common/log.h"
 #include "src/common/proc_args.h"
 #include "src/common/parse_time.h"
 #include "src/common/slurm_protocol_api.h"
-#include "src/interfaces/acct_gather_profile.h"
+#include "src/common/slurm_acct_gather_profile.h"
 #include "src/common/xmalloc.h"
 #include "src/common/xstring.h"
 
@@ -425,7 +426,7 @@ uint64_t str_to_mbytes(const char *arg)
 		;
 	else if (((endptr[0] == 'k') || (endptr[0] == 'K')) &&
 		 _end_on_byte(endptr))
-		result = ROUNDUP(result, 1024);	/* round up */
+		result = (result + 1023) / 1024;	/* round up */
 	else if (((endptr[0] == 'm') || (endptr[0] == 'M')) &&
 	         _end_on_byte(endptr))
 		;
@@ -463,7 +464,8 @@ extern char *mbytes_to_str(uint64_t mbytes)
 }
 
 /* Convert a string into a node count */
-extern int str_to_nodes(const char *num_str, char **leftover)
+static int
+_str_to_nodes(const char *num_str, char **leftover)
 {
 	long int num;
 	char *endptr;
@@ -483,20 +485,15 @@ extern int str_to_nodes(const char *num_str, char **leftover)
 	}
 	*leftover = endptr;
 
-	if ((num < 0) || (num > INT_MAX))
-		return -1;
-
 	return (int)num;
 }
 
 /*
- * verify that a node count in arg is of a known form (count or min-max or list)
+ * verify that a node count in arg is of a known form (count or min-max)
  * OUT min, max specified minimum and maximum node counts
- * OUT job_size_str
  * RET true if valid
  */
-bool verify_node_count(const char *arg, int *min_nodes, int *max_nodes,
-		       char **job_size_str)
+bool verify_node_count(const char *arg, int *min_nodes, int *max_nodes)
 {
 	char *ptr, *min_str, *max_str;
 	char *leftover;
@@ -505,50 +502,9 @@ bool verify_node_count(const char *arg, int *min_nodes, int *max_nodes,
 	 * Does the string contain a "-" character?  If so, treat as a range.
 	 * otherwise treat as an absolute node count.
 	 */
-	if (job_size_str)
-		xfree(*job_size_str);
-
-	if ((ptr = xstrchr(arg, ',')) || (ptr = xstrchr(arg, ':'))) {
-		bitstr_t *job_size_bitmap;
-		char *tok, *tmp_str, *save_ptr = NULL;
-		long int max = 0;
-
-		tmp_str = xstrdup(arg);
-
-		tok = strtok_r(tmp_str, ",-:", &save_ptr);
-		while (tok) {
-			char *endptr;
-			long int num = strtol(tok, &endptr, 10);
-			if ((endptr == tok) || ((*endptr != '\0') &&
-						(*endptr != ',') &&
-						(*endptr != '-') &&
-						(*endptr != ':'))) {
-				error("\"%s\" is not a valid node count", tok);
-				xfree(tmp_str);
-				return false;
-			}
-			if (num > max)
-				max = num;
-			tok = strtok_r(NULL, ",-:", &save_ptr);
-		}
-		xfree(tmp_str);
-		tmp_str = xstrdup(arg);
-		job_size_bitmap = bit_alloc(max + 1);
-		if (bit_unfmt(job_size_bitmap, tmp_str)) {
-			error("\"%s\" is not a valid node count", arg);
-			FREE_NULL_BITMAP(job_size_bitmap);
-			xfree(tmp_str);
-			return false;
-		}
-		*min_nodes = bit_ffs(job_size_bitmap);
-		*max_nodes = bit_fls(job_size_bitmap);
-		if (job_size_str)
-			*job_size_str = bit_fmt_full(job_size_bitmap);
-		FREE_NULL_BITMAP(job_size_bitmap);
-		xfree(tmp_str);
-	} else if ((ptr = xstrchr(arg, '-')) != NULL) {
+	if ((ptr = xstrchr(arg, '-')) != NULL) {
 		min_str = xstrndup(arg, ptr-arg);
-		*min_nodes = str_to_nodes(min_str, &leftover);
+		*min_nodes = _str_to_nodes(min_str, &leftover);
 		if (!xstring_is_whitespace(leftover)) {
 			error("\"%s\" is not a valid node count", min_str);
 			xfree(min_str);
@@ -559,7 +515,7 @@ bool verify_node_count(const char *arg, int *min_nodes, int *max_nodes,
 			*min_nodes = 1;
 
 		max_str = xstrndup(ptr+1, strlen(arg)-((ptr+1)-arg));
-		*max_nodes = str_to_nodes(max_str, &leftover);
+		*max_nodes = _str_to_nodes(max_str, &leftover);
 		if (!xstring_is_whitespace(leftover)) {
 			error("\"%s\" is not a valid node count", max_str);
 			xfree(max_str);
@@ -567,7 +523,7 @@ bool verify_node_count(const char *arg, int *min_nodes, int *max_nodes,
 		}
 		xfree(max_str);
 	} else {
-		*min_nodes = *max_nodes = str_to_nodes(arg, &leftover);
+		*min_nodes = *max_nodes = _str_to_nodes(arg, &leftover);
 		if (!xstring_is_whitespace(leftover)) {
 			error("\"%s\" is not a valid node count", arg);
 			return false;
@@ -661,7 +617,7 @@ bool get_resource_arg_range(const char *arg, const char *what, int* min,
 			exit(1);
 		return false;
 	} else if (result > INT_MAX) {
-		error("Numeric argument (%ld) too large for %s.", result, what);
+		error ("Numeric argument (%ld) to big for %s.", result, what);
 		if (isFatal)
 			exit(1);
 		return false;
@@ -689,7 +645,7 @@ bool get_resource_arg_range(const char *arg, const char *what, int* min,
 			exit(1);
 		return false;
 	} else if (result > INT_MAX) {
-		error("Numeric argument (%ld) too large for %s.", result, what);
+		error ("Numeric argument (%ld) to big for %s.", result, what);
 		if (isFatal)
 			exit(1);
 		return false;
@@ -1048,7 +1004,7 @@ char *search_path(char *cwd, char *cmd, bool check_cwd_last, int access_mode,
 		  bool test_exec)
 {
 	List         l        = NULL;
-	list_itr_t *i = NULL;
+	ListIterator i        = NULL;
 	char *path, *fullpath = NULL;
 
 	/* Relative path */
@@ -1226,10 +1182,8 @@ static struct {
 	{ "KILL",	SIGKILL	},
 	{ "ALRM",	SIGALRM	},
 	{ "TERM",	SIGTERM	},
-	{ "CHLD",	SIGCHLD	},
 	{ "USR1",	SIGUSR1	},
 	{ "USR2",	SIGUSR2	},
-	{ "PIPE",	SIGPIPE	},
 	{ "URG",	SIGURG	},
 	{ "CONT",	SIGCONT	},
 	{ "STOP",	SIGSTOP	},
@@ -1400,10 +1354,10 @@ extern int parse_int(const char *name, const char *val, bool positive)
 	    (positive && (result <= 0L))) {
 		error ("Invalid numeric value \"%s\" for %s.", val, name);
 		exit(1);
-	} else if (result >= INT_MAX) {
-		error("Numeric argument (%ld) too large for %s.", result, name);
+	} else if (result == LONG_MAX) {
+		error ("Numeric argument (%ld) to big for %s.", result, name);
 		exit(1);
-	} else if (result <= INT_MIN) {
+	} else if (result == LONG_MIN) {
 		error ("Numeric argument (%ld) to small for %s.", result, name);
 		exit(1);
 	}
@@ -1575,6 +1529,10 @@ extern uint64_t parse_resv_flags(const char *flagstr, const char *msg,
 				outflags |= RESERVE_FLAG_NO_PURGE_COMP;
 			else
 				outflags |= RESERVE_FLAG_PURGE_COMP;
+		} else if (!xstrncasecmp(curr, "First_Cores", MAX(taglen,1)) &&
+			   op != RESV_REM) {
+			curr += taglen;
+			outflags |= RESERVE_FLAG_FIRST_CORES;
 		} else if (!xstrncasecmp(curr, "Time_Float", MAX(taglen,1)) &&
 			   op == RESV_NEW) {
 			curr += taglen;
@@ -1591,12 +1549,6 @@ extern uint64_t parse_resv_flags(const char *flagstr, const char *msg,
 					 MAX(taglen, 1)) && op != RESV_REM) {
 			curr += taglen;
 			outflags |= RESERVE_FLAG_NO_HOLD_JOBS;
-		} else if (!xstrncasecmp(curr, "User_Delete", MAX(taglen, 1))) {
-			curr += taglen;
-			if (op == RESV_REM)
-				outflags |= RESERVE_FLAG_NO_USER_DEL;
-			else
-				outflags |= RESERVE_FLAG_USER_DEL;
 		} else {
 			error("Error parsing flags %s.  %s", flagstr, msg);
 			return INFINITE64;
@@ -1709,7 +1661,7 @@ extern bool subpath(char *path1, char *path2)
 	return ret;
 }
 
-#ifdef __METASTACK_NEW_LOAD_ABNORMAL
+#ifdef __METASTACK_LOAD_ABNORMAL
 extern int validate_abnormal_dete(char *abnormal_dete)
 {
 	int i;
@@ -1744,7 +1696,7 @@ extern int validate_acctg_freq(char *acctg_freq)
 	int i;
 	char *save_ptr = NULL, *tok, *tmp;
 	bool valid;
-#ifdef __METASTACK_NEW_LOAD_ABNORMAL
+#ifdef __METASTACK_LOAD_ABNORMAL
 	bool valid2 = false;
 #endif
 	int rc = SLURM_SUCCESS;
@@ -1761,27 +1713,26 @@ extern int validate_acctg_freq(char *acctg_freq)
 				valid = true;
 				break;
 			}
-
-#ifdef __METASTACK_NEW_LOAD_ABNORMAL
+#ifdef __METASTACK_LOAD_ABNORMAL
 		valid2 = false;
-		/*
-			In some cases, the acctg-freq parameter may be passed with the job-monitor parameter concatenated, 
-			in which case it is also necessary to check the contents of the job-monitor parameter
-		*/
+	/*
+		In some cases, the acctg-freq parameter may be passed with the job-monitor parameter concatenated, 
+		in which case it is also necessary to check the contents of the job-monitor parameter
+	*/
 		for (i = 0; i < PROFILE_ABNORMAL_DETE_CNT; i++)
 			if (acct_gather_parse_abnormal_dete(i, tok) != -1){
 				valid2 = true;
 				break;
 			}
 
-		/*
-			Since the parameter will be concatenated only after the successful test, the concatenated content must be correct at this time, 
-			so the value has the following situations:
-			1. valid = 0, valid2 = 0 acctg has incorrect output parameter error information
-			2. valid = 1, valid2 = 0 No errors
-			3. valid = 0, valid2 = 1 No errors
+	/*
+		Since the parameter will be concatenated only after the successful test, the concatenated content must be correct at this time, 
+		so the value has the following situations:
+		1. valid = 0, valid2 = 0 acctg has incorrect output parameter error information
+		2. valid = 1, valid2 = 0 No errors
+		3. valid = 0, valid2 = 1 No errors
 
-		*/
+	*/
 		if (!valid && !valid2) {
 			error("Invalid --acctg-freq specification: %s", tok);
 			rc = SLURM_ERROR;
@@ -1797,7 +1748,7 @@ extern int validate_acctg_freq(char *acctg_freq)
 /*
  * Format a tres_per_* argument
  * dest OUT - resulting string
- * prefix IN - TRES type (e.g. "gres/gpu")
+ * prefix IN - TRES type (e.g. "gres:gpu")
  * src IN - user input, can include multiple comma-separated specifications
  */
 extern void xfmt_tres(char **dest, char *prefix, char *src)
@@ -1824,7 +1775,7 @@ extern void xfmt_tres(char **dest, char *prefix, char *src)
 /*
  * Format a tres_freq argument
  * dest OUT - resulting string
- * prefix IN - TRES type (e.g. "gres/gpu")
+ * prefix IN - TRES type (e.g. "gres:gpu")
  * src IN - user input
  */
 extern void xfmt_tres_freq(char **dest, char *prefix, char *src)

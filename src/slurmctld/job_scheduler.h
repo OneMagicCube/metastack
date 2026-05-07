@@ -84,11 +84,9 @@ extern void main_sched_fini(void);
  * IN  details->features|prefer
  * OUT details->feature_list|prefer_list
  * IN  prefer - if prefer or feature is being processed
- * IN  is_reservation - true if for a reservation, false otherwise
  * RET error code
  */
-extern int build_feature_list(job_record_t *job_ptr, bool prefer,
-			      bool is_reservation);
+extern int build_feature_list(job_record_t *job_ptr, bool prefer);
 
 /*
  * Set up job_queue_rec->job_ptr to use a magnetic reservation if the
@@ -109,7 +107,6 @@ extern void job_queue_rec_resv_list(job_queue_rec_t *job_queue_rec);
  * RET the job queue
  * NOTE: the caller must call list_destroy() on RET value to free memory
  */
-//extern List build_job_queue(bool clear_start, bool backfill);
 #ifdef __METASTACK_NEW_PART_PARA_SCHED
 extern List build_job_queue(bool clear_start, bool backfill, List* job_queue);
 #endif
@@ -120,10 +117,10 @@ extern batch_job_launch_msg_t *build_launch_job_msg(job_record_t *job_ptr,
 
 /* Determine if job's deadline specification is still valid, kill job if not
  * job_ptr IN - Job to test
- * func IN - function name used for logging
+ * func IN - function named used for logging, "sched" or "backfill"
  * RET - true of valid, false if invalid and job cancelled
  */
-extern bool deadline_ok(job_record_t *job_ptr, const char *func);
+extern bool deadline_ok(job_record_t *job_ptr, char *func);
 
 /*
  * epilog_slurmctld - execute the prolog_slurmctld for a job that has just
@@ -197,12 +194,9 @@ extern int make_batch_job_cred(batch_job_launch_msg_t *launch_msg_ptr,
 /*
  * Determine which nodes must be rebooted for a job
  * IN job_ptr - pointer to job that will be initiated
- * IN/OUT reboot_features - features that should be applied to the node on
- *                          reboot. Caller must xfree().
  * RET bitmap of nodes requiring a reboot for NodeFeaturesPlugin or NULL if none
  */
-extern bitstr_t *node_features_reboot(job_record_t *job_ptr,
-				      char **reboot_features);
+extern bitstr_t *node_features_reboot(job_record_t *job_ptr);
 
 /* Print a job's dependency information based upon job_ptr->depend_list */
 extern void print_job_dependency(job_record_t *job_ptr, const char *func);

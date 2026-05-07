@@ -2,7 +2,8 @@
  *  federation_functions.c - Interface to functions dealing with federations in
  *                           the database.
  *****************************************************************************
- *  Copyright (C) SchedMD LLC.
+ *  Copyright (C) 2016 SchedMD LLC.
+ *  Written by Brian Christiansen <brian@schedmd.com>
  *
  *  This file is part of Slurm, a resource management program.
  *  For details, see <https://slurm.schedmd.com/>.
@@ -38,7 +39,7 @@
 #include "slurm/slurm_errno.h"
 #include "slurm/slurmdb.h"
 
-#include "src/interfaces/accounting_storage.h"
+#include "src/common/slurm_accounting_storage.h"
 
 /*
  * add federations to accounting system

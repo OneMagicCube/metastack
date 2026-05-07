@@ -1,7 +1,8 @@
 /*****************************************************************************\
  *  cron.h
  *****************************************************************************
- *  Copyright (C) SchedMD LLC.
+ *  Copyright (C) 2020 SchedMD LLC.
+ *  Written by Tim Wickberg <tim@schedmd.com>
  *
  *  This file is part of Slurm, a resource management program.
  *  For details, see <https://slurm.schedmd.com/>.
@@ -76,7 +77,7 @@ extern char *cronspec_from_cron_entry(cron_entry_t *entry);
  * Calculate the next starting time given a cron entry.
  * Always advances at least one minute into the future.
  */
-extern time_t calc_next_cron_start(cron_entry_t *entry, time_t next);
+extern time_t calc_next_cron_start(cron_entry_t *entry);
 
 /*
  * Function signatures adjusted for use with slurm_{pack,unpack}_list().

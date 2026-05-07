@@ -2,7 +2,7 @@
  *  gang.c - Gang scheduler functions.
  *****************************************************************************
  *  Copyright (C) 2008 Hewlett-Packard Development Company, L.P.
- *  Copyright (C) SchedMD LLC.
+ *  Portions Copyright (C) 2010 SchedMD <https://www.schedmd.com>.
  *  Written by Chris Holmes
  *  CODE-OCEC-09-009. All rights reserved.
  *
@@ -49,13 +49,11 @@
 #include "src/common/bitstring.h"
 #include "src/common/list.h"
 #include "src/common/macros.h"
+#include "src/common/select.h"
 #include "src/common/slurm_protocol_defs.h"
 #include "src/common/xstring.h"
-
-#include "src/interfaces/preempt.h"
-#include "src/interfaces/select.h"
-
 #include "src/slurmctld/locks.h"
+#include "src/slurmctld/preempt.h"
 #include "src/slurmctld/slurmctld.h"
 
 /* global timeslicer thread variables */
@@ -152,6 +150,7 @@ static List gs_part_list = NULL;
 static uint32_t default_job_list_size = 64;
 static pthread_mutex_t data_mutex = PTHREAD_MUTEX_INITIALIZER;
 
+static uint16_t *gs_bits_per_node = NULL;
 static uint32_t num_sorted_part = 0;
 
 /* function declarations */
@@ -243,6 +242,41 @@ static uint16_t _get_part_gr_type(part_record_t *part_ptr)
 	return gr_type;
 }
 
+/* For GS_CPU and GS_CPU2 gs_bits_per_node is the total number of CPUs per node.
+ * For GS_CORE and GS_SOCKET gs_bits_per_node is the total number of
+ *	cores per per node.
+ */
+static void _load_phys_res_cnt(void)
+{
+	uint16_t bit = 0;
+	uint32_t i, bit_index = 0;
+	node_record_t *node_ptr;
+
+	xfree(gs_bits_per_node);
+
+	if (gr_type == GS_NODE)
+		return;
+
+	gs_bits_per_node = xmalloc(node_record_count * sizeof(uint16_t));
+
+	for (int i = 0; (node_ptr = next_node(&i)); i++) {
+		if (gr_type == GS_CPU) {
+			bit = node_ptr->config_ptr->cpus;
+		} else {
+			bit  = node_ptr->tot_cores;
+		}
+
+		gs_bits_per_node[bit_index++] = bit;
+	}
+
+	if (slurm_conf.debug_flags & DEBUG_FLAG_GANG) {
+		for (i = 0; i < bit_index; i++) {
+			info("gang: _load_phys_res_cnt: bits_per_node[%d]=%u",
+			     i, gs_bits_per_node[i]);
+		}
+	}
+}
+
 static uint16_t _get_phys_bit_cnt(int node_index)
 {
 	node_record_t *node_ptr = node_record_table_ptr[node_index];
@@ -278,16 +312,13 @@ static void _destroy_parts(void *x)
  * once a job is added. */
 static void _build_parts(void)
 {
-	list_itr_t *part_iterator;
+	ListIterator part_iterator;
 	part_record_t *p_ptr;
 	struct gs_part *gs_part_ptr;
 	int num_parts;
 
 	FREE_NULL_LIST(gs_part_list);
 
-#ifdef __METASTACK_BUG_NULL_GS_PART_LIST
-	gs_part_list = list_create(_destroy_parts); /* always allocate */
-#endif
 	/* reset the sorted list, since it's currently
 	 * pointing to partitions we just destroyed */
 	num_sorted_part = 0;
@@ -296,9 +327,7 @@ static void _build_parts(void)
 	if (num_parts == 0)
 		return;
 
-#ifdef __METASTACK_BUG_NULL_GS_PART_LIST
-	//gs_part_list = list_create(_destroy_parts);
-#endif
+	gs_part_list = list_create(_destroy_parts);
 	part_iterator = list_iterator_create(part_list);
 	while ((p_ptr = list_next(part_iterator))) {
 		gs_part_ptr = xmalloc(sizeof(struct gs_part));
@@ -334,23 +363,26 @@ static int _find_job_index(struct gs_part *p_ptr, uint32_t job_id)
 /* Return 1 if job "cpu count" fits in this row, else return 0 */
 static int _can_cpus_fit(job_record_t *job_ptr, struct gs_part *p_ptr)
 {
+	int i, j, size;
 	uint16_t *p_cpus, *j_cpus;
 	job_resources_t *job_res = job_ptr->job_resrcs;
 
 	if (gr_type != GS_CPU)
 		return 0;
 
+	size = bit_size(job_res->node_bitmap);
 	p_cpus = p_ptr->active_cpus;
 	j_cpus = job_res->cpus;
 
 	if (!p_cpus || !j_cpus)
 		return 0;
 
-	for (int j = 0, i = 0; next_node_bitmap(job_res->node_bitmap, &i);
-	     i++) {
-		if (p_cpus[i] + j_cpus[j] > _get_phys_bit_cnt(i))
-			return 0;
-		j++;
+	for (j = 0, i = 0; i < size; i++) {
+		if (bit_test(job_res->node_bitmap, i)) {
+			if (p_cpus[i]+j_cpus[j] > _get_phys_bit_cnt(i))
+				return 0;
+			j++;
+		}
 	}
 	return 1;
 }
@@ -371,7 +403,8 @@ static int _job_fits_in_active_row(job_record_t *job_ptr,
 	job_gr_type = _get_part_gr_type(job_ptr->part_ptr);
 	if ((job_gr_type == GS_CPU2) || (job_gr_type == GS_CORE) ||
 	    (job_gr_type == GS_SOCKET)) {
-		return job_fits_into_cores(job_res, p_ptr->active_resmap);
+		return job_fits_into_cores(job_res, p_ptr->active_resmap,
+					   gs_bits_per_node);
 	}
 
 	/* job_gr_type == GS_NODE || job_gr_type == GS_CPU */
@@ -443,62 +476,71 @@ static void _fill_sockets(bitstr_t *job_nodemap, struct gs_part *p_ptr)
  * 
  * IN job_ptr - job pointer
  * IN/OUT full_bitmap - bitmap of available CPUs, allocate as needed
+ * IN bits_per_node - bits per node in the full_bitmap
+ * RET 1 on success, 0 otherwise
  */
-static void add_job_to_cores2(job_record_t *job_ptr,
-			     bitstr_t **full_core_bitmap)
+static void add_job_to_cores2(job_record_t *job_ptr, bitstr_t **full_core_bitmap, 
+			 const uint16_t *bits_per_node)
 {
-	node_record_t *node_ptr = NULL;
-	int job_bit_inx = 0;
+	int full_node_inx = 0, job_node_cnt;
+	int job_bit_inx  = 0, full_bit_inx  = 0, i;
 	if(!(job_ptr->job_resrcs && job_ptr->job_resrcs->core_bitmap))
 		return;
 
 	/* add the job to the row_bitmap */
-	node_conf_create_cluster_core_bitmap(full_core_bitmap);
+	if (*full_core_bitmap == NULL) {
+		uint32_t size = 0;
+		for (i = 0; i < node_record_count; i++)
+				size += bits_per_node[i];
+		*full_core_bitmap = bit_alloc(size);
+	}
 
 	if ((IS_JOB_COMPLETING(job_ptr) && job_ptr->node_bitmap_cg)) {
+		/*  */
 		if (!(bit_overlap(job_ptr->node_bitmap_cg, job_ptr->job_resrcs->node_bitmap) == 
 				 bit_set_count(job_ptr->node_bitmap_cg)))
 			goto normal;
-
+		
 		debug3("%s: scaning gs job, CG job have been detected, jobid=%d", __func__, job_ptr->job_id);
-		for (int full_node_inx = 0;
-			(node_ptr = next_node_bitmap(
-				job_ptr->node_bitmap_cg, &full_node_inx));
-			full_node_inx++) {
-			int full_bit_inx = cr_node_cores_offset[full_node_inx];
-
-			for (int core = 0; core < node_ptr->tot_cores; core++) {
-				if (!(job_ptr->job_resrcs->whole_node &
-					WHOLE_NODE_REQUIRED) &&
-					!bit_test(job_ptr->job_resrcs->core_bitmap,
-						job_bit_inx + core))
-					continue;
-				bit_set(*full_core_bitmap, full_bit_inx + core);
+		job_node_cnt = bit_set_count(job_ptr->node_bitmap_cg);
+		for (full_node_inx = bit_ffs(job_ptr->node_bitmap_cg);
+				 job_node_cnt > 0; full_node_inx++) {
+			if (bit_test(job_ptr->node_bitmap_cg, full_node_inx)) {
+				full_bit_inx = cr_node_cores_offset[full_node_inx];
+				for (i = 0; i < bits_per_node[full_node_inx]; i++) {
+					if ((job_ptr->job_resrcs->whole_node != 1) &&
+							!bit_test(job_ptr->job_resrcs->core_bitmap,
+							job_bit_inx + i))
+						continue;
+					bit_set(*full_core_bitmap, full_bit_inx + i);
+				}
+				job_bit_inx += bits_per_node[full_node_inx];
+				job_node_cnt --;
 			}
-			job_bit_inx += node_ptr->tot_cores;
 		}
 		return;
 	}
-normal:
-	for (int full_node_inx = 0;
-		(node_ptr = next_node_bitmap(
-			job_ptr->job_resrcs->node_bitmap, &full_node_inx));
-		full_node_inx++) {
-		int full_bit_inx = cr_node_cores_offset[full_node_inx];
 
-		for (int core = 0; core < node_ptr->tot_cores; core++) {
-			if (!(job_ptr->job_resrcs->whole_node &
-				WHOLE_NODE_REQUIRED) &&
-				!bit_test(job_ptr->job_resrcs->core_bitmap,
-					job_bit_inx + core))
-				continue;
-			bit_set(*full_core_bitmap, full_bit_inx + core);
+normal:
+	job_node_cnt = bit_set_count(job_ptr->job_resrcs->node_bitmap);
+	for (full_node_inx = bit_ffs(job_ptr->job_resrcs->node_bitmap);
+			 job_node_cnt > 0; full_node_inx++) {
+		if (bit_test(job_ptr->job_resrcs->node_bitmap, full_node_inx)) {
+			full_bit_inx = cr_node_cores_offset[full_node_inx];
+			for (i = 0; i < bits_per_node[full_node_inx]; i++) {
+				if ((job_ptr->job_resrcs->whole_node != 1) &&
+					!bit_test(job_ptr->job_resrcs->core_bitmap,
+							job_bit_inx + i))
+					continue;
+				bit_set(*full_core_bitmap, full_bit_inx + i);
+			}
+			job_bit_inx += bits_per_node[full_node_inx];
+			job_node_cnt --;
 		}
-		job_bit_inx += node_ptr->tot_cores;
 	}
 	return;
 }
-#endif
+#endif 
 
 /* Add the given job to the "active" structures of
  * the given partition and increment the run count */
@@ -511,12 +553,16 @@ static void _add_job_to_active(job_record_t *job_ptr, struct gs_part *p_ptr)
 	job_gr_type = _get_part_gr_type(job_ptr->part_ptr);
 	if ((job_gr_type == GS_CPU2) || (job_gr_type == GS_CORE) ||
 	    (job_gr_type == GS_SOCKET)) {
-		if (p_ptr->jobs_active == 0 && p_ptr->active_resmap)
-			bit_clear_all(p_ptr->active_resmap);
+		if (p_ptr->jobs_active == 0 && p_ptr->active_resmap) {
+			uint32_t size = bit_size(p_ptr->active_resmap);
+			bit_nclear(p_ptr->active_resmap, 0, size-1);
+		}
 #ifdef __METASTACK_BUG_PREEMPT_JOBCG
-		add_job_to_cores2(job_ptr, &(p_ptr->active_resmap));
+		add_job_to_cores2(job_ptr, &(p_ptr->active_resmap), 
+				 gs_bits_per_node);
 #else
-		add_job_to_cores(job_res, &(p_ptr->active_resmap));
+		add_job_to_cores(job_res, &(p_ptr->active_resmap),
+				 gs_bits_per_node);
 #endif
 		if (job_gr_type == GS_SOCKET)
 			_fill_sockets(job_res->node_bitmap, p_ptr);
@@ -675,6 +721,8 @@ static void _preempt_job_dequeue(void)
 			}
 		}
 	}
+
+	return;
 }
 
 /* This is the reverse order defined by list.h so to generated a list in
@@ -683,18 +731,23 @@ static int _sort_partitions(void *part1, void *part2)
 {
 	struct gs_part *g1;
 	struct gs_part *g2;
+	int prio1;
+	int prio2;
 
 	g1 = *(struct gs_part **)part1;
 	g2 = *(struct gs_part **)part2;
 
-	return slurm_sort_uint16_list_desc(&g1->priority, &g2->priority);
+	prio1 = g1->priority;
+	prio2 = g2->priority;
+
+	return prio2 - prio1;
 }
 
 /* Scan the partition list. Add the given job as a "shadow" to every
  * partition with a lower priority than the given partition */
 static void _cast_shadow(struct gs_job *j_ptr, uint16_t priority)
 {
-	list_itr_t *part_iterator;
+	ListIterator part_iterator;
 	struct gs_part *p_ptr;
 	int i;
 
@@ -734,7 +787,7 @@ static void _cast_shadow(struct gs_job *j_ptr, uint16_t priority)
 /* Remove the given job as a "shadow" from all partitions */
 static void _clear_shadow(struct gs_job *j_ptr)
 {
-	list_itr_t *part_iterator;
+	ListIterator part_iterator;
 	struct gs_part *p_ptr;
 	int i;
 
@@ -866,7 +919,7 @@ static void _update_active_row(struct gs_part *p_ptr, int add_new_jobs)
  */
 static void _update_all_active_rows(void)
 {
-	list_itr_t *part_iterator;
+	ListIterator part_iterator;
  	struct gs_part *p_ptr;
 
 	/* Sort the partitions. This way the shadows of any high-priority
@@ -924,6 +977,8 @@ static void _remove_job_from_part(uint32_t job_id, struct gs_part *p_ptr,
 	}
 	j_ptr->job_ptr = NULL;
 	xfree(j_ptr);
+
+	return;
 }
 
 /* Add the given job to the given partition, and if it remains running
@@ -1026,7 +1081,7 @@ static void _scan_slurm_job_list(void)
 	job_record_t *job_ptr;
 	struct gs_part *p_ptr;
 	int i;
-	list_itr_t *job_iterator;
+	ListIterator job_iterator;
 	char *part_name;
 
 	if (!job_list) {	/* no jobs */
@@ -1083,6 +1138,8 @@ static void _scan_slurm_job_list(void)
 	/* now that all of the old jobs have been flushed out,
 	 * update the active row of all partitions */
 	_update_all_active_rows();
+
+	return;
 }
 
 
@@ -1133,6 +1190,9 @@ extern void gs_init(void)
 	gr_type = _get_gr_type();
 	preempt_job_list = list_create(xfree_ptr);
 
+	/* load the physical resource count data */
+	_load_phys_res_cnt();
+
 	slurm_mutex_lock(&data_mutex);
 	_build_parts();
 	/* load any currently running jobs */
@@ -1176,6 +1236,7 @@ extern void gs_fini(void)
 	slurm_mutex_lock(&data_mutex);
 	FREE_NULL_LIST(gs_part_list);
 	gs_part_list = NULL;
+	xfree(gs_bits_per_node);
 	slurm_mutex_unlock(&data_mutex);
 	log_flag(GANG, "gang: leaving gs_fini");
 }
@@ -1240,7 +1301,7 @@ extern void gs_job_start(job_record_t *job_ptr)
 extern void gs_wake_jobs(void)
 {
 	job_record_t *job_ptr;
-	list_itr_t *job_iterator;
+	ListIterator job_iterator;
 
 	if (!job_list)	/* no jobs */
 		return;
@@ -1319,7 +1380,7 @@ extern void gs_job_fini(job_record_t *job_ptr)
 extern void gs_reconfig(void)
 {
 	int i;
-	list_itr_t *part_iterator;
+	ListIterator part_iterator;
 	struct gs_part *p_ptr, *newp_ptr;
 	List old_part_list;
 	job_record_t *job_ptr;
@@ -1342,6 +1403,7 @@ extern void gs_reconfig(void)
 
 	/* reset global data */
 	gr_type = _get_gr_type();
+	_load_phys_res_cnt();
 	_build_parts();
 
 	/* scan the old part list and add existing jobs to the new list */
@@ -1538,7 +1600,7 @@ static void *_timeslicer_thread(void *arg)
 	/* Write locks on job and read lock on nodes */
 	slurmctld_lock_t job_write_lock = {
 		NO_LOCK, WRITE_LOCK, READ_LOCK, NO_LOCK, READ_LOCK };
-	list_itr_t *part_iterator;
+	ListIterator part_iterator;
 	struct gs_part *p_ptr;
 
 	log_flag(GANG, "gang: starting timeslicer loop");
@@ -1572,5 +1634,6 @@ static void *_timeslicer_thread(void *arg)
 	}
 
 	timeslicer_thread_id = (pthread_t) 0;
+	pthread_exit((void *) 0);
 	return NULL;
 }

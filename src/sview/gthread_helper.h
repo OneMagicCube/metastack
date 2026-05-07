@@ -1,7 +1,8 @@
 /****************************************************************************\
  *  sview.h - definitions used for sview data functions
  *****************************************************************************
- *  Copyright (C) SchedMD LLC.
+ *  Copyright (C) 2012 SchedMD LLC
+ *  Written by Danny Auble <da@schedmd.com>
  *
  *  This file is part of Slurm, a resource management program.
  *  For details, see <https://slurm.schedmd.com/>.
@@ -27,12 +28,11 @@
 
 #include "config.h"
 
-#include <stdbool.h>
-
 #include <gtk/gtk.h>
 
 void sview_thread_init(gpointer vtable);
-bool sview_thread_new(GThreadFunc func, gpointer data, GError **error);
+GThread *sview_thread_new(GThreadFunc func, gpointer data,
+			  gboolean joinable, GError **error);
 void sview_mutex_new(GMutex **mutex);
 void sview_cond_new(GCond **cond);
 

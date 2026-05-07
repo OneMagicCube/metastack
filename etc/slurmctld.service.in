@@ -1,18 +1,14 @@
 [Unit]
 Description=Slurm controller daemon
-After=network-online.target remote-fs.target munge.service sssd.service
+After=network-online.target munge.service
 Wants=network-online.target
 ConditionPathExists=@sysconfdir@/slurm.conf
 
 [Service]
-Type=notify
+Type=simple
 EnvironmentFile=-/etc/sysconfig/slurmctld
 EnvironmentFile=-/etc/default/slurmctld
-User=slurm
-Group=slurm
-RuntimeDirectory=slurmctld
-RuntimeDirectoryMode=0755
-ExecStart=@sbindir@/slurmctld --systemd $SLURMCTLD_OPTIONS
+ExecStart=@sbindir@/slurmctld -D -s $SLURMCTLD_OPTIONS
 ExecReload=/bin/kill -HUP $MAINPID
 LimitNOFILE=65536
 @SYSTEMD_TASKSMAX_OPTION@

@@ -33,10 +33,8 @@ AC_DEFUN([X_AC_DSMI],
 
     cppflags_save="$CPPFLAGS"
     ldflags_save="$LDFLAGS"
-    DSMI_CPPFLAGS="-I$_x_ac_dsmi_dir/driver/kernel/inc/driver"
-    CPPFLAGS="$DSMI_CPPFLAGS"
-    DSMI_LIB_DIR="$_x_ac_dsmi_dir/driver/lib64/driver"
-    LDFLAGS="-L$DSMI_LIB_DIR"
+    CPPFLAGS="-I$_x_ac_dsmi_dir/driver/kernel/inc/driver $CPPFLAGS"
+    LDFLAGS="-L$_x_ac_dsmi_dir/driver/lib64/driver $LDFLAGS"
     AC_CHECK_HEADER([dsmi_common_interface.h], [ac_dsmi_h=yes], [ac_dsmi_h=no])
     CPPFLAGS="$cppflags_save"
     LDFLAGS="$ldflags_save"

@@ -3,7 +3,7 @@
  *****************************************************************************
  *  Copyright (C) 2006-2007 The Regents of the University of California.
  *  Copyright (C) 2008-2009 Lawrence Livermore National Security.
- *  Copyright (C) SchedMD LLC.
+ *  Portions Copyright (C) 2010-2017 SchedMD LLC
  *  Produced at Lawrence Livermore National Laboratory (cf, DISCLAIMER).
  *  Written by Danny Auble <da@llnl.gov>.
  *  CODE-OCEC-09-009. All rights reserved.
@@ -44,14 +44,8 @@
 #include "src/common/read_config.h"
 #include "src/common/slurm_time.h"
 #include "src/common/xstring.h"
-#include "src/interfaces/data_parser.h"
-#include "src/interfaces/serializer.h"
 #include "sacct.h"
 #include <time.h>
-
-#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
-#include "src/common/assoc_mgr.h"
-#endif
 
 /* getopt_long options, integers but not characters */
 #define OPT_LONG_DELIMITER 0x100
@@ -65,16 +59,6 @@
 #define OPT_LONG_ENV       0x108
 #define OPT_LONG_JSON      0x109
 #define OPT_LONG_YAML      0x110
-#define OPT_LONG_AUTOCOMP  0x111
-#define OPT_LONG_ARRAY     0x112
-#define OPT_LONG_HELPSTATE 0x113
-#define OPT_LONG_HELPREASON 0x114
-#define OPT_LONG_EXPAND_PATTERNS 0x115
-#ifdef __METASTACK_OPT_APP  
-#define OPT_LONG_APPNAME   0x116  
-#define OPT_LONG_APPVERSION 0x117  
-#define OPT_LONG_APPSOURCE 0x118  
-#endif
 
 #define JOB_HASH_SIZE 1000
 
@@ -88,7 +72,7 @@ List selected_steps = NULL;
 void *acct_db_conn = NULL;
 
 List print_fields_list = NULL;
-list_itr_t *print_fields_itr = NULL;
+ListIterator print_fields_itr = NULL;
 int field_count = 0;
 List g_qos_list = NULL;
 List g_tres_list = NULL;
@@ -96,7 +80,7 @@ List g_tres_list = NULL;
 static List _build_cluster_list(slurmdb_federation_rec_t *fed)
 {
 	slurmdb_cluster_rec_t *cluster;
-	list_itr_t *iter;
+	ListIterator iter;
 	List cluster_list;
 
 	cluster_list = list_create(xfree_ptr);
@@ -123,39 +107,13 @@ static void _help_fields_msg(void)
 	return;
 }
 
-static void _help_job_state_msg(void)
-{
-	for (int idx = 0; idx < JOB_END; idx++) {
-		if (idx & 3)
-			printf(" ");
-		else if (idx)
-			printf("\n");
-		printf("%-19s", job_state_string(idx));
-	}
-	printf("\n");
-	return;
-}
-
-static void _help_job_reason_msg(void)
-{
-	for (int idx = 0; idx < REASON_END; idx++) {
-		if (idx & 1)
-			printf(" ");
-		else if (idx)
-			printf("\n");
-		printf("%-39s", job_state_reason_string(idx));
-	}
-	printf("\n");
-	return;
-}
-
 /* returns number of objects added to list */
 static int _addto_reason_char_list_internal(List char_list, char *name, void *x)
 {
 	uint32_t c;
 	char *tmp_name = NULL;
 
-	c = job_state_reason_num(name);
+	c = job_reason_num(name);
 	if (c == NO_VAL)
 		fatal("unrecognized job reason value '%s'", name);
 	tmp_name = xstrdup_printf("%u", c);
@@ -222,7 +180,7 @@ static int _sacct_parse_extend (char* format_long)
 	}
 	tmp_format = xstrdup(format_long);
 	token = strtok_r(tmp_format, ",",&str_tmp);
-	while (token) {
+    while (token) {
 		int command_len = 0;
 		_parse_env_token_extend(token, &field_size, &right_format);
 		command_len = strlen(token);
@@ -236,6 +194,7 @@ static int _sacct_parse_extend (char* format_long)
 			continue;
 		}
 		for (i = 0; fields[i].name; i++) {
+			//command_len = strlen(fields[i].name);
 			if (!xstrncasecmp(fields[i].name, token, command_len))
 				goto foundfield;
 		}
@@ -251,17 +210,20 @@ static int _sacct_parse_extend (char* format_long)
 		error("Invalid field requested in env: \"%s\"", token);
 		exit(1);
 foundfield:
+		//if (newlen_set)
 		if (field_size)
 			fields[i].len = field_size;
 		fields[i].right_format = right_format;
 		token = strtok_r(NULL, ",", &str_tmp);
 			
 	}
-	xfree(tmp_format);
+	if(tmp_format)
+		xfree(tmp_format);
 	return SLURM_SUCCESS;
 
 }
 #endif
+
 
 static int _addto_state_char_list_internal(List char_list, char *name, void *x)
 {
@@ -309,9 +271,6 @@ sacct [<OPTION>]                                                            \n \
      -A, --accounts:                                                        \n\
 	           Use this comma separated list of accounts to select jobs \n\
                    to display.  By default, all accounts are selected.      \n\
-     --array:                                                               \n\
-                   Expand job arrays. Display array tasks on separate lines \n\
-                   instead of consolidating them to a single line.          \n\
      -b, --brief:                                                           \n\
 	           Equivalent to '--format=jobstep,state,error'.            \n\
      -B, --batch-script:                                                    \n\
@@ -343,7 +302,6 @@ sacct [<OPTION>]                                                            \n \
                    NOTE: Requesting specific job(s) with '-j' is required   \n\
                          for this.                                          \n\
          --federation: Report jobs from federation if a member of a one.    \n\
-     --expand-pattern: substitute wildcards in field name patterns          \n\
      -f, --file=file:                                                       \n\
 	           Read data from the specified file, rather than Slurm's   \n\
                    current accounting log file. (Only appliciable when      \n\
@@ -353,12 +311,6 @@ sacct [<OPTION>]                                                            \n \
                    to select jobs to display.  By default, all groups are   \n\
                    selected.                                                \n\
      -h, --help:   Print this description of use.                           \n\
-         --helpreason                                                       \n\
-                   Print a list of job reasons that can be specified with   \n\
-                   the '--reason' option.                                   \n\
-         --helpstate                                                        \n\
-                   Print a list of job states that can be specified with    \n\
-                   the '--state' option.                                    \n\
      -i, --nnodes=N:                                                        \n\
                    Return jobs which ran on this many nodes (N = min[-max]) \n\
      -I, --ncpus=N:                                                         \n\
@@ -369,7 +321,7 @@ sacct [<OPTION>]                                                            \n \
                    jobs. Adding .step will display the specific job step of \n\
                    that job. (A step id of 'batch' will display the         \n\
                    information about the batch step.)                       \n\
-     --json[=data_parser]                                                   \n\
+     --json:                                                                \n\
                    Produce JSON output                                      \n\
      -k, --timelimit-min:                                                   \n\
                    Only send data about jobs with this timelimit.           \n\
@@ -454,14 +406,6 @@ sacct [<OPTION>]                                                            \n \
      -V, --version: Print version.                                          \n\
      -W, --wckeys:                                                          \n\
                    Only send data about these wckeys.  Default is all.      \n\
-     --appname:                                                               \n\
-                   Filter by application name(s), comma separated.           \n\
-     --appversion:                                                            \n\
-                   Filter by application version(s), comma separated.        \n\
-                   Must be used with --appname.                              \n\
-     --appsource:                                                             \n\
-                   Filter by application source(s), comma separated.           \n\
-                   Valid values: user, auto, portal, marketplace.             \n\
      --whole-hetjob[=yes|no]:                                               \n\
 		   If set to 'yes' (or no argument), then information about \n\
 		   all the heterogeneous components will be retrieved. If   \n\
@@ -474,7 +418,7 @@ sacct [<OPTION>]                                                            \n \
      -X, --allocations:                                                     \n\
 	           Only show statistics relevant to the job allocation      \n\
 	           itself, not taking steps into consideration.             \n\
-     --yaml[=data_parser]                                                   \n\
+     --yaml:                                                                \n\
                    Produce YAML output                                      \n\
 	                                                                    \n\
      Note, valid start/end time formats are...                              \n\
@@ -552,7 +496,7 @@ static void _remove_duplicate_fed_jobs(List jobs)
 	uint32_t *hash_tbl_size = NULL;
 	slurmdb_job_rec_t ***hash_job = NULL;
 	slurmdb_job_rec_t *job = NULL;
-	list_itr_t *itr = NULL;
+	ListIterator itr = NULL;
 
 	xassert(jobs);
 
@@ -615,8 +559,8 @@ extern int get_data(void)
 {
 	slurmdb_job_rec_t *job = NULL;
 	slurmdb_step_rec_t *step = NULL;
-	list_itr_t *itr = NULL;
-	list_itr_t *itr_step = NULL;
+	ListIterator itr = NULL;
+	ListIterator itr_step = NULL;
 	slurmdb_job_cond_t *job_cond = params.job_cond;
 	int cnt;
 
@@ -676,10 +620,10 @@ extern int get_data(void)
 extern void parse_command_line(int argc, char **argv)
 {
 	extern int optind;
-	int c, i, option_index = 0;
+	int c, i, optionIndex = 0;
 	char *end = NULL, *start = NULL;
 	slurm_selected_step_t *selected_step = NULL;
-	list_itr_t *itr = NULL;
+	ListIterator itr = NULL;
 	struct stat stat_buf;
 	char *dot = NULL;
 	char *env_val = NULL;
@@ -694,12 +638,11 @@ extern void parse_command_line(int argc, char **argv)
 #ifdef __METASTACK_OPT_PRINT_COMMAND
 	char *env_sacct = NULL;
 #endif
+
 	static struct option long_options[] = {
-		{"autocomplete", required_argument, 0, OPT_LONG_AUTOCOMP},
                 {"allusers",       no_argument,       0,    'a'},
                 {"accounts",       required_argument, 0,    'A'},
                 {"allocations",    no_argument,       0,    'X'},
-                {"array",          no_argument,       0,    OPT_LONG_ARRAY},
                 {"brief",          no_argument,       0,    'b'},
 		{"batch-script",   no_argument,       0,    'B'},
                 {"completion",     no_argument,       0,    'c'},
@@ -709,11 +652,8 @@ extern void parse_command_line(int argc, char **argv)
                 {"federation",     no_argument,       0,    OPT_LONG_FEDR},
                 {"helpformat",     no_argument,       0,    'e'},
                 {"help-fields",    no_argument,       0,    'e'},
-                {"helpreason",     no_argument,       0,    OPT_LONG_HELPREASON},
-                {"helpstate",      no_argument,       0,    OPT_LONG_HELPSTATE},
                 {"endtime",        required_argument, 0,    'E'},
                 {"env-vars",       no_argument,       0,    OPT_LONG_ENV},
-		{"expand-patterns",no_argument,       0,    OPT_LONG_EXPAND_PATTERNS},
                 {"file",           required_argument, 0,    'f'},
                 {"flags",          required_argument, 0,    'F'},
                 {"gid",            required_argument, 0,    'g'},
@@ -753,13 +693,8 @@ extern void parse_command_line(int argc, char **argv)
                 {"wckeys",         required_argument, 0,    'W'},
                 {"whole-hetjob",   optional_argument, 0,    OPT_LONG_WHETJOB},
                 {"associations",   required_argument, 0,    'x'},
-                {"json", optional_argument, 0, OPT_LONG_JSON},
-                {"yaml", optional_argument, 0, OPT_LONG_YAML},
-#ifdef __METASTACK_OPT_APP    
-                {"appname",        required_argument, 0,    OPT_LONG_APPNAME},    
-                {"appversion",     required_argument, 0,    OPT_LONG_APPVERSION},    
-                {"appsource",      required_argument, 0,    OPT_LONG_APPSOURCE},  
-#endif
+                {"json", no_argument, 0, OPT_LONG_JSON},
+                {"yaml", no_argument, 0, OPT_LONG_YAML},
                 {0,                0,		      0,    0}};
 
 	params.opt_uid = getuid();
@@ -780,7 +715,7 @@ extern void parse_command_line(int argc, char **argv)
 	while (1) {		/* now cycle through the command line */
 		c = getopt_long(argc, argv,
 				"aA:bBcC:DeE:f:F:g:hi:I:j:k:K:lLM:nN:o:pPq:r:s:S:Ttu:UvVW:x:X",
-				long_options, &option_index);
+				long_options, &optionIndex);
 		if (c == -1)
 			break;
 		switch (c) {
@@ -791,9 +726,6 @@ extern void parse_command_line(int argc, char **argv)
 			if (!job_cond->acct_list)
 				job_cond->acct_list = list_create(xfree_ptr);
 			slurm_addto_char_list(job_cond->acct_list, optarg);
-			break;
-		case OPT_LONG_ARRAY:
-			params.opt_array = true;
 			break;
 		case 'b':
 			brief_output = true;
@@ -841,9 +773,6 @@ extern void parse_command_line(int argc, char **argv)
 		case OPT_LONG_ENV:
 			job_cond->flags |= JOBCOND_FLAG_ENV;
 			job_cond->flags |= JOBCOND_FLAG_NO_STEP;
-			break;
-		case OPT_LONG_EXPAND_PATTERNS:
-			params.expand_patterns = true;
 			break;
 		case 'f':
 			xfree(slurm_conf.job_comp_loc);
@@ -1058,70 +987,18 @@ extern void parse_command_line(int argc, char **argv)
 			break;
 		case OPT_LONG_JSON:
 			params.mimetype = MIME_TYPE_JSON;
-			params.data_parser = optarg;
-			if (serializer_g_init(MIME_TYPE_JSON_PLUGIN, NULL))
-				fatal("JSON plugin load failure");
+			data_init(MIME_TYPE_JSON_PLUGIN, NULL);
 			break;
 		case OPT_LONG_YAML:
 			params.mimetype = MIME_TYPE_YAML;
-			params.data_parser = optarg;
-			if (serializer_g_init(MIME_TYPE_YAML_PLUGIN, NULL))
-				fatal("YAML plugin load failure");
+			data_init(MIME_TYPE_YAML_PLUGIN, NULL);
 			break;
-		case OPT_LONG_AUTOCOMP:
-			suggest_completion(long_options, optarg);
-			exit(0);
-			break;
-		case OPT_LONG_HELPSTATE:
-			params.opt_help = 4;
-			break;
-		case OPT_LONG_HELPREASON:
-			params.opt_help = 5;
-			break;
-#ifdef __METASTACK_OPT_APP  
-		case OPT_LONG_APPNAME:  
-			if (!job_cond->appname_list)  
-				job_cond->appname_list = list_create(xfree_ptr);  
-			slurm_addto_char_list(job_cond->appname_list, optarg);  
-			job_cond->flags |= JOBCOND_FLAG_APP;  
-			break;  
-		case OPT_LONG_APPVERSION:  
-			if (!job_cond->appversion_list)  
-				job_cond->appversion_list = list_create(xfree_ptr);  
-			slurm_addto_char_list(job_cond->appversion_list, optarg);  
-			job_cond->flags |= JOBCOND_FLAG_APP;  
-			break;  
-		case OPT_LONG_APPSOURCE:  
-		{  
-			if (!job_cond->appsource_list)  
-				job_cond->appsource_list = list_create(xfree_ptr);  
-			char *tmp = xstrdup(optarg);  
-			char *save_ptr = NULL;  
-			char *tok = strtok_r(tmp, ",", &save_ptr);  
-			while (tok) {  
-				uint8_t val = app_source_from_str(tok);  
-				if (val == NO_VAL8)  
-					fatal("Invalid --appsource value: '%s'", tok);  
-				char *num_str = xstrdup_printf("%u", val);  
-				list_append(job_cond->appsource_list, num_str);  
-				tok = strtok_r(NULL, ",", &save_ptr);  
-			}  
-			xfree(tmp);  
-			job_cond->flags |= JOBCOND_FLAG_APP;  
-			break;  
-		}  
-#endif
 		case ':':
 		case '?':	/* getopt() has explained it */
 			exit(1);
 		}
 	}
-#ifdef __METASTACK_OPT_APP    
-	if (job_cond->appversion_list && list_count(job_cond->appversion_list)
-	    && (!job_cond->appname_list || !list_count(job_cond->appname_list))) {
-		fatal("--appversion must be used with --appname");    
-	}
-#endif
+
 	if (!job_cond->step_list || !list_count(job_cond->step_list)) {
 		char *reason = NULL;
 		if (job_cond->flags & JOBCOND_FLAG_SCRIPT)
@@ -1152,7 +1029,7 @@ extern void parse_command_line(int argc, char **argv)
 
 	if (job_cond->usage_end &&
 	    (job_cond->usage_start > job_cond->usage_end)) {
-		char start_str[256], end_str[256];
+		char start_str[32], end_str[32];
 		slurm_make_time_str(&job_cond->usage_start, start_str,
 				    sizeof(start_str));
 		slurm_make_time_str(&job_cond->usage_end, end_str,
@@ -1168,7 +1045,7 @@ extern void parse_command_line(int argc, char **argv)
 
 		if (job_cond->state_list && list_count(job_cond->state_list)) {
 			char *state;
-			list_itr_t *itr = list_iterator_create(
+			ListIterator itr = list_iterator_create(
 				job_cond->state_list);
 
 			while ((state = list_next(itr))) {
@@ -1214,25 +1091,21 @@ extern void parse_command_line(int argc, char **argv)
 	      (job_cond->flags & JOBCOND_FLAG_NO_WHOLE_HETJOB ? "no" : 0));
 
 	if (params.opt_completion) {
-		if (!slurm_conf.job_comp_type) {
+		slurmdb_jobcomp_init(slurm_conf.job_comp_loc);
+
+		if (!xstrcmp(slurm_conf.job_comp_type, "jobcomp/none")) {
 			fprintf(stderr, "Slurm job completion is disabled\n");
 			exit(1);
 		}
-
-		if (slurmdb_jobcomp_init() != SLURM_SUCCESS) {
-			fprintf(stderr,
-				"Slurm unable to initialize jobcomp plugin\n");
+	} else {
+		if (slurm_acct_storage_init() != SLURM_SUCCESS) {
+			fprintf(stderr, "Slurm unable to initialize storage plugin\n");
 			exit(1);
 		}
-	} else {
-		if (!slurm_conf.accounting_storage_type) {
+		if (!xstrcmp(slurm_conf.accounting_storage_type,
+			     "accounting_storage/none")) {
 			fprintf(stderr,
 				"Slurm accounting storage is disabled\n");
-			exit(1);
-		}
-		if (acct_storage_g_init() != SLURM_SUCCESS) {
-			fprintf(stderr,
-				"Slurm unable to initialize storage plugin\n");
 			exit(1);
 		}
 		acct_db_conn = slurmdb_connection_get(NULL);
@@ -1321,12 +1194,7 @@ extern void parse_command_line(int argc, char **argv)
 			all_users = true;
 
 	/* set all_users for user root if not requesting any */
-#ifdef __METASTACK_OPT_READ_ONLY_ADMIN
-	if (!job_cond->userid_list && (!params.opt_uid || 
-		assoc_mgr_get_admin_level(acct_db_conn, params.opt_uid) >= SLURMDB_ADMIN_READ_ONLY))
-#else
 	if (!job_cond->userid_list && !params.opt_uid)
-#endif
 		all_users = true;
 
 	if (all_users) {
@@ -1447,10 +1315,9 @@ extern void parse_command_line(int argc, char **argv)
 
 		xstrfmtcat(params.opt_field_list, "%s,", dot);
 	}
-
 #ifdef __METASTACK_OPT_PRINT_COMMAND
 	if ((env_sacct = getenv("SACCT_EXTEND"))) {
-		char *format = xstrdup(env_sacct);
+   		char *format = xstrdup(env_sacct);
 		_sacct_parse_extend(format);
 		if (format)
 			xfree(format);
@@ -1462,10 +1329,6 @@ extern void parse_command_line(int argc, char **argv)
 			dot = DEFAULT_COMP_FIELDS;
 		else if ( ( env_val = getenv("SACCT_FORMAT") ) )
 			dot = xstrdup(env_val);
-#ifdef __METASTACK_OPT_APP  
-		else if (job_cond->flags & JOBCOND_FLAG_APP)  
-			dot = DEFAULT_APP_FIELDS;  
-#endif 
 		else
 			dot = DEFAULT_FIELDS;
 
@@ -1520,13 +1383,6 @@ extern void parse_command_line(int argc, char **argv)
 	foundfield:
 		if (newlen_set)
 			fields[i].len = newlen;
-#ifdef __METASTACK_OPT_APP  
-		/* Auto-set APPTYPE flag when app format fields are requested */  
-		if (fields[i].type == PRINT_APPNAME ||  
-		    fields[i].type == PRINT_APPVERSION ||  
-		    fields[i].type == PRINT_APPSOURCE)  
-			job_cond->flags |= JOBCOND_FLAG_APP;
-#endif  
 		list_append(print_fields_list, &fields[i]);
 		start = end + 1;
 	}
@@ -1553,12 +1409,6 @@ extern void do_help(void)
 	case 3:
 		_usage();
 		break;
-	case 4:
-		_help_job_state_msg();
-		break;
-	case 5:
-		_help_job_reason_msg();
-		break;
 	default:
 		debug2("sacct bug: params.opt_help=%d",
 			params.opt_help);
@@ -1567,7 +1417,7 @@ extern void do_help(void)
 
 /* Return true if the specified job id is local to a cluster
  * (not a federated job) */
-static bool _test_local_job(uint32_t job_id)
+static inline bool _test_local_job(uint32_t job_id)
 {
 	if ((job_id & (~MAX_JOB_ID)) == 0)
 		return true;
@@ -1602,26 +1452,13 @@ static void _print_env(slurmdb_job_rec_t *job)
  * At this point, we have already selected the desired data,
  * so we just need to print it for the user.
  */
-extern void do_list(int argc, char **argv)
+extern void do_list(void)
 {
-	list_itr_t *itr = NULL;
-	list_itr_t *itr_step = NULL;
+	ListIterator itr = NULL;
+	ListIterator itr_step = NULL;
 	slurmdb_job_rec_t *job = NULL;
 	slurmdb_step_rec_t *step = NULL;
 	slurmdb_job_cond_t *job_cond = params.job_cond;
-
-	if (params.mimetype) {
-		if (is_data_parser_deprecated(params.data_parser))
-			DATA_DUMP_CLI_DEPRECATED(JOB_LIST, jobs, "jobs", argc,
-						 argv, acct_db_conn,
-						 params.mimetype, errno);
-		else
-			DATA_DUMP_CLI_SINGLE(OPENAPI_SLURMDBD_JOBS_RESP, jobs,
-					     argc, argv, acct_db_conn,
-					     params.mimetype,
-					     params.data_parser, errno);
-		return;
-	}
 
 	if (!jobs)
 		return;
@@ -1668,7 +1505,7 @@ extern void do_list(int argc, char **argv)
  */
 extern void do_list_completion(void)
 {
-	list_itr_t *itr = NULL;
+	ListIterator itr = NULL;
 	jobcomp_job_rec_t *job = NULL;
 
 	if (!jobs)
@@ -1701,7 +1538,7 @@ extern void sacct_fini(void)
 		slurmdb_jobcomp_fini();
 	else {
 		slurmdb_connection_close(&acct_db_conn);
-		acct_storage_g_fini();
+		slurm_acct_storage_fini();
 	}
 	xfree(params.opt_field_list);
 	slurmdb_destroy_job_cond(params.job_cond);

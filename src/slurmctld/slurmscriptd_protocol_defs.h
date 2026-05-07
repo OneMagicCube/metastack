@@ -1,7 +1,8 @@
 /*****************************************************************************\
  *  slurmscriptd_protocol_defs.h - definitions used for slurmscriptd RPCs.
  *****************************************************************************
- *  Copyright (C) SchedMD LLC.
+ *  Copyright (C) 2021 SchedMD LLC.
+ *  Written by Marshall Garey <marshall@schedmd.com>
  *
  *  This file is part of Slurm, a resource management program.
  *  For details, see <https://slurm.schedmd.com/>.
@@ -49,10 +50,7 @@ typedef enum {
 	SLURMSCRIPTD_BB_LUA,
 	SLURMSCRIPTD_EPILOG,
 	SLURMSCRIPTD_MAIL,
-	SLURMSCRIPTD_POWER,
 	SLURMSCRIPTD_PROLOG,
-	SLURMSCRIPTD_REBOOT,
-	SLURMSCRIPTD_RESV,
 } script_type_t;
 
 typedef struct {
@@ -75,15 +73,11 @@ typedef struct {
 	uint32_t argc;
 	char **argv;
 	char **env;
-	char *extra_buf;
-	uint32_t extra_buf_size;
 	uint32_t job_id;
 	char *script_name;
 	char *script_path;
 	script_type_t script_type;
 	uint32_t timeout;
-	char *tmp_file_env_name;
-	char *tmp_file_str;
 } run_script_msg_t;
 
 typedef struct {
@@ -99,7 +93,16 @@ typedef struct {
 	bool log_rotate;
 } log_msg_t;
 
+typedef struct {
+	uint64_t debug_flags;
+	char *logfile;
+	uint16_t log_fmt;
+	uint16_t slurmctld_debug;
+	uint16_t syslog_debug;
+} reconfig_msg_t;
+
 /* Free message functions */
+extern void slurmscriptd_free_reconfig(reconfig_msg_t *msg);
 extern void slurmscriptd_free_run_script_msg(run_script_msg_t *msg);
 extern void slurmscriptd_free_script_complete(script_complete_t *msg);
 

@@ -33,7 +33,6 @@
  *  with LSD-Tools; if not, write to the Free Software Foundation, Inc.,
  *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301  USA.
  *****************************************************************************/
- #include "slurm/slurm.h"
 
 #ifndef LSD_LIST_H
 #define LSD_LIST_H
@@ -51,7 +50,6 @@
 #ifndef   __list_datatypes_defined
 #  define __list_datatypes_defined
 typedef struct xlist *List;
-typedef struct xlist list_t;
 
 /*
  *  List opaque data type.
@@ -60,7 +58,7 @@ typedef struct xlist list_t;
 /*
  *  List Iterator opaque data type.
  */
-typedef struct listIterator list_itr_t;
+typedef struct listIterator *ListIterator;
 
 /*
  *  Function prototype to deallocate data stored in a list.
@@ -88,14 +86,6 @@ typedef int (*ListFindF) (void *x, void *key);
  */
 typedef int (*ListForF) (void *x, void *arg);
 
-#ifdef __METASTACK_BUG_SEND_UPDATE_ON_BAD_FD
-/* TExtends the ListForF type by adding a retry_count 
- * parameter to implement response timeout calculation 
- * that increases with each retry attempt. 
- */
-typedef int (*ListForF_FixBug) (void *x, void *arg, int retry_count);
-#endif
-
 #endif
 
 /*******************************
@@ -110,25 +100,25 @@ typedef int (*ListForF_FixBug) (void *x, void *arg, int retry_count);
  *  Note: Abandoning a list without calling list_destroy() will result
  *    in a memory leak.
  */
-extern list_t *list_create(ListDelF f);
+List list_create(ListDelF f);
 
 /*
  *  Destroys list [l], freeing memory used for list iterators and the
  *    list itself; if a deletion function was specified when the list
  *    was created, it will be called for each item in the list.
  */
-extern void list_destroy(list_t *l);
+void list_destroy(List l);
 
 /*
  *  Returns non-zero if list [l] is empty; o/w returns zero.
  */
-extern int list_is_empty(list_t *l);
+int list_is_empty(List l);
 
 /*
  * Return the number of items in list [l].
  * If [l] is NULL, return 0.
  */
-extern int list_count(list_t *l);
+int list_count(List l);
 
 /*
  *  Create new shallow copy of list [l] pointers, without destructor.
@@ -139,7 +129,7 @@ extern int list_count(list_t *l);
  *  Warning: destruction of this list will not free members of [l].
  *  Warning: This list is only valid while [l] is unchanged.
  */
-extern list_t *list_shallow_copy(list_t *l);
+List list_shallow_copy(List l);
 
 /***************************
  *  List Access Functions  *
@@ -147,15 +137,16 @@ extern list_t *list_shallow_copy(list_t *l);
 
 /*
  *  Inserts data [x] at the end of list [l].
+ *  Returns the data's ptr.
  */
-extern void list_append(list_t *l, void *x);
+void *list_append(List l, void *x);
 
 /*
  *  Inserts list [sub] at the end of list [l].
  *  Note: list [l] must have a destroy function of NULL.
  *  Returns a count of the number of items added to list [l].
  */
-extern int list_append_list(list_t *l, List sub);
+int list_append_list(List l, List sub);
 
 /*
  *  Pops off list [sub] and appends data at the end of list [l].
@@ -163,7 +154,7 @@ extern int list_append_list(list_t *l, List sub);
  *  Note: list [sub] will be returned empty, but not destroyed.
  *  Returns a count of the number of items added to list [l].
  */
-extern int list_transfer(list_t *l, List sub);
+int list_transfer(List l, List sub);
 
 /*
  *  Pop off elements in list [sub] to [l], unless already in [l].
@@ -173,7 +164,7 @@ extern int list_transfer(list_t *l, List sub);
  *        but never destroyed.
  *  Returns a count of the number of items added to list [l].
  */
-extern int list_transfer_unique(list_t *l, ListFindF f, list_t *sub);
+int list_transfer_unique(List l, ListFindF f, List sub);
 
 /*
  *  Pops off list [sub] to [l] with maximum number of entries.
@@ -182,20 +173,13 @@ extern int list_transfer_unique(list_t *l, ListFindF f, list_t *sub);
  *  Note: list [sub] may be returned empty, but not destroyed.
  *  Returns a count of the number of items added to list [l].
  */
-extern int list_transfer_max(list_t *l, list_t *sub, int max);
-
-/*
- *  Traverses list [l] using [f] to match each item with [key].
- *  Matching items are then transfered to [sub].
- *  Note: list [l] must have the same destroy function as list [sub].
- *  Returns a count of the number of items moved to list [sub] from list [l].
- */
-extern int list_transfer_match(list_t *l, list_t *sub, ListFindF f, void *key);
+int list_transfer_max(List l, List sub, int max);
 
 /*
  *  Inserts data [x] at the beginning of list [l].
+ *  Returns the data's ptr.
  */
-extern void list_prepend(list_t *l, void *x);
+void *list_prepend(List l, void *x);
 
 /*
  *  Traverses list [l] using [f] to match each item with [key].
@@ -205,12 +189,13 @@ extern void list_prepend(list_t *l, void *x);
  *    a list iterator; it should only be used when all list items are known
  *    to be unique (according to the function [f]).
  */
-extern void *list_find_first(list_t *l, ListFindF f, void *key);
+void *list_find_first(List l, ListFindF f, void *key);
 
 /*
  * Same as list_find_first, but use rdlock instead of wrlock
  */
-extern void *list_find_first_ro(list_t *l, ListFindF f, void *key);
+void *list_find_first_ro(List l, ListFindF f, void *key);
+
 
 /*
  *  Traverses list [l] using [f] to match each item with [key].
@@ -221,7 +206,7 @@ extern void *list_find_first_ro(list_t *l, ListFindF f, void *key);
  *    a list iterator; it should only be used when all list items are known
  *    to be unique (according to the function [f]).
  */
-extern void *list_remove_first(list_t *l, ListFindF f, void *key);
+void *list_remove_first(List l, ListFindF f, void *key);
 
 /*
  *  Traverses list [l] using [f] to match each item with [key].
@@ -230,7 +215,7 @@ extern void *list_remove_first(list_t *l, ListFindF f, void *key);
  *    created, it will be called to deallocate each item being removed.
  *  Returns a count of the number of items removed from the list.
  */
-extern int list_delete_all(list_t *l, ListFindF f, void *key);
+int list_delete_all(List l, ListFindF f, void *key);
 
 /*
  *  Traverses list [l] using [f] to match each item with [key].
@@ -242,7 +227,7 @@ extern int list_delete_all(list_t *l, ListFindF f, void *key);
  *  Returns 0 if no item was found, 1 if an item was removed, -1 if processing
  *    was stopped.
  */
-extern int list_delete_first(list_t *l, ListFindF f, void *key);
+int list_delete_first(List l, ListFindF f, void *key);
 
 /*
  *  Traverses list [l] and deletes 'key' from it.
@@ -251,7 +236,7 @@ extern int list_delete_first(list_t *l, ListFindF f, void *key);
  *  removed.
  *  Returns 1 if found and 0 if not.
  */
-extern int list_delete_ptr(list_t *l, void *key);
+int list_delete_ptr(List l, void *key);
 
 /*
  *  For each item in list [l], invokes the function [f] with [arg].
@@ -259,8 +244,8 @@ extern int list_delete_ptr(list_t *l, void *key);
  *  If [f] returns <0 for a given item, the iteration is aborted and the
  *    function returns the negative of that item's position in the list.
  */
-extern int list_for_each(list_t *l, ListForF f, void *arg);
-extern int list_for_each_ro(list_t *l, ListForF f, void *arg);
+int list_for_each(List l, ListForF f, void *arg);
+int list_for_each_ro(List l, ListForF f, void *arg);
 
 /*
  *  For each item in list [l], invokes the function [f] with [arg].
@@ -268,7 +253,7 @@ extern int list_for_each_ro(list_t *l, ListForF f, void *arg);
  *  If [f] returns <0 for a given item, the iteration is NOT aborted but the
  *  return value (count of items processed) will be negated.
  */
-extern int list_for_each_nobreak(list_t *l, ListForF f, void *arg);
+int list_for_each_nobreak(List l, ListForF f, void *arg);
 
 /*
  *  For each item in list [l], invokes the function [f] with [arg].
@@ -280,20 +265,8 @@ extern int list_for_each_nobreak(list_t *l, ListForF f, void *arg);
  *  If [f] returns <0 for a given item, the iteration is aborted and the
  *    function returns the negative of that item's position in the list.
  */
-extern int list_for_each_max(list_t *l, int *max, ListForF f, void *arg,
-			     int break_on_fail, int write_lock);
-
-#ifdef __METASTACK_BUG_SEND_UPDATE_ON_BAD_FD
-/* This function is a modified version of the original "list_for_each_max()",  
- * specifically created to fix bug 112603.
- * For each item in list [l], invokes the function [f] passing [arg] and [retry_count] as arguments.
- * Returns a count of the number of items on which [f] was invoked.
- * If [f] returns <0 for a given item, the iteration is NOT aborted but the
- * return value (count of items processed) will be negated.
- */
-extern int list_for_each_max_nobreak(list_t *l, int max, ListForF_FixBug f, void *arg,
-			     int retry_count, int write_lock);
-#endif
+int list_for_each_max(List l, int *max, ListForF f, void *arg,
+		      int break_on_fail, int write_lock);
 
 /*
  *  Traverses list [l] and removes all items in list
@@ -301,7 +274,7 @@ extern int list_for_each_max_nobreak(list_t *l, int max, ListForF_FixBug f, void
  *  created, it will be called to deallocate each item being removed.
  *  Returns a count of the number of items removed from the list.
  */
-extern int list_flush(list_t *l);
+int list_flush(List l);
 
 /*
  *  Traverses list [l] and removes items.
@@ -310,20 +283,20 @@ extern int list_flush(list_t *l);
  *  created, it will be called to deallocate each item being removed.
  *  Returns a count of the number of items removed from the list.
  */
-extern int list_flush_max(list_t *l, int max);
+int list_flush_max(List l, int max);
 
 /*
  *  Sorts list [l] into ascending order according to the function [f].
  *  Note: Sorting a list resets all iterators associated with the list.
  *  This function uses the libC qsort() algorithm.
  */
-extern void list_sort(list_t *l, ListCmpF f);
+void list_sort(List l, ListCmpF f);
 
 /*
  * Reverses the order of the items in list [l].
  * Note: Reversing a list resets all iterators associated with the list.
  */
-extern void list_flip(list_t *l);
+void list_flip(List l);
 
 /****************************
  *  Stack Access Functions  *
@@ -331,21 +304,22 @@ extern void list_flip(list_t *l);
 
 /*
  *  Pushes data [x] onto the top of stack [l].
+ *  Returns the data's ptr.
  */
-extern void list_push(list_t *l, void *x);
+void *list_push(List l, void *x);
 
 /*
  *  Pops the data item at the top of the stack [l].
  *  Returns the data's ptr, or NULL if the stack is empty.
  */
-extern void *list_pop(list_t *l);
+void *list_pop(List l);
 
 /*
  *  Peeks at the data item at the top of the stack (or head of the queue) [l].
  *  Returns the data's ptr, or NULL if the stack (or queue) is empty.
  *  Note: The item is not removed from the list.
  */
-extern void *list_peek(list_t *l);
+void *list_peek(List l);
 
 /****************************
  *  Queue Access Functions  *
@@ -353,14 +327,15 @@ extern void *list_peek(list_t *l);
 
 /*
  *  Enqueues data [x] at the tail of queue [l].
+ *  Returns the data's ptr.
  */
-extern void list_enqueue(list_t *l, void *x);
+void *list_enqueue(List l, void *x);
 
 /*
  *  Dequeues the data item at the head of the queue [l].
  *  Returns the data's ptr, or NULL if the queue is empty.
  */
-extern void *list_dequeue(list_t *l);
+void *list_dequeue(List l);
 
 
 /*****************************
@@ -371,40 +346,41 @@ extern void *list_dequeue(list_t *l);
  *  Creates and returns a list iterator for non-destructively traversing
  *    list [l].
  */
-extern list_itr_t *list_iterator_create(list_t *l);
+ListIterator list_iterator_create(List l);
 
 /*
  *  Resets the list iterator [i] to start traversal at the beginning
  *    of the list.
  */
-extern void list_iterator_reset(list_itr_t *i);
+void list_iterator_reset(ListIterator i);
 
 /*
  *  Destroys the list iterator [i]; list iterators not explicitly destroyed
  *    in this manner will be destroyed when the list is deallocated via
  *    list_destroy().
  */
-extern void list_iterator_destroy(list_itr_t *i);
+void list_iterator_destroy(ListIterator i);
 
 /*
  *  Returns a ptr to the next item's data,
  *    or NULL once the end of the list is reached.
  *  Example: i=list_iterator_create(i); while ((x=list_next(i))) {...}
  */
-extern void *list_next(list_itr_t *i);
+void *list_next(ListIterator i);
 
 /*
  *  Returns a ptr to the next item's data WITHOUT advancing the pointer,
  *    or NULL once the end of the list is reached.
  */
-extern void *list_peek_next(list_itr_t *i);
+void *list_peek_next(ListIterator i);
 
 /*
  *  Inserts data [x] immediately before the last item returned via list
  *    iterator [i]; once the list iterator reaches the end of the list,
  *    insertion is made at the list's end.
+ *  Returns the data's ptr.
  */
-extern void list_insert(list_itr_t *i, void *x);
+void *list_insert(ListIterator i, void *x);
 
 /*
  *  Traverses the list from the point of the list iterator [i]
@@ -413,14 +389,14 @@ extern void list_insert(list_itr_t *i, void *x);
  *    returns non-zero, or NULL once the end of the list is reached.
  *  Example: i=list_iterator_reset(i); while ((x=list_find(i,f,k))) {...}
  */
-extern void *list_find(list_itr_t *i, ListFindF f, void *key);
+void *list_find(ListIterator i, ListFindF f, void *key);
 
 /*
  *  Removes from the list the last item returned via list iterator [i]
  *    and returns the data's ptr.
  *  Note: The client is responsible for freeing the returned data.
  */
-extern void *list_remove(list_itr_t *i);
+void *list_remove(ListIterator i);
 
 /*
  *  Removes from the list the last item returned via list iterator [i];
@@ -429,6 +405,6 @@ extern void *list_remove(list_itr_t *i);
  *  Returns a count of the number of items removed from the list
  *    (ie, '1' if the item was removed, and '0' otherwise).
  */
-extern int list_delete_item(list_itr_t *i);
+int list_delete_item(ListIterator i);
 
 #endif /* !LSD_LIST_H */

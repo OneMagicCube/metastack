@@ -2,7 +2,8 @@
  *  test12.11.prog.c - Simple test program for Slurm regression test12.11.
  *  Usage: test12.2.prog <megabytes> <sleep_secs>
  *****************************************************************************
- *  Copyright (C) SchedMD LLC.
+ *  Copyright (C) 2021 SchedMD LLC
+ *  Written by Alejandro Sanchez <alex@schedmd.com>
  *
  *  This file is part of Slurm, a resource management program.
  *  For details, see <https://slurm.schedmd.com/>.

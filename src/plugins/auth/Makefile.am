@@ -1,11 +1,7 @@
 # Makefile for auth plugins
 
-SUBDIRS = none
-
-if WITH_MUNGE
-SUBDIRS += munge
-endif
+SUBDIRS = munge none
 
 if WITH_JWT
-SUBDIRS += jwt slurm
+SUBDIRS += jwt
 endif

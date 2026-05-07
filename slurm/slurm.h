@@ -70,6 +70,17 @@ typedef struct sockaddr_storage slurm_addr_t;
 typedef struct slurmdb_cluster_rec slurmdb_cluster_rec_t;
 #endif
 
+#ifndef __slurm_cred_t_defined
+#  define __slurm_cred_t_defined
+typedef struct slurm_job_credential slurm_cred_t;
+#endif
+
+/* Define switch_jobinfo_t below to avoid including extraneous slurm headers */
+#ifndef __switch_jobinfo_t_defined
+#  define  __switch_jobinfo_t_defined
+typedef struct switch_jobinfo switch_jobinfo_t;	/* opaque data type */
+#endif
+
 /* Define job_resources_t below
  * to avoid including extraneous slurm headers */
 #ifndef __job_resources_t_defined
@@ -104,46 +115,21 @@ typedef struct sbcast_cred sbcast_cred_t;		/* opaque data type */
 #endif
 
 /*****************************************************************************\
- *	DEFINITIONS FOR METASTACK VALUES
+ *	DEFINITIONS FOR POSIX VALUES
 \*****************************************************************************/
+#ifndef HOST_NAME_MAX
+#define HOST_NAME_MAX 64
+#endif
+
 #ifndef __META_PROTOCOL
 #define __META_PROTOCOL
 #endif
 
-#ifndef __METASTACK_NEW_SUSPEND_KEEP_IDLE
-#define __METASTACK_NEW_SUSPEND_KEEP_IDLE
-#define KEEP_IDLE_INTERVAL    300
-#endif
-/* opt: add part's visible based on account, not only group
+/* opt: add part's visible based on account, not only group 
  * also mcs_account perf.
  */
 #ifndef __METASTACK_OPT_PART_VISIBLE
 #define __METASTACK_OPT_PART_VISIBLE
-#endif
-
-#ifndef __METASTACK_OPT_CACHE_QUERY
-#define __METASTACK_OPT_CACHE_QUERY
-#endif
-
-#ifndef __METASTACK_OPT_SSTAT_CPUUTIL
-#define __METASTACK_OPT_SSTAT_CPUUTIL
-#endif
-
-#ifndef __METASTACK_QOS_HASH
-#define __METASTACK_QOS_HASH
-#endif
-
-/* slurmd -C can obtain the corresponding computing node topology based on configuration */
-#ifndef __METASTACK_OPT_NODE_SOCKET_TOPOLOGY
-#define __METASTACK_OPT_NODE_SOCKET_TOPOLOGY
-#endif
-
-#ifndef __METASTACK_BUG_CONN_FIX
-#define __METASTACK_BUG_CONN_FIX
-#endif
-
-#ifndef __METASTACK_OPT_RPC_USER_FIX
-#define __METASTACK_OPT_RPC_USER_FIX
 #endif
 
 /* scontrol show job with user_list, do not pack all jobs in slurmctld. */
@@ -151,59 +137,42 @@ typedef struct sbcast_cred sbcast_cred_t;		/* opaque data type */
 #define __METASTACK_OPT_SCONTROL_JOBUSER
 #endif
 
-#ifndef __METASTACK_BUG_SRUN_RECVMSG_VERIF
-#define __METASTACK_BUG_SRUN_RECVMSG_VERIF
-#endif
-
-#ifndef __METASTACK_NEW_RPC_RATE_LIMIT
-#define __METASTACK_NEW_RPC_RATE_LIMIT
+#ifndef __METASTACK_BUG_DEBUG_GRPNODELIMIT
+#define __METASTACK_BUG_DEBUG_GRPNODELIMIT
 #endif
 
 #ifndef __METASTACK_BUG_PREEMPT_JOBCG
 #define __METASTACK_BUG_PREEMPT_JOBCG
 #endif
 
-/* Macro definitions that control the size of Jobsize */
-#ifndef __METASTACK_OPT_PRIORITY_JOBSIZE
-#define __METASTACK_OPT_PRIORITY_JOBSIZE
-#endif
-
-#ifndef __METASTACK_NEW_GRES_DCU
-#define __METASTACK_NEW_GRES_DCU
-#endif
-
-#ifndef __METASTACK_NEW_GRES_NPU
-#define __METASTACK_NEW_GRES_NPU
-#endif
-
-#ifndef __METASTACK_NEW_GRES_MLU
-#define __METASTACK_NEW_GRES_MLU
+#ifndef __METASTACK_BUG_BACKFILL_ENDLESS_LOOP
+#define __METASTACK_BUG_BACKFILL_ENDLESS_LOOP
 #endif
 
 #ifndef __METASTACK_ASSOC_HASH
 #define __METASTACK_ASSOC_HASH
 #endif
 
-#ifndef __METASTACK_OPT_SRUN_STEP_CREATE
-#define __METASTACK_OPT_SRUN_STEP_CREATE
+#ifndef __METASTACK_OPT_PRINT_COMMAND
+#define __METASTACK_OPT_PRINT_COMMAND
 #endif
 
-#ifndef __METASTACK_NEW_MAIN_SCHED_PLANNED
-#define __METASTACK_NEW_MAIN_SCHED_PLANNED
+#ifndef __METASTACK_NEW_SUSPEND_KEEP_IDLE
+#define __METASTACK_NEW_SUSPEND_KEEP_IDLE
+#define KEEP_IDLE_INTERVAL    300
 #endif
 
-#ifndef __METASTACK_OPT_JOBCOMP_PENDING
-#define __METASTACK_OPT_JOBCOMP_PENDING
-#endif
-/* Controls the timeout for the HealthCheckProgram */ 
-#ifndef __METASTACK_OPT_HEALTHCHECK_PROG_TIMEOUT
-#define __METASTACK_OPT_HEALTHCHECK_PROG_TIMEOUT
+#ifndef __METASTACK_OPT_SSTAT_CPUUTIL
+#define __METASTACK_OPT_SSTAT_CPUUTIL
 #endif
 
-#ifndef __METASTACK_OPT_ENV_UCX_IB_ADDR_TYPE
-#define __METASTACK_OPT_ENV_UCX_IB_ADDR_TYPE
+#ifndef __METASTACK_BUG_NODESTATE_EXCLUDE
+#define __METASTACK_BUG_NODESTATE_EXCLUDE
 #endif
 
+#ifndef __METASTACK_OPT_RPC_USER_FIX
+#define __METASTACK_OPT_RPC_USER_FIX
+#endif
 #ifndef __METASTACK_OPT_PROLOG_SLURMCTLD
 #define __METASTACK_OPT_PROLOG_SLURMCTLD
 #endif
@@ -212,28 +181,52 @@ typedef struct sbcast_cred sbcast_cred_t;		/* opaque data type */
 #define __METASTACK_BUG_IDLE_SINFO
 #endif
 
-#ifndef __METASTACK_BUG_CR_CORE
-#define __METASTACK_BUG_CR_CORE
-#endif
-
-#ifndef __METASTACK_OPT_PMIX_AGENT
-#define __METASTACK_OPT_PMIX_AGENT
-#endif
-
-#ifndef __METASTACK_BUG_GRES_BIND
-#define __METASTACK_BUG_GRES_BIND
-#endif
-
-#ifndef __METASTACK_BUG_BACKFILL_ENDLESS_LOOP
-#define __METASTACK_BUG_BACKFILL_ENDLESS_LOOP
-#endif
-
 #ifndef __METASTACK_NEW_PART_LLS
 #define __METASTACK_NEW_PART_LLS
 #endif
 
-#ifndef __METASTACK_OPT_REGISTRATION_FIX
-#define __METASTACK_OPT_REGISTRATION_FIX
+#ifndef __METASTACK_OPT_ACCOUNTING_ENHANCE
+#define __METASTACK_OPT_ACCOUNTING_ENHANCE
+#endif
+
+#ifndef __METASTACK_OPT_SACCT_OUTPUT
+#define __METASTACK_OPT_SACCT_OUTPUT
+#endif
+
+#ifndef __METASTACK_NEW_LICENSE_OCCUPIED
+#define __METASTACK_NEW_LICENSE_OCCUPIED
+#endif
+
+#ifndef __METASTACK_OPT_SACCT_COMMAND
+#define __METASTACK_OPT_SACCT_COMMAND
+#endif/* Define slurm_addr_t below to avoid including extraneous slurm headers */
+
+#if (defined __METASTACK_OPT_SACCT_COMMAND) || (defined __METASTACK_OPT_ACCOUNTING_ENHANCE)
+#define __METASTACK_OPT_HIST_COMMAND
+#endif
+
+#if (defined __METASTACK_OPT_SACCT_OUTPUT) || (defined __METASTACK_OPT_ACCOUNTING_ENHANCE)
+#define __METASTACK_OPT_HIST_OUTPUT
+#endif
+
+#ifndef __METASTACK_OPT_RESC_NODEDETAIL
+#define __METASTACK_OPT_RESC_NODEDETAIL
+#endif
+
+#ifdef __METASTACK_OPT_ACCOUNTING_ENHANCE
+#define __METASTACK_OPT_RESC_NODEDETAIL
+#endif
+
+#ifndef __METASTACK_OPT_JOBCOMP_PENDING
+#define __METASTACK_OPT_JOBCOMP_PENDING
+#endif
+
+#ifndef __METASTACK_OPT_HEALTHCHECK_PROG_TIMEOUT
+#define __METASTACK_OPT_HEALTHCHECK_PROG_TIMEOUT
+#endif
+
+#ifndef __METASTACK_OPT_ENV_UCX_IB_ADDR_TYPE
+#define __METASTACK_OPT_ENV_UCX_IB_ADDR_TYPE
 #endif
 
 #ifndef __METASTACK_OPT_REDUCE_REPEAT_SCHED
@@ -248,27 +241,13 @@ typedef struct sbcast_cred sbcast_cred_t;		/* opaque data type */
 #define __METASTACK_OPT_PUBLIC_CODE_REUSE
 #endif
 
-#ifndef __METASTACK_BUG_HETJOB_SUPPORT
-#define __METASTACK_BUG_HETJOB_SUPPORT
+#ifndef __METASTACK_BUG_LOG_OUTPUT
+#define __METASTACK_BUG_LOG_OUTPUT
 #endif
 
-#ifndef __METASTACK_OPT_MAIN_SCHED_LICENSE
-#define __METASTACK_OPT_MAIN_SCHED_LICENSE
+#ifndef __METASTACK_BUG_BACKCTLD_THREADID_FIX
+#define __METASTACK_BUG_BACKCTLD_THREADID_FIX
 #endif
-
-#ifndef __METASTACK_OPT_GRES_CONFIG
-#define __METASTACK_OPT_GRES_CONFIG
-#endif
-
-#ifndef __METASTACK_OPT_LIST_USER
-#define __METASTACK_OPT_LIST_USER
-#endif
-
-/* Macro Definition for Controlling Parallel Scheduling */
-#ifndef __METASTACK_NEW_PART_PARA_SCHED
-#define __METASTACK_NEW_PART_PARA_SCHED
-#endif
-
 
 /* Macro definitions that control heterogeneous partitioning capabilities */
 #ifndef __METASTACK_NEW_HETPART_SUPPORT
@@ -280,56 +259,51 @@ typedef struct sbcast_cred sbcast_cred_t;		/* opaque data type */
 #define __METASTACK_NEW_PART_RBN
 #endif
 
-#ifndef __METASTACK_BUG_DEBUG_GRPNODELIMIT
-#define __METASTACK_BUG_DEBUG_GRPNODELIMIT
-#endif
-
 /* Macro definition that job running time prediction function */
 #ifndef __METASTACK_NEW_TIME_PREDICT
 #define __METASTACK_NEW_TIME_PREDICT
 #endif
 
-/**
- * slurmstepd does not need to read the acct_gather.conf configuration file; 
- * If slurmstepd reads the local acct_gather.conf file, it will cause all the 
- * submitted jobs to fail during the activation of the acct_gather plugin.
- * instead, it only receives from slurmd.
- */
-#ifndef __METASTACK_BUG_SLURMSTEPD_READ_ACCT_GATHER_CONF
-#define __METASTACK_BUG_SLURMSTEPD_READ_ACCT_GATHER_CONF
+#ifndef __METASTACK_OPT_CACHE_QUERY
+#define __METASTACK_OPT_CACHE_QUERY
 #endif
 
-/*
-	Originally, in the design, the time between the suspension and cancellation was not included in the 
-	total suspension time of the job. This macro fixes this bug.
-*/
-#ifndef __METASTACK_BUG_FIX_SUSPEND_TIME
-#define __METASTACK_BUG_FIX_SUSPEND_TIME
+#ifndef __METASTACK_BUG_CR_CORE
+#define __METASTACK_BUG_CR_CORE
 #endif
 
-#ifndef __METASTACK_PART_PRIORITY_WEIGHT
-#define __METASTACK_PART_PRIORITY_WEIGHT
+#ifndef __METASTACK_OPT_PMIX_AGENT
+#define __METASTACK_OPT_PMIX_AGENT
 #endif
 
-#ifndef __METASTACK_NEW_TIME_SYNC_CHECK
-#define __METASTACK_NEW_TIME_SYNC_CHECK
+/* slurmd -C can obtain the corresponding computing node topology based on configuration */
+#ifndef __METASTACK_OPT_NODE_SOCKET_TOPOLOGY
+#define __METASTACK_OPT_NODE_SOCKET_TOPOLOGY
 #endif
 
-#ifndef __METASTACK_OPT_ENV_WRITE
-#define __METASTACK_OPT_ENV_WRITE
+#ifndef __METASTACK_BUG_HETJOB_SUPPORT
+#define __METASTACK_BUG_HETJOB_SUPPORT
 #endif
 
-#ifndef __METASTACK_OPT_PRINT_COMMAND
-#define __METASTACK_OPT_PRINT_COMMAND
+#ifndef __METASTACK_OPT_MAIN_SCHED_LICENSE
+#define __METASTACK_OPT_MAIN_SCHED_LICENSE
 #endif
 
-/* Please Note to comment out same Macro in slurm_errno.h if you want to disable this feature*/
-#ifndef __METASTACK_NEW_AUTO_SUPPLEMENT_AVAIL_NODES
-#define __METASTACK_NEW_AUTO_SUPPLEMENT_AVAIL_NODES
+#ifndef __METASTACK_NEW_GRES_DCU
+#define __METASTACK_NEW_GRES_DCU
 #endif
 
-#ifndef __METASTACK_MAX_JOB_ID
-#define __METASTACK_MAX_JOB_ID
+#ifndef __METASTACK_NEW_GRES_NPU
+#define __METASTACK_NEW_GRES_NPU
+#endif
+
+#ifndef __METASTACK_NEW_GRES_MLU
+#define __METASTACK_NEW_GRES_MLU
+#endif
+
+/* Macro Definition for Controlling Parallel Scheduling */
+#ifndef __METASTACK_NEW_PART_PARA_SCHED
+#define __METASTACK_NEW_PART_PARA_SCHED
 #endif
 
 /* Macro definition for optimizing serial job scheduling*/
@@ -337,317 +311,129 @@ typedef struct sbcast_cred sbcast_cred_t;		/* opaque data type */
 #define __METASTACK_OPT_HIGH_THROUGHPUT
 #endif
 
-#ifndef __METASTACK_OPT_ACCOUNTING_ENHANCE
-#define __METASTACK_OPT_ACCOUNTING_ENHANCE
+/* Please Note to comment out same Macro in slurm_errno.h if you want to disable this feature*/
+#ifndef __METASTACK_NEW_RPC_RATE_LIMIT
+#define __METASTACK_NEW_RPC_RATE_LIMIT
 #endif
 
-#ifndef __METASTACK_OPT_SACCT_OUTPUT
-#define __METASTACK_OPT_SACCT_OUTPUT
+#ifndef __METASTACK_OPT_ENV_WRITE
+#define __METASTACK_OPT_ENV_WRITE
 #endif
 
-#if (defined __METASTACK_OPT_SACCT_OUTPUT) || (defined __METASTACK_OPT_ACCOUNTING_ENHANCE)
-#define __METASTACK_OPT_HIST_OUTPUT
+/* Please Note to comment out same Macro in slurm_errno.h if you want to disable this feature*/
+#ifndef __METASTACK_NEW_AUTO_SUPPLEMENT_AVAIL_NODES
+#define __METASTACK_NEW_AUTO_SUPPLEMENT_AVAIL_NODES
 #endif
 
-#ifndef __METASTACK_OPT_SACCT_COMMAND
-#define __METASTACK_OPT_SACCT_COMMAND
-#endif/* Define slurm_addr_t below to avoid including extraneous slurm headers */
-
-#if (defined __METASTACK_OPT_SACCT_COMMAND) || (defined __METASTACK_OPT_ACCOUNTING_ENHANCE)
-#define __METASTACK_OPT_HIST_COMMAND
+#ifndef __METASTACK_OPT_SACCTMGR_ADD_USER
+#define __METASTACK_OPT_SACCTMGR_ADD_USER
 #endif
 
-#ifndef __METASTACK_OPT_RESC_NODEDETAIL
-#define __METASTACK_OPT_RESC_NODEDETAIL
+#ifndef __METASTACK_BUG_CONN_FIX
+#define __METASTACK_BUG_CONN_FIX
 #endif
 
-#ifdef __METASTACK_OPT_ACCOUNTING_ENHANCE
-#define __METASTACK_OPT_RESC_NODEDETAIL
+#ifndef __METASTACK_OPT_LIST_USER
+#define __METASTACK_OPT_LIST_USER
+#endif
+
+#ifndef __METASTACK_BUG_MSGSIZE_FIX
+#define __METASTACK_BUG_MSGSIZE_FIX
+#endif
+
+#ifndef __METASTACK_QOS_HASH
+#define __METASTACK_QOS_HASH
+#endif
+
+#ifndef __METASTACK_OPT_REGISTRATION_FIX
+#define __METASTACK_OPT_REGISTRATION_FIX
+#endif
+
+#if (!defined __METASTACK_LOAD_ABNORMAL) && (defined __METASTACK_OPT_SSTAT_CPUUTIL)
+#define __METASTACK_LOAD_ABNORMAL
+#endif
+
+#ifndef __METASTACK_OPT_INFLUXDB_PERFORMANCE
+#define __METASTACK_OPT_INFLUXDB_PERFORMANCE
+#endif
+
+#ifndef __METASTACK_BUG_FIX_SUSPEND_TIME
+#define __METASTACK_BUG_FIX_SUSPEND_TIME
+#endif
+
+#ifndef __METASTACK_NEW_APPTYPE_RECOGNITION
+#define __METASTACK_NEW_APPTYPE_RECOGNITION
+#endif
+
+#ifndef __METASTACK_OPT_INFLUXDB_ENFORCE
+#define __METASTACK_OPT_INFLUXDB_ENFORCE
+#endif
+
+#ifndef __METASTACK_MAX_JOB_ID
+#define __METASTACK_MAX_JOB_ID
+#endif
+
+#ifndef __METASTACK_BUG_GRES_BIND
+#define __METASTACK_BUG_GRES_BIND
 #endif
 
 #ifndef __METASTACK_NEW_STATE_TO_NHC
 #define __METASTACK_NEW_STATE_TO_NHC
 #endif
 
+#ifndef __METASTACK_OPT_SRUN_STEP_CREATE
+#define __METASTACK_OPT_SRUN_STEP_CREATE
+#endif
+
 #ifndef __METASTACK_OPT_MSG_OUTPUT
 #define __METASTACK_OPT_MSG_OUTPUT
 #endif
 
+#ifndef __METASTACK_NEW_MAIN_SCHED_PLANNED
+#define __METASTACK_NEW_MAIN_SCHED_PLANNED
+#endif
 
-#ifndef __METASTACK_OPT_SACCTMGR_ADD_USER
-#define __METASTACK_OPT_SACCTMGR_ADD_USER
+#ifndef __METASTACK_OPT_GRES_CONFIG
+#define __METASTACK_OPT_GRES_CONFIG
 #endif
 
 
-#if (!defined __METASTACK_NEW_LOAD_ABNORMAL) && (defined __METASTACK_OPT_SSTAT_CPUUTIL)
-#define __METASTACK_NEW_LOAD_ABNORMAL
+/* Macro definitions that control the size of Jobsize */
+#ifndef __METASTACK_PRIORITY_JOBSIZE
+#define __METASTACK_PRIORITY_JOBSIZE
 #endif
 
-#ifndef __METASTACK_OPT_INFLUXDB_PERFORMANCE
-#define __METASTACK_OPT_INFLUXDB_PERFORMANCE
+#ifndef __METASTACK_BUG_CGROUP_MUTEX_DESTROY
+#define __METASTACK_BUG_CGROUP_MUTEX_DESTROY
 #endif
 
-#ifndef __METASTACK_OPT_INFLUXDB_ENFORCE
-#define __METASTACK_OPT_INFLUXDB_ENFORCE
+#ifndef __METASTACK_TIME_SYNC_CHECK
+#define __METASTACK_TIME_SYNC_CHECK
 #endif
 
-
-#if (!defined __METASTACK_NEW_LOAD_ABNORMAL) && (defined __METASTACK_OPT_SSTAT_CPUUTIL)
-#define __METASTACK_NEW_LOAD_ABNORMAL
+#ifndef __METASTACK_PART_PRIORITY_WEIGHT
+#define __METASTACK_PART_PRIORITY_WEIGHT
 #endif
 
-#ifndef __METASTACK_OPT_INFLUXDB_PERFORMANCE
-#define __METASTACK_OPT_INFLUXDB_PERFORMANCE
+#ifndef __METASTACK_BUG_SRUN_RECVMSG_VERIF
+#define __METASTACK_BUG_SRUN_RECVMSG_VERIF
 #endif
 
-#ifndef __METASTACK_OPT_INFLUXDB_ENFORCE
-#define __METASTACK_OPT_INFLUXDB_ENFORCE
+#ifndef __METASTACK_BUG_SHOW_PRIO_FLAGS
+#define __METASTACK_BUG_SHOW_PRIO_FLAGS
 #endif
 
-#ifndef __METASTACK_OPT_FAIL_BY_PART
-#define __METASTACK_OPT_FAIL_BY_PART
+#ifndef __METASTACK_FIX_BUG_READ_CONF
+#define __METASTACK_FIX_BUG_READ_CONF
 #endif
 
-#ifndef __METASTACK_OPT_READ_ONLY_ADMIN
-#define __METASTACK_OPT_READ_ONLY_ADMIN
-#endif
-
-/* 
-	The process information of the job step is collected at the beginning of the job running to judge the application type
-*/
-#ifndef __METASTACK_NEW_APPTYPE_RECOGNITION
-#define __METASTACK_NEW_APPTYPE_RECOGNITION
-#endif
-
-#ifndef __METASTACK_NEW_CUSTOM_EXCEPTION
-#define __METASTACK_NEW_CUSTOM_EXCEPTION
-#endif
-
-#ifndef __METASTACK_BUG_SPLIT_BRAIN
-#define __METASTACK_BUG_SPLIT_BRAIN
-#endif
-
-#ifndef __METASTACK_BUG_JWT_FILE_PERMISSION
-#define __METASTACK_BUG_JWT_FILE_PERMISSION
-#endif
-
-#ifndef __METASTACK_BUG_SRUN_STEPNODE_ERR
-#define __METASTACK_BUG_SRUN_STEPNODE_ERR
-#endif
-
-#ifndef __METASTACK_BUG_CTLD_RESTART_POLL_HANG_FIX
-#define __METASTACK_BUG_CTLD_RESTART_POLL_HANG_FIX
-#endif
-
-#ifndef __METASTACK_BUG_SCONTROL_RECONFIG_DEADLOCK
-#define __METASTACK_BUG_SCONTROL_RECONFIG_DEADLOCK
-#endif
-
-#ifndef __METASTACK_BUG_USERADD_RECONFIG_CTLD_CRASH
-#define __METASTACK_BUG_USERADD_RECONFIG_CTLD_CRASH
-#endif
-
-#ifndef __METASTACK_BUG_SCONTROL_UPDATE_JOBGRES
-#define __METASTACK_BUG_SCONTROL_UPDATE_JOBGRES
-#endif
-
-#ifndef __METASTACK_BUG_PROCESS_DISTRIBUTION
-#define __METASTACK_BUG_PROCESS_DISTRIBUTION
-#endif
-
-#ifndef __METASTACK_BUG_ADDUSER_TCP_BUFFER_CORRUPTION
-#define __METASTACK_BUG_ADDUSER_TCP_BUFFER_CORRUPTION
-#endif
-
-/*
-	Fix the bug where some environment variables were not updated after 
-	modifying the job resources.
-*/
-#ifndef __METASTACK_BUG_UPDATE_JOB_ENV
-#define __METASTACK_BUG_UPDATE_JOB_ENV
-#endif
-
-#ifndef __METASTACK_BUG_FORKSTEPD_FD_LEAK
-#define __METASTACK_BUG_FORKSTEPD_FD_LEAK
-#endif
-
-#ifndef __METASTACK_BUG_OVERLAP_NODE_DIST
-#define __METASTACK_BUG_OVERLAP_NODE_DIST
-#endif
-
-/*
- * Fixed an issue where sending update_list from slurmdbd to slurmctld fails 
- * when the connection file descriptor is -1, causing user addition failures in slurmctld memory.
-*/
-#ifndef __METASTACK_BUG_SEND_UPDATE_ON_BAD_FD
-#define __METASTACK_BUG_SEND_UPDATE_ON_BAD_FD
-#endif
-
-/*****************************************************************************\
- *	DEFINITIONS FOR HIGH THROUGHPUT OPTIMIZATION
-\*****************************************************************************/
-
-#ifndef __METASTACK_OPT_HIGH_THROUGHPUT_MEM_POOL
-#define __METASTACK_OPT_HIGH_THROUGHPUT_MEM_POOL
-#endif
-
-#ifndef __METASTACK_OPT_HIGH_THROUGHPUT_NO_THROTTLE
-#define __METASTACK_OPT_HIGH_THROUGHPUT_NO_THROTTLE
-#endif
-
-#ifndef __METASTACK_BUG_STEPD_CLOSE_FD
-#define __METASTACK_BUG_STEPD_CLOSE_FD
-#endif
-
-#ifndef __METASTACK_BUG_DEL_YAML_EVENT
-#define __METASTACK_BUG_DEL_YAML_EVENT
-#endif
-
-#ifndef __METASTACK_OPT_HIGH_THROUGHPUT_SRUN_JOB_COM
-#define __METASTACK_OPT_HIGH_THROUGHPUT_SRUN_JOB_COM
-#endif
-
-#ifndef __METASTACK_OPT_HIGH_THROUGHPUT_BITMAP2NODENAME
-#define __METASTACK_OPT_HIGH_THROUGHPUT_BITMAP2NODENAME
-#endif
-
-#ifndef __METASTACK_OPT_HIGH_THROUGHPUT_AGENT_THREAD_POOL
-#define __METASTACK_OPT_HIGH_THROUGHPUT_AGENT_THREAD_POOL
-#endif
-
-/* Thread pool for RPC queue*/
-#ifndef __METASTACK_OPT_HIGH_THROUGHPUT_RPC_QUEUE_THREAD_POOL
-#define __METASTACK_OPT_HIGH_THROUGHPUT_RPC_QUEUE_THREAD_POOL
-#endif
-
-#ifndef __METASTACK_OPT_HIGH_THROUGHPUT_SUBMIT_PARALLEL
-#define __METASTACK_OPT_HIGH_THROUGHPUT_SUBMIT_PARALLEL
-#endif
-
-#ifndef __METASTACK_OPT_HIGH_THROUGHPUT_EPILOG_PARALLEL
-#define __METASTACK_OPT_HIGH_THROUGHPUT_EPILOG_PARALLEL
-#endif
-
-#if (defined __METASTACK_OPT_HIGH_THROUGHPUT_EPILOG_PARALLEL) || (defined __METASTACK_OPT_HIGH_THROUGHPUT_SUBMIT_PARALLEL)
-#define __METASTACK_OPT_HIGH_THROUGHPUT_RPC_QUEUE_THREAD_POOL
-#endif
-
-#ifndef __METASTACK_OPT_HIGH_THROUGHPUT_TERMNAL_JOB_MESSAGE
-#define __METASTACK_OPT_HIGH_THROUGHPUT_TERMNAL_JOB_MESSAGE
-#endif
-
-#ifndef __METASTACK_BUG_SLURMDSPOOLDIR_SYMBOLIC_LINK
-#define __METASTACK_BUG_SLURMDSPOOLDIR_SYMBOLIC_LINK
-#endif
-
-#ifndef __METASTACK_BUG_ABNORMAL_LICENSE_COUNT
-#define __METASTACK_BUG_ABNORMAL_LICENSE_COUNT
-#endif
-
-#ifndef __METASTACK_BUG_NULL_ASSOC_LIST
-#define __METASTACK_BUG_NULL_ASSOC_LIST
-#endif
-
-#ifndef __METASTACK_BUG_NULL_GS_PART_LIST
-#define __METASTACK_BUG_NULL_GS_PART_LIST
-#endif
-
-// Fixed in Slurm 25.11.0-rc1.
-#ifndef __METASTACK_BUG_SEGFAULT_PREP_RUNINJOB
-#define __METASTACK_BUG_SEGFAULT_PREP_RUNINJOB
-#endif
-
-#ifndef __METASTACK_BUG_EXTERN_THREAD_FINISH
-#define __METASTACK_BUG_EXTERN_THREAD_FINISH
-#endif
-
-#ifndef __METASTACK_BUG_CANNOT_CANCEL_STEP
-#define __METASTACK_BUG_CANNOT_CANCEL_STEP
-#endif
-
-#ifndef __METASTACK_BUG_ENV_PMIX_UCX
-#define __METASTACK_BUG_ENV_PMIX_UCX
-#endif
-
-// Fixed bug 118019. In a scenario where the cluster has a large number of disconnected nodes, the REQUEST_RECONFIGURE agent operation takes an extremely long time.
-#ifndef __METASTACK_BUG_RECONFIG_AGENT_TIME_CONSUME
-#define __METASTACK_BUG_RECONFIG_AGENT_TIME_CONSUME
-#endif
-
-// Fixed task 49275. Optimize Gres logs in slurmctld.
-#ifndef __METASTACK_BUG_OPTIMIZE_GRES_LOG
-#define __METASTACK_BUG_OPTIMIZE_GRES_LOG
-#endif
-
-// Fixed Bug 115829. Enhanced message retry mechanism for messages sent to stepmgr.
-#ifndef __METASTACK_BUG_STEPMGR_CONN_RETRY
-#define __METASTACK_BUG_STEPMGR_CONN_RETRY
-#endif
-
-// Fixed Bug 115829. Enhanced message retry mechanism for messages sent to slurmctld.
-#ifndef __METASTACK_BUG_CTLD_CONN_RETRY
-#define __METASTACK_BUG_CTLD_CONN_RETRY
-#endif
-
-// Fixed Bug 118291. Stepmgr enabled, job steps fail to be delivered continuously and cannot be cancelled.
-#ifndef __METASTACK_BUG_STEPMGR_STEP_STUCK
-#define __METASTACK_BUG_STEPMGR_STEP_STUCK
-#endif
-
-// Fixed Bug 117009. Stepmgr enabled, job assigned to faulty node
-#ifndef __METASTACK_BUG_STEPMGR_ASSIGN_FAULT_NODE
-#define __METASTACK_BUG_STEPMGR_ASSIGN_FAULT_NODE
-#endif
-
-// Fixed Bug 118289. node fault causes job step delay (irrelevant to stepmgr)
-#ifndef __METASTACK_BUG_NODE_FAULT_STEP_DELAY
-#define __METASTACK_BUG_NODE_FAULT_STEP_DELAY
-#endif
-
-// Fixed Bug 118427. Batch host fault with --no-kill causes job to hang
-#ifndef __METASTACK_BUG_BATCH_HOST_FAULT_HANG
-#define __METASTACK_BUG_BATCH_HOST_FAULT_HANG
-#endif
-
-// Fixed Bug 118198. Slurmdbd crash caused by NULL dereference of db_conn when the MySQL service stops.
-#ifndef __METASTACK_BUG_DB_CONN_NULL_DEREF
-#define __METASTACK_BUG_DB_CONN_NULL_DEREF
-#endif
-
-// Fixed Bug 118449. Specifying both the --spread-job and GRES-related options in the job submission option causes the slurmctld to crash.
-#ifndef __METASTACK_BUG_SPREAD_JOB_CRASH_CTLD
-#define __METASTACK_BUG_SPREAD_JOB_CRASH_CTLD
-#endif
-
-#ifndef __METASTACK_OPT_MSG_OUTPUT_MULTI_LANG
-#define __METASTACK_OPT_MSG_OUTPUT_MULTI_LANG
-#endif
-
-#ifndef __METASTACK_OPT_APP  
-#define __METASTACK_OPT_APP
-#endif
-
-#ifndef __METASTACK_OPT_USER_DEACTIVATE
-#define __METASTACK_OPT_USER_DEACTIVATE
-#endif
-
-/*****************************************************************************\
- *	DEFINITIONS FOR POSIX VALUES
-\*****************************************************************************/
-#ifndef HOST_NAME_MAX
-#define HOST_NAME_MAX 64
-#endif
-
-#ifndef __METASTACK_NEW_GRES_GATHER_DCU
-#define __METASTACK_NEW_GRES_GATHER_DCU
-#endif
-
-#ifndef __METASTACK_NEW_PROFILE_TIME_SYNC
-#define __METASTACK_NEW_PROFILE_TIME_SYNC
-#endif
 /*****************************************************************************\
  *	DEFINITIONS FOR INPUT VALUES
 \*****************************************************************************/
+
+#ifndef __METASTACK_NEW_CUSTOM_EXCEPTION
+#define __METASTACK_NEW_CUSTOM_EXCEPTION  
+#endif
 
 /* INFINITE is used to identify unlimited configurations,  */
 /* eg. the maximum count of nodes any job may use in some partition */
@@ -663,14 +449,9 @@ typedef struct sbcast_cred sbcast_cred_t;		/* opaque data type */
 #define MAX_TASKS_PER_NODE 512
 #ifdef __METASTACK_MAX_JOB_ID
 #define MAX_JOB_ID (0x1FFFFFFF) /* bits 0-28 */
-#else
-#define MAX_JOB_ID (0x03FFFFFF) /* bits 0-25 */
-#endif
-#define MAX_FED_JOB_ID (0xfffffffd) /* NO_VAL - 1 */
-#define MAX_HET_JOB_COMPONENTS 128
-#ifdef __METASTACK_MAX_JOB_ID
 #define MAX_FED_CLUSTERS 7
 #else
+#define MAX_JOB_ID (0x03FFFFFF) /* bits 0-25 */
 #define MAX_FED_CLUSTERS 63
 #endif
 
@@ -843,10 +624,6 @@ enum job_states {
 #define JOB_PROLOG_MAXREQUEUE_HOLD  SLURM_BIT(27) /* Requeue jobs in hold when failed to run prologue for much times */
 #endif
 
-#ifdef __METASTACK_OPT_HIGH_THROUGHPUT_TERMNAL_JOB_MESSAGE
-#define STEP_SEND_TEMN_JOB     SLURM_BIT(28) /* The step sends a temn job message */
-#endif
-
 #define READY_JOB_FATAL	   -2	/* fatal error */
 #define READY_JOB_ERROR    -1	/* ordinary error */
 
@@ -870,13 +647,6 @@ enum job_states {
 					   * buffer stage out */
 #define MAIL_ARRAY_TASKS    SLURM_BIT(9)  /* Send emails for each array task */
 #define MAIL_INVALID_DEPEND SLURM_BIT(10) /* Notify on job invalid dependency */
-
-/* Do not fatal on unrecognized input */
-#define PARSE_FLAGS_IGNORE_NEW		SLURM_BIT(0)
-/* Check 0600 permissions for slurmdbd.conf included files */
-#define PARSE_FLAGS_CHECK_PERMISSIONS	SLURM_BIT(1)
-/* Only parse Include directives and ignore rest of parsing */
-#define PARSE_FLAGS_INCLUDE_ONLY	SLURM_BIT(2)
 
 /*
  * job_array_struct_t array_flags definitions. ARRAY_TASK_REQUEUED could be
@@ -925,8 +695,10 @@ enum job_state_reason {
 	WAIT_QOS_JOB_LIMIT,	/* QOS job limit reached */
 	WAIT_QOS_RESOURCE_LIMIT,/* QOS resource limit reached */
 	WAIT_QOS_TIME_LIMIT,	/* QOS time limit reached */
-	FAIL_SIGNAL,		/* raised a signal that caused it to exit */
-	DEFUNCT_WAIT_34, /* free for reuse */
+	WAIT_BLOCK_MAX_ERR,     /* BLUEGENE Block has too many cnodes
+				 * in error state to allow more jobs. */
+	WAIT_BLOCK_D_ACTION,    /* BLUEGENE Block is being freed,
+				 * can't allow more jobs. */
 	WAIT_CLEANING,          /* If a job is requeued and it is
 				 * still cleaning up from the last run. */
 	WAIT_PROLOG,		/* Prolog is running */
@@ -974,8 +746,9 @@ enum job_state_reason {
 	WAIT_BURST_BUFFER_RESOURCE,  /* Burst buffer resources */
 	WAIT_BURST_BUFFER_STAGING,   /* Burst buffer file stage-in */
 	FAIL_BURST_BUFFER_OP,	     /* Burst buffer operation failure */
-	DEFUNCT_WAIT_76, /* free for reuse */
-	DEFUNCT_WAIT_77, /* free for reuse */
+	WAIT_POWER_NOT_AVAIL,        /* not enough power available */
+	WAIT_POWER_RESERVED,         /* job is waiting for available power
+				      * because of power reservations */
 	WAIT_ASSOC_GRP_UNK,          /* ASSOC GrpTRES exceeded
 				      * (Unknown) */
 	WAIT_ASSOC_GRP_UNK_MIN,      /* ASSOC GrpTRESMins exceeded
@@ -1149,49 +922,7 @@ enum job_state_reason {
 	WAIT_QOS_MAX_BILLING_PER_ACCT,      /* MaxTRESPerAcct    */
 	WAIT_QOS_MIN_BILLING,               /* MinTRESPerJob     */
 
-	WAIT_RESV_DELETED,	      /* Reservation was deleted */
-	WAIT_RESV_INVALID,
-	FAIL_CONSTRAINTS, /* Constraints cannot currently be satisfied */
-
-	WAIT_QOS_MAX_BB_RUN_MINS_PER_ACCT,/* QOS MaxTRESRunMinsPerAccount
-					   * exceeded (burst buffer) */
-	WAIT_QOS_MAX_BILLING_RUN_MINS_PER_ACCT,/* QOS MaxTRESRunMinsPerAccount
-						* exceeded (billing) */
-	WAIT_QOS_MAX_CPU_RUN_MINS_PER_ACCT,/* QOS MaxTRESRunMinsPerAccount
-					    * exceeded (CPU) */
-	WAIT_QOS_MAX_ENERGY_RUN_MINS_PER_ACCT,/* QOS MaxTRESRunMinsPerAccount
-					       * exceeded (Energy) */
-	WAIT_QOS_MAX_GRES_RUN_MINS_PER_ACCT,/* QOS MaxTRESRunMinsPerAccount
-					     * exceeded (GRES) */
-	WAIT_QOS_MAX_NODE_RUN_MINS_PER_ACCT,/* QOS MaxTRESRunMinsPerAccount
-					     * exceeded (Node) */
-	WAIT_QOS_MAX_LIC_RUN_MINS_PER_ACCT,/* QOS MaxTRESRunMinsPerAccount
-					    * exceeded (license) */
-	WAIT_QOS_MAX_MEM_RUN_MINS_PER_ACCT,/* QOS MaxTRESRunMinsPerAccount
-					    * exceeded (Memory) */
-	WAIT_QOS_MAX_UNK_RUN_MINS_PER_ACCT,/* QOS MaxTRESRunMinsPerAccount
-					    * exceeded (Unknown) */
-	WAIT_QOS_MAX_BB_RUN_MINS_PER_USER,/* QOS MaxTRESRunMinsPerUser exceeded
-					   * (burst buffer) */
-	WAIT_QOS_MAX_BILLING_RUN_MINS_PER_USER,/* QOS MaxTRESRunMinsPerUser
-						* exceeded (billing) */
-	WAIT_QOS_MAX_CPU_RUN_MINS_PER_USER,/* QOS MaxTRESRunMinsPerUser exceeded
-					    * (CPU) */
-	WAIT_QOS_MAX_ENERGY_RUN_MINS_PER_USER,/* QOS MaxTRESRunMinsPerUser
-					       * exceeded (Energy) */
-	WAIT_QOS_MAX_GRES_RUN_MINS_PER_USER,/* QOS MaxTRESRunMinsPerUser
-					     * exceeded (GRES) */
-	WAIT_QOS_MAX_NODE_RUN_MINS_PER_USER,/* QOS MaxTRESRunMinsPerUser
-					     * exceeded (Node) */
-	WAIT_QOS_MAX_LIC_RUN_MINS_PER_USER,/* QOS MaxTRESRunMinsPerUser exceeded
-					    * (license) */
-	WAIT_QOS_MAX_MEM_RUN_MINS_PER_USER,/* QOS MaxTRESRunMinsPerUser exceeded
-					    * (Memory) */
-	WAIT_QOS_MAX_UNK_RUN_MINS_PER_USER,/* QOS MaxTRESRunMinsPerUser exceeded
-					    * (Unknown) */
-	WAIT_MAX_POWERED_NODES,            /* max_powered_nodes reached */
-	WAIT_MPI_PORTS_BUSY,		   /* MPI resv_ports busy */
-	REASON_END, /* end of table */
+	WAIT_RESV_DELETED	      /* Reservation was deleted */
 };
 
 enum job_acct_types {
@@ -1226,7 +957,6 @@ enum auth_plugin_type {
 	AUTH_PLUGIN_NONE	= 100,
 	AUTH_PLUGIN_MUNGE	= 101,
 	AUTH_PLUGIN_JWT		= 102,
-	AUTH_PLUGIN_SLURM	= 103,
 };
 
 /*
@@ -1237,36 +967,22 @@ enum hash_plugin_type {
 	HASH_PLUGIN_NONE,
 	HASH_PLUGIN_K12,
 	HASH_PLUGIN_SHA256,
-	HASH_PLUGIN_SHA3,
 	HASH_PLUGIN_CNT,
-};
-
-/*
- * TLS plugin (id) used for communication.
- */
-enum tls_plugin_type {
-	TLS_PLUGIN_NONE = 100,
-	TLS_PLUGIN_S2N = 101,
 };
 
 /* Select plugin (id) in use by cluster */
 enum select_plugin_type {
 	/* 100 unused (originally for BlueGene) */
-	/*
-	 * 101 cons_res was removed in 23.11. However, this is needed for
-	 * systems that are upgrading from an older version and were using
-	 * cons_res. This can be removed two versions after 23.11.
-	 */
-	SELECT_PLUGIN_CONS_RES = 101,
+	SELECT_PLUGIN_CONS_RES       = 101, /* Cons Res on a normal system */
 	SELECT_PLUGIN_LINEAR         = 102, /* Linear on a normal system */
 	/* 103 unused (originally used for BGQ) */
 	/* 104 unused (originally used for Cray/ALPS with select/linear) */
 	/* 105 unused (originally used for Cray/ALPS with select/cons_res) */
-	/* 106 unused (originally used for Serial) */
-	/* 107 unused (originally used for Cray Aries with select/linear) */
-	/* 108 unused (originally used for Cray Aries with select/cons_res) */
+	SELECT_PLUGIN_SERIAL         = 106, /* Serial */
+	SELECT_PLUGIN_CRAY_LINEAR    = 107, /* Linear on a Native Cray */
+	SELECT_PLUGIN_CRAY_CONS_RES  = 108, /* Cons Res on a Native Cray */
 	SELECT_PLUGIN_CONS_TRES      = 109, /* Cons TRES on a normal system */
-	/* 110 unused (originally used for Cray Aries with select/cons_tres) */
+	SELECT_PLUGIN_CRAY_CONS_TRES = 110  /* Cons TRES on a Native Cray */
 };
 
 /* switch plugin (id) in use by cluster */
@@ -1276,11 +992,15 @@ enum switch_plugin_type {
 	SWITCH_PLUGIN_CRAY         = 102, /* Cray */
 	/* 103 unused (originally used for NRT) */
 	SWITCH_PLUGIN_SLINGSHOT    = 104, /* HPE Slingshot */
-	SWITCH_PLUGIN_NVIDIA_IMEX = 105,
 };
 
 enum select_jobdata_type {
+	SELECT_JOBDATA_PAGG_ID	= 14,	/* data-> uint64_t job container ID */
+	SELECT_JOBDATA_PTR	= 15,	/* data-> select_jobinfo_t *jobinfo */
+	SELECT_JOBDATA_CLEANING	= 22,	/* data-> uint16_t if the job is in
+					 * cleaning state or not. */
 	SELECT_JOBDATA_NETWORK	= 23,	/* data-> char * network info */
+	SELECT_JOBDATA_RELEASED	= 24,	/* if job resources have been released */
 };
 
 enum select_nodedata_type {
@@ -1335,16 +1055,16 @@ enum acct_gather_profile_info {
 };
 
 #define ACCT_GATHER_PROFILE_NOT_SET 0x00000000
-#define ACCT_GATHER_PROFILE_NONE    SLURM_BIT(0)
-#define ACCT_GATHER_PROFILE_ENERGY  SLURM_BIT(1)
-#define ACCT_GATHER_PROFILE_TASK    SLURM_BIT(2)
-#define ACCT_GATHER_PROFILE_LUSTRE  SLURM_BIT(3)
-#define ACCT_GATHER_PROFILE_NETWORK SLURM_BIT(4)
-#ifdef __METASTACK_NEW_LOAD_ABNORMAL
-#define ACCT_GATHER_PROFILE_STEPD   SLURM_BIT(5)
-#endif
+#define ACCT_GATHER_PROFILE_NONE    0x00000001
+#define ACCT_GATHER_PROFILE_ENERGY  0x00000002
+#define ACCT_GATHER_PROFILE_TASK    0x00000004
+#define ACCT_GATHER_PROFILE_LUSTRE  0x00000008
+#define ACCT_GATHER_PROFILE_NETWORK 0x00000010
+#ifdef __METASTACK_LOAD_ABNORMAL
+#define ACCT_GATHER_PROFILE_STEPD   0x00000020
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
-#define ACCT_GATHER_PROFILE_APPTYPE  SLURM_BIT(6)
+#define ACCT_GATHER_PROFILE_APPTYPE  0x00000040
+#endif
 #endif
 #define ACCT_GATHER_PROFILE_ALL     0xffffffff
 
@@ -1369,12 +1089,6 @@ enum acct_energy_type {
 	ENERGY_DATA_NODE_ENERGY_UP,
 	ENERGY_DATA_STEP_PTR
 };
-
-typedef enum {
-	UPDATE_SET, /* Set to specified value */
-	UPDATE_ADD, /* Append to existing value (+=)*/
-	UPDATE_REMOVE, /* Remove from existing vale (-=) */
-} update_mode_t;
 
 /*
  * Task distribution states/methods
@@ -1485,11 +1199,6 @@ typedef enum cpu_bind_type {	/* cpu binding type from --cpu-bind=... */
 	CPU_BIND_OFF               = 0x80000	/* Disable binding */
 } cpu_bind_type_t;
 
-#define CPU_BIND_T_TO_MASK 0x001e
-#define CPU_BIND_T_AUTO_TO_MASK 0x34000
-#define CPU_BIND_T_MASK 0x0fe0
-#define CPU_BIND_T_TASK_PARAMS_MASK (SLURMD_OFF_SPEC | CPU_BIND_OFF)
-
 /* Flag to indicate that cpu_freq is a range: low,medium,high,high-1
  * instead of an integer value in kilohertz */
 #define CPU_FREQ_RANGE_FLAG		0x80000000
@@ -1520,9 +1229,6 @@ typedef enum mem_bind_type {    /* memory binding type from --mem-bind=... */
 	MEM_BIND_PREFER = 0x80	/* =prefer */
 } mem_bind_type_t;
 
-#define MEM_BIND_TYPE_MASK 0x3e
-#define MEM_BIND_TYPE_FLAGS_MASK 0xc0
-
 typedef enum accel_bind_type {    /* accelerator binding from --accel_bind= */
 	ACCEL_BIND_VERBOSE         = 0x01, /* 'v' verbose */
 	ACCEL_BIND_CLOSEST_GPU     = 0x02, /* 'g' Use closest GPU to the CPU */
@@ -1548,7 +1254,10 @@ enum node_states {
 #define NODE_STATE_FLAGS      0xfffffff0
 
 /* SLURM_BIT(0-3) taken for base states */
-/*  was NODE_STATE_NET        SLURM_BIT(4), removed v24.05 */
+#define NODE_STATE_NET        SLURM_BIT(4) /* If a node is using Cray's
+					    * Network Performance
+					    * Counters but isn't in a
+					    * allocation. */
 #define NODE_STATE_RES        SLURM_BIT(5) /* If a node is in a
 					    * reservation (used primarily
 					    * to note a node isn't idle
@@ -1582,10 +1291,13 @@ enum node_states {
 #define NODE_STATE_POWER_UP SLURM_BIT(24) /* manual node power up */
 #define NODE_STATE_POWER_DRAIN SLURM_BIT(25) /* signal power down asap */
 #define NODE_STATE_DYNAMIC_NORM SLURM_BIT(26) /* dynamic norm node */
-#define NODE_STATE_BLOCKED SLURM_BIT(27) /* node blocked by exclusive topo */
 #ifdef __METASTACK_NEW_AUTO_SUPPLEMENT_AVAIL_NODES
 #define NODE_STATE_BORROWED SLURM_BIT(31) /* node borrowed from resource pool */
 #endif
+/* used to define the size of the credential.signature size
+ * used to define the key size of the io_stream_header_t
+ */
+#define SLURM_SSL_SIGNATURE_LENGTH 128
 
 /* Used as show_flags for slurm_get_ and slurm_load_ function calls.
  * Values can be ORed */
@@ -1602,7 +1314,6 @@ enum node_states {
 #ifdef __METASTACK_NEW_AUTO_SUPPLEMENT_AVAIL_NODES
 #define SHOW_BORROW	0x0100	/* Show borrow nodes */
 #endif
-
 /* CR_CPU, CR_SOCKET and CR_CORE are mutually exclusive
  * CR_MEMORY may be added to any of the above values or used by itself
  * CR_ONE_TASK_PER_CORE may also be added to any of the above values */
@@ -1619,10 +1330,12 @@ enum node_states {
 				 * level. Jobs will not be co-allocated
 				 * within a board. */
 #define CR_MEMORY	0x0010	/* Memory as consumable resources. Memory is
-				 * not over-committed when selected as a CR. */
-/* was CR_OTHER_CONS_RES    0x0020, removed v23.11 */
-#define ENFORCE_BINDING_GRES 0x0040
-#define ONE_TASK_PER_SHARING_GRES 0x0080
+				 * not over-commited when selected as a CR. */
+#define CR_OTHER_CONS_RES    0x0020 /* if layering select plugins use
+				     * cons_res instead of linear (default)
+				     */
+/* was CR_NHC_STEP_NO 0x0040, removed v19.05 */
+/* was CR_NHC_NO 0x0080, removed v19.05 */
 
 /* By default, schedule only one task per core.
  * Without this option, tasks would be allocated threads. */
@@ -1632,19 +1345,13 @@ enum node_states {
  * across available nodes */
 #define CR_PACK_NODES  0x0200
 
-#define LL_SHARED_GRES 0x0400 /* Prefer least-loaded device for shared GRES */
-/* was CR_OTHER_CONS_TRES   0x0800, removed v24.05 */
+/* was CR_NHC_ABSOLUTELY_NO 0x0400, removed v19.05 */
+#define CR_OTHER_CONS_TRES   0x0800 /* if layering select plugins use
+				     * cons_tres instead of linear (default)
+				     */
 /* By default, distribute cores using a block approach inside the nodes */
 #define CR_CORE_DEFAULT_DIST_BLOCK 0x1000
 #define CR_LLN		0x4000  /* Select nodes by "least loaded." */
-#define MULTIPLE_SHARING_GRES_PJ 0x8000  /* Allow multiple sharing gres per job */
-
-
-/*
- * This is used internally to know whether the job was started with
- * cons_tres or linear. It is not a configuration option.
- */
-#define CR_LINEAR 0x8000
 
 #define MEM_PER_CPU  0x8000000000000000
 #define SHARED_FORCE 0x8000
@@ -1659,7 +1366,8 @@ enum node_states {
 #define PRIVATE_DATA_ACCOUNTS     SLURM_BIT(5) /* accounting account data is
 						* private */
 #define PRIVATE_DATA_RESERVATIONS SLURM_BIT(6) /* reservation data is private */
-/* SLURM_BIT(7) Available 2 versions after 23.02 */
+#define PRIVATE_CLOUD_NODES       SLURM_BIT(7) /* hide powered down nodes in
+						* cloud */
 #define PRIVATE_DATA_EVENTS       SLURM_BIT(8) /* events are private */
 #ifdef __METASTACK_NEW_MAIN_SCHED_PLANNED
 #define PRIVATE_DATA_PLANNED       SLURM_BIT(9)	/* planned node state is private */
@@ -1712,10 +1420,7 @@ enum node_states {
 #define PRIORITY_FLAGS_NO_NORMAL_QOS	 SLURM_BIT(9)
 #define PRIORITY_FLAGS_NO_NORMAL_TRES	 SLURM_BIT(10)
 
-/*
- * These bits are set in the bitflags field of job_desc_msg_t and
- * job_flags in slurm_opt_t
- */
+/* These bits are set in the bitflags field of job_desc_msg_t */
 #define KILL_INV_DEP       SLURM_BIT(0) /* Kill job on invalid dependency */
 #define NO_KILL_INV_DEP    SLURM_BIT(1) /* Don't kill job on invalid
 					 * dependency */
@@ -1725,8 +1430,10 @@ enum node_states {
 #define GRES_ENFORCE_BIND  SLURM_BIT(4) /* Enforce CPU/GRES binding */
 #define TEST_NOW_ONLY      SLURM_BIT(5) /* Test for immediately start only */
 #define JOB_SEND_ENV       SLURM_BIT(6) /* Send env to the dbd */
-#define GRACE_PREEMPT      SLURM_BIT(7) /* Job signalled and waiting for
-					   Gracetime */
+/*
+ * #define NODE_REBOOT     SLURM_BIT(7)    DEPRECATED in 22.05, can be used in
+ *                                         23.11.
+ */
 #define SPREAD_JOB         SLURM_BIT(8) /* Spread job across max node count */
 #define USE_MIN_NODES      SLURM_BIT(9) /* Prefer minimum node count */
 #define JOB_KILL_HURRY     SLURM_BIT(10) /* Avoid burst buffer stage out */
@@ -1745,9 +1452,8 @@ enum node_states {
 #define JOB_WAS_RUNNING    SLURM_BIT(20) /* Job was running */
 #define RESET_ACCRUE_TIME  SLURM_BIT(21) /* Reset the job's accrue time */
 #define CRON_JOB           SLURM_BIT(22) /* Job submitted through scrontab */
-#define JOB_MEM_SET        SLURM_BIT(23) /* Memory limit explicitly set by job */
-/*                         SLURM_BIT(24)    Removed in 23.11, free in 25.05 */
-
+#define JOB_MEM_SET        SLURM_BIT(23) /* Memory limit explicity set by job */
+#define JOB_RESIZED        SLURM_BIT(24) /* Running job added/removed nodes */
 #define USE_DEFAULT_ACCT   SLURM_BIT(25) /* Job submitted to default account */
 #define USE_DEFAULT_PART   SLURM_BIT(26) /* Job submitted to default
 					  * partition */
@@ -1763,16 +1469,8 @@ enum node_states {
 					  * last_eval_time */
 #define BACKFILL_LAST      SLURM_BIT(33) /* Job was considered in last
 					  * schedule attempt */
-#define TASKS_CHANGED      SLURM_BIT(34) /* Reset licenses per job */
+/*                         SLURM_BIT(34)    Available 2 versions after 21.08 */
 #define JOB_SEND_SCRIPT    SLURM_BIT(35) /* Send script to the dbd */
-#define RESET_LIC_TASK     SLURM_BIT(36) /* Reset licenses per task */
-#define RESET_LIC_JOB      SLURM_BIT(37) /* Reset licenses per job */
-#define GRES_ONE_TASK_PER_SHARING SLURM_BIT(38) /* Don't let tasks in the same
-						 * job share the same gres */
-#define GRES_MULT_TASKS_PER_SHARING SLURM_BIT(39)/* Negate
-						  * GRES_ONE_TASK_PER_SHARING */
-#define GRES_ALLOW_TASK_SHARING SLURM_BIT(40) /* Allow tasks to share gres */
-#define STEPMGR_ENABLED SLURM_BIT(41) /* enable(d) stepmgr or not */
 
 /* These bits are set in the x11 field of job_desc_msg_t */
 #define X11_FORWARD_ALL		0x0001	/* all nodes should setup forward */
@@ -1794,17 +1492,7 @@ typedef enum {
 				     * steps; resources allocated to this step
 				     * are not decremented from the job's
 				     * allocation */
-	SSF_NO_SIG_FAIL = 1 << 7, /* Don't fail step due to signal */
-	SSF_EXT_LAUNCHER = 1 << 8, /* Request is for an external launcher */
-	SSF_GRES_ALLOW_TASK_SHARING = 1 << 9,
 } step_spec_flags_t;
-
-enum topology_plugin_type {
-	TOPOLOGY_PLUGIN_DEFAULT = 100,
-	TOPOLOGY_PLUGIN_3DTORUS = 101,
-	TOPOLOGY_PLUGIN_TREE = 102,
-	TOPOLOGY_PLUGIN_BLOCK = 103,
-};
 
 /*****************************************************************************\
  *      SLURM LIBRARY INITIALIZATION FUNCTIONS
@@ -1838,7 +1526,7 @@ extern void slurm_fini(void);
  */
 #ifndef   __hostlist_t_defined
 #  define __hostlist_t_defined
-typedef struct hostlist hostlist_t;
+typedef struct hostlist * hostlist_t;
 #endif
 
 /*
@@ -1873,20 +1561,20 @@ typedef struct hostlist hostlist_t;
  * The returned hostlist must be freed with hostlist_destroy()
  *
  */
-extern hostlist_t *slurm_hostlist_create(const char *hostlist);
+extern hostlist_t slurm_hostlist_create(const char *hostlist);
 
 /* slurm_hostlist_count():
  *
  * Return the number of hosts in hostlist hl.
  */
-extern int slurm_hostlist_count(hostlist_t *hl);
+extern int slurm_hostlist_count(hostlist_t hl);
 
 /*
  * slurm_hostlist_destroy():
  *
  * Destroy a hostlist object. Frees all memory allocated to the hostlist.
  */
-extern void slurm_hostlist_destroy(hostlist_t *hl);
+extern void slurm_hostlist_destroy(hostlist_t hl);
 
 /* slurm_hostlist_find():
  *
@@ -1895,7 +1583,7 @@ extern void slurm_hostlist_destroy(hostlist_t *hl);
  *
  * Returns -1 if host is not found.
  */
-extern int slurm_hostlist_find(hostlist_t *hl, const char *hostname);
+extern int slurm_hostlist_find(hostlist_t hl, const char *hostname);
 
 /* slurm_hostlist_push():
  *
@@ -1906,7 +1594,7 @@ extern int slurm_hostlist_find(hostlist_t *hl, const char *hostname);
  * Returns the number of hostnames inserted into the list,
  * or 0 on failure.
  */
-extern int slurm_hostlist_push(hostlist_t *hl, const char *hosts);
+extern int slurm_hostlist_push(hostlist_t hl, const char *hosts);
 
 /* slurm_hostlist_push_host():
  *
@@ -1916,7 +1604,7 @@ extern int slurm_hostlist_push(hostlist_t *hl, const char *hosts);
  *
  * return value is 1 for success, 0 for failure.
  */
-extern int slurm_hostlist_push_host(hostlist_t *hl, const char *host);
+extern int slurm_hostlist_push_host(hostlist_t hl, const char *host);
 
 /* slurm_hostlist_ranged_string():
  *
@@ -1929,7 +1617,15 @@ extern int slurm_hostlist_push_host(hostlist_t *hl, const char *host);
  * slurm_hostlist_ranged_string() will write a bracketed hostlist representation
  * where possible.
  */
-extern ssize_t slurm_hostlist_ranged_string(hostlist_t *hl, size_t n, char *buf);
+extern ssize_t slurm_hostlist_ranged_string(hostlist_t hl, size_t n, char *buf);
+
+/* slurm_hostlist_ranged_string_malloc():
+ *
+ * Return the string representation of the hostlist hl.
+ *
+ * The result must be released using free();
+ */
+extern char *slurm_hostlist_ranged_string_malloc(hostlist_t hl);
 
 /* hostlist_ranged_string_xmalloc():
  *
@@ -1939,7 +1635,7 @@ extern ssize_t slurm_hostlist_ranged_string(hostlist_t *hl, size_t n, char *buf)
  *
  * Caller should free the result string using xfree().
  */
-extern char *slurm_hostlist_ranged_string_xmalloc(hostlist_t *hl);
+extern char *slurm_hostlist_ranged_string_xmalloc(hostlist_t hl);
 
 /*
  * slurm_hostlist_shift():
@@ -1950,14 +1646,14 @@ extern char *slurm_hostlist_ranged_string_xmalloc(hostlist_t *hl);
  *
  * Note: Caller is responsible for freeing the returned memory.
  */
-extern char *slurm_hostlist_shift(hostlist_t *hl);
+extern char *slurm_hostlist_shift(hostlist_t hl);
 
 /* slurm_hostlist_uniq():
  *
  * Sort the hostlist hl and remove duplicate entries.
  *
  */
-extern void slurm_hostlist_uniq(hostlist_t *hl);
+extern void slurm_hostlist_uniq(hostlist_t hl);
 
 /*****************************************************************************\
  *      SLURM LIST FUNCTIONS
@@ -1966,12 +1662,11 @@ extern void slurm_hostlist_uniq(hostlist_t *hl);
 #ifndef   __list_datatypes_defined
 #  define __list_datatypes_defined
 typedef struct xlist * List;
-typedef struct xlist list_t;
 /*
  *  List opaque data type.
  */
 
-typedef struct listIterator list_itr_t;
+typedef struct listIterator * ListIterator;
 /*
  *  List Iterator opaque data type.
  */
@@ -2001,28 +1696,20 @@ typedef int (*ListForF) (void *x, void *arg);
  *  Function prototype for operating on each item in a list.
  *  Returns less-than-zero on error.
  */
-
-#ifdef __METASTACK_BUG_SEND_UPDATE_ON_BAD_FD
-/* TExtends the ListForF type by adding a retry_count 
- * parameter to implement response timeout calculation 
- * that increases with each retry attempt. 
- */
-typedef int (*ListForF_FixBug) (void *x, void *arg, int retry_count);
-#endif
-
 #endif
 
 /* slurm_list_append():
  *
  *  Inserts data [x] at the end of list [l].
+ *  Returns the data's ptr.
  */
-extern void slurm_list_append(list_t *l, void *x);
+extern void *slurm_list_append(List l, void *x);
 
 /* slurm_list_count():
  *
  *  Returns the number of items in list [l].
  */
-extern int slurm_list_count(list_t *l);
+extern int slurm_list_count(List l);
 
 /* slurm_list_create():
  *
@@ -2033,7 +1720,7 @@ extern int slurm_list_count(list_t *l);
  *  Note: Abandoning a list without calling slurm_list_destroy() will result
  *    in a memory leak.
  */
-extern list_t *slurm_list_create(ListDelF f);
+extern List slurm_list_create(ListDelF f);
 
 /* slurm_list_destroy():
  *
@@ -2041,7 +1728,7 @@ extern list_t *slurm_list_create(ListDelF f);
  *    list itself; if a deletion function was specified when the list
  *    was created, it will be called for each item in the list.
  */
-extern void slurm_list_destroy(list_t *l);
+extern void slurm_list_destroy(List l);
 
 /* slurm_list_find():
  *
@@ -2052,33 +1739,33 @@ extern void slurm_list_destroy(list_t *l);
  *  Example: i=slurm_list_iterator_reset(i);
  *	     while ((x=slurm_list_find(i,f,k))) {...}
  */
-extern void *slurm_list_find(list_itr_t *i, ListFindF f, void *key);
+extern void *slurm_list_find(ListIterator i, ListFindF f, void *key);
 
 /* slurm_list_is_empty():
  *
  *  Returns non-zero if list [l] is empty; o/w returns zero.
  */
-extern int slurm_list_is_empty(list_t *l);
+extern int slurm_list_is_empty(List l);
 
 /*
  *  Creates and returns a list iterator for non-destructively traversing
  *    list [l].
  */
-extern list_itr_t *slurm_list_iterator_create(list_t *l);
+extern ListIterator slurm_list_iterator_create(List l);
 
 /* slurm_list_iterator_reset():
  *
  *  Resets the list iterator [i] to start traversal at the beginning
  *    of the list.
  */
-extern void slurm_list_iterator_reset(list_itr_t *i);
+extern void slurm_list_iterator_reset(ListIterator i);
 
 /*
  *  Destroys the list iterator [i]; list iterators not explicitly destroyed
  *    in this manner will be destroyed when the list is deallocated via
  *    list_destroy().
  */
-extern void slurm_list_iterator_destroy(list_itr_t *i);
+extern void slurm_list_iterator_destroy(ListIterator i);
 
 /* slurm_list_next():
  *
@@ -2087,7 +1774,7 @@ extern void slurm_list_iterator_destroy(list_itr_t *i);
  *  Example: i=slurm_list_iterator_create(i);
  *	     while ((x=slurm_list_next(i))) {...}
  */
-extern void *slurm_list_next(list_itr_t *i);
+extern void *slurm_list_next(ListIterator i);
 
 /* slurm_list_sort():
  *
@@ -2095,14 +1782,14 @@ extern void *slurm_list_next(list_itr_t *i);
  *  Note: Sorting a list resets all iterators associated with the list.
  *  Note: The sort algorithm is stable.
  */
-extern void slurm_list_sort(list_t *l, ListCmpF f);
+extern void slurm_list_sort(List l, ListCmpF f);
 
 /* slurm_list_pop():
  *
  *  Pops the data item at the top of the stack [l].
  *  Returns the data's ptr, or NULL if the stack is empty.
  */
-extern void *slurm_list_pop(list_t *l);
+extern void *slurm_list_pop(List l);
 
 /*****************************************************************************\
  *      SLURM BITSTR FUNCTIONS
@@ -2125,7 +1812,8 @@ typedef bitstr_t bitoff_t;
 #define JOB_SHARED_OK           0x0001
 #define JOB_SHARED_USER         0x0002
 #define JOB_SHARED_MCS          0x0003
-#define JOB_SHARED_TOPO 0x0004
+
+#define SLURM_POWER_FLAGS_LEVEL 0x0001		/* Equal power cap on all nodes */
 
 /*****************************************************************************\
  *	PROTOCOL DATA STRUCTURE DEFINITIONS
@@ -2144,13 +1832,26 @@ typedef struct acct_gather_energy {
 	time_t poll_time;         /* When information was last retrieved */
 } acct_gather_energy_t;
 
-typedef struct {
-	time_t expiration;
-	char *net_cred;
-	slurm_addr_t *node_addrs;
-	uint32_t node_cnt;
-	char *node_list;
-} slurm_node_alias_addrs_t;
+typedef struct ext_sensors_data {
+	uint64_t consumed_energy;    /* total energy consumed, in joules */
+	uint32_t temperature;	     /* temperature, in celsius */
+	time_t   energy_update_time; /* last update time for consumed_energy */
+	uint32_t current_watts;      /* current power consumption, in watts */
+} ext_sensors_data_t;
+
+typedef struct power_mgmt_data {
+	uint32_t cap_watts;	/* power consumption limit of node, in watts */
+	uint32_t current_watts;	/* current power consumption, in watts */
+	uint64_t joule_counter;	/* total energy consumption by node, in joules */
+	uint32_t new_cap_watts;	/* new power consumption limit of node, in watts */
+	uint32_t max_watts;	/* maximum power consumption by node, in watts */
+	uint32_t min_watts;	/* minimum power consumption by node, in watts */
+	time_t new_job_time;	/* set when a new job has been scheduled on the
+				 * node, used to trigger higher cap */
+	uint16_t state;		/* Power state information */
+	uint64_t time_usec;	/* Data timestamp in microseconds since start
+				 * of the day */
+} power_mgmt_data_t;
 
 #define CORE_SPEC_THREAD 0x8000	/* If set, this is a thread count not core count */
 
@@ -2187,7 +1888,6 @@ typedef struct job_descriptor {	/* For submit, allocate, and update requests */
 	uint16_t contiguous;	/* 1 if job requires contiguous nodes,
 				 * 0 otherwise,default=0 */
 	char *container;	/* OCI container bundle */
-	char *container_id;	/* OCI container ID */
 	uint16_t core_spec;	/* specialized core/thread count,
 				 * see CORE_SPEC_THREAD */
 	char *cpu_bind;		/* binding map for map/mask_cpu - This
@@ -2213,26 +1913,22 @@ typedef struct job_descriptor {	/* For submit, allocate, and update requests */
 				 *  name=value pairs, one per line */
 	slurm_hash_t env_hash;  /* hash value of environment NO NOT PACK */
 	uint32_t env_size;	/* element count in environment */
+	char *extra;		/* unused */
 	char *exc_nodes;	/* comma separated list of nodes excluded
 				 * from job's allocation, default NONE */
-	char *extra;		/* Arbitrary string */
 	char *features;		/* required feature specification,
 				 * default NONE */
 	uint64_t fed_siblings_active; /* Bitmap of active fed sibling ids */
 	uint64_t fed_siblings_viable; /* Bitmap of viable fed sibling ids */
 	uint32_t group_id;	/* group to assume, if run as root. */
 	uint32_t het_job_offset; /* HetJob component offset */
-	void *id;		/* actually identity_t. DO NOT PACK */
 	uint16_t immediate;	/* 1 if allocate to run or fail immediately,
 				 * 0 if to be queued awaiting resources */
 	uint32_t job_id;	/* job ID, default set by Slurm */
 	char * job_id_str;      /* string representation of the jobid */
-	char *job_size_str;
 	uint16_t kill_on_node_fail; /* 1 if node failure to kill job,
 				     * 0 otherwise,default=1 */
 	char *licenses;		/* licenses required by the job */
-	char *licenses_tot;	/* total licenses required by the job included
-				 * from tres requests as well, NOT PACKED */
 	uint16_t mail_type;	/* see MAIL_JOB_ definitions above */
 	char *mail_user;	/* user to receive notification */
 	char *mcs_label;	/* mcs_label if mcs plugin in use */
@@ -2254,6 +1950,8 @@ typedef struct job_descriptor {	/* For submit, allocate, and update requests */
 				 * default in Slurm config */
 	uint16_t plane_size;	/* plane size when task_dist =
 				   SLURM_DIST_PLANE */
+	uint8_t power_flags;	/* power management flags,
+				 * see SLURM_POWER_FLAGS_ */
 	char *prefer;		/* soft feature specification,
 				 * default NONE */
 	uint32_t priority;	/* relative priority of the job,
@@ -2268,7 +1966,6 @@ typedef struct job_descriptor {	/* For submit, allocate, and update requests */
 				 * default NONE */
 	uint16_t requeue;	/* enable or disable job requeue option */
 	char *reservation;	/* name of reservation to use */
-	uint16_t resv_port_cnt;	/* count of MPI ports reserved per node */
 	char *script;		/* the actual job script, default NONE */
 	void *script_buf;	/* job script as mmap buf */
 	slurm_hash_t script_hash; /* hash value of script NO NOT PACK */
@@ -2339,7 +2036,8 @@ typedef struct job_descriptor {	/* For submit, allocate, and update requests */
 				  * default=0 */
 	char *req_context;	/* requested selinux context */
 	uint32_t req_switch;    /* Minimum number of switches */
-	uint16_t segment_size;	/* segment_size */
+	dynamic_plugin_data_t *select_jobinfo; /* opaque data type,
+					   * Slurm internal use only */
 	char *selinux_context;	/* used internally in the slurmctld,
 				   DON'T PACK */
 	char *std_err;		/* pathname of stderr */
@@ -2354,7 +2052,7 @@ typedef struct job_descriptor {	/* For submit, allocate, and update requests */
 	char *x11_target;	/* target hostname, or unix socket if port == 0 */
 	uint16_t x11_target_port; /* target tcp port, 6000 + the display number */
 #ifdef __METASTACK_OPT_MSG_OUTPUT
-	char *reason_detail;
+    char *reason_detail;
 #endif
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
 	char *watch_dog;
@@ -2362,53 +2060,7 @@ typedef struct job_descriptor {	/* For submit, allocate, and update requests */
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
 	char *apptype;
 #endif
-#ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
-	uint32_t style_step;
-#endif
-#ifdef __METASTACK_OPT_APP  
-	char *app;           /* --app combined name, e.g. "vasp-5.7.1" */  
-	char *app_name;      /* parsed app name, e.g. "vasp" */  
-	char *app_version;   /* parsed app version, e.g. "5.7.1" */  
-	uint8_t app_source;  /* app_source_t values; uint8_t for packed layout */
-#endif
 } job_desc_msg_t;
-
-#ifdef __METASTACK_OPT_APP  
-/*  
- * app_source identifies HOW the app information was attached to a job:  
- *   NOTSET      - Not set / unknown (zero-init safe default)  
- *   USER        - User explicitly specified --app=X on command line  
- *   AUTO        - cli_filter.lua auto-recognized the application type  
- *   PORTAL      - Set by web portal integration (preserved across validation)  
- *   MARKETPLACE - Set by marketplace integration (preserved across validation)  
- *  
- * NOTSET must be 0 so that zero-initialized fields are safely "not set"  
- * rather than falsely indicating a specific source.  
- *  
- * PORTAL and MARKETPLACE are "external" sources: once set, they are NOT  
- * overwritten by the slurmctld validation logic (see _job_create).  
- */  
-typedef enum {
-	APP_SOURCE_NOTSET = 0,
-	APP_SOURCE_USER = 1,
-	APP_SOURCE_AUTO = 2,
-	APP_SOURCE_PORTAL = 3,
-	APP_SOURCE_MARKETPLACE = 4,
-} app_source_t;
-
-/* app_source string constants (parallel to app_source_t) */
-#define APP_SOURCE_STR_NOTSET      "notset"
-#define APP_SOURCE_STR_USER        "user"
-#define APP_SOURCE_STR_AUTO        "auto"
-#define APP_SOURCE_STR_PORTAL      "portal"
-#define APP_SOURCE_STR_MARKETPLACE "marketplace"
-
-extern const char *app_source_to_str(app_source_t source);
-/*
- * Returns app_source_t value as uint8_t, or NO_VAL8 if str is NULL or unknown.
- */
-extern uint8_t app_source_from_str(const char *str);
-#endif
 
 typedef struct job_info {
 	char *account;		/* charge to specified account */
@@ -2433,10 +2085,9 @@ typedef struct job_info {
 	char *cluster_features;	/* comma separated list of required cluster
 				 * features */
 	char *command;		/* command to be executed, built from submitted
-				 * job's argv */
+				 * job's argv and NULL for salloc command */
 	char *comment;		/* arbitrary comment */
 	char *container;	/* OCI Container bundle path */
-	char *container_id;	/* OCI Container ID */
 	uint16_t contiguous;	/* 1 if job requires contiguous nodes */
 	uint16_t core_spec;	/* specialized core count */
 	uint16_t cores_per_socket; /* cores per socket required by job  */
@@ -2459,8 +2110,6 @@ typedef struct job_info {
 				 * start_range_1, end_range_1,
 				 * start_range_2, .., -1  */
 	uint32_t exit_code;	/* exit code for job (status from wait call) */
-	char *extra;		/* Arbitrary string */
-	char *failed_node;	/* if set, node that caused job to fail */
 	char *features;		/* comma separated list of required features */
 	char *fed_origin_str;	/* Origin cluster's name */
 	uint64_t fed_siblings_active;  /* bitmap of active fed sibling ids */
@@ -2477,7 +2126,6 @@ typedef struct job_info {
 	uint32_t het_job_offset; /* HetJob component offset from leader */
 	uint32_t job_id;	/* job ID */
 	job_resources_t *job_resrcs; /* opaque data type, job resources */
-	char *job_size_str;
 	uint32_t job_state;	/* state of the job, see enum job_states */
 	time_t last_sched_eval; /* last time job was evaluated for scheduling */
 	char *licenses;		/* licenses required by the job */
@@ -2507,14 +2155,14 @@ typedef struct job_info {
 	uint64_t pn_min_memory; /* minimum real memory per node, default=0 */
 	uint16_t pn_min_cpus;   /* minimum # CPUs per node, default=0 */
 	uint32_t pn_min_tmp_disk; /* minimum tmp disk per node, default=0 */
+	uint8_t power_flags;	/* power management flags,
+				 * see SLURM_POWER_FLAGS_ */
 	time_t preempt_time;	/* preemption signal time */
 	time_t preemptable_time;/* job becomes preemptable from
 				 *  PreemptExemptTime */
 	time_t pre_sus_time;	/* time job ran prior to last suspend */
 	uint32_t priority;	/* relative priority of the job,
 				 * 0=held, 1=required nodes DOWN/DRAINED */
-	uint32_t *priority_array; /* partition based priority */
-	char *priority_array_parts; /* partition order of priority_array */
 	uint32_t profile;	/* Level of acct_gather_profile {all | none} */
 	char *qos;		/* Quality of Service */
 	uint8_t reboot;		/* node reboot requested before start */
@@ -2527,8 +2175,11 @@ typedef struct job_info {
 	time_t resize_time;	/* time of latest size change */
 	uint16_t restart_cnt;	/* count of job restarts */
 	char *resv_name;	/* reservation name */
-	char *resv_ports;	/* Reserved MPI ports (as hostlist str) */
 	char *sched_nodes;	/* list of nodes scheduled to be used for job */
+	dynamic_plugin_data_t *select_jobinfo; /* opaque data type,
+						* process using
+						* select_g_select_jobinfo_*
+						*/
 	char *selinux_context;
 	uint16_t shared;	/* 1 if job can share nodes with other jobs */
 	uint16_t show_flags;	/* conveys level of details requested */
@@ -2540,10 +2191,10 @@ typedef struct job_info {
 				      *	either srun or the lowest slurmd version
 				      *	it is talking to */
 	char *state_desc;	/* optional details for state_reason */
-	uint32_t state_reason;	/* reason job still pending or failed, see
+	uint16_t state_reason;	/* reason job still pending or failed, see
 				 * slurm.h:enum job_state_reason */
 #ifdef __METASTACK_OPT_MSG_OUTPUT
-	char *reason_detail;
+    char *reason_detail;
 #endif
 	char *std_err;		/* pathname of job's stderr file */
 	char *std_in;		/* pathname of job's stdin file */
@@ -2563,7 +2214,7 @@ typedef struct job_info {
 	char *tres_per_node;	/* semicolon delimited list of TRES=# values */
 	char *tres_per_socket;	/* semicolon delimited list of TRES=# values */
 	char *tres_per_task;	/* semicolon delimited list of TRES=# values */
-	char *tres_req_str;	/* tres requested in the job */
+	char *tres_req_str;	/* tres reqeusted in the job */
 	char *tres_alloc_str;   /* tres used in the job */
 	uint32_t user_id;	/* user the job runs as */
 	char *user_name;	/* user_name or null. not always set, but
@@ -2575,45 +2226,35 @@ typedef struct job_info {
 #ifdef __METASTACK_NEW_PENDING_ORDER
 	uint32_t pending_order;
 #endif
-#ifdef __METASTACK_OPT_APP  
-	char *app_name;      /* application name, e.g. "vasp" */  
-	char *app_version;   /* application version, e.g. "5.7.1" */  
-	uint8_t app_source;  /* app_source_t; how app was determined */  
-#endif
 } slurm_job_info_t;
 
 typedef slurm_job_info_t job_info_t;
 
-typedef struct {
-	uint32_t nice;
+typedef struct priority_factors_object {
+	char *cluster_name;	/* Cluster name ONLY set in federation */
+	uint32_t job_id;
+	char *partition;
+	uint32_t user_id;
+
 	double	 priority_age;
 	double	 priority_assoc;
 	double	 priority_fs;
 	double	 priority_js;
 	double	 priority_part;
 	double	 priority_qos;
+	double   direct_prio;   /* manually set priority */
 	uint32_t priority_site;
 
 	double   *priority_tres;/* tres priorities with weights applied. */
 	uint32_t  tres_cnt;     /* number of configured tres' on system. */
 	char    **tres_names;	/* packed as assoc_mgr_tres_names[] */
 	double   *tres_weights; /* PriorityWeightTRES weights as an array */
-} priority_factors_t;
 
-typedef struct priority_factors_object {
-	char *account;
-	char *cluster_name;	/* Cluster name ONLY set in federation */
-	double direct_prio; /* Manually set priority. If it is set prio_factors
-			     * will be NULL */
-	uint32_t job_id;
-	char *partition;
-	priority_factors_t *prio_factors;
-	char *qos;
-	uint32_t user_id;
+	uint32_t nice;
 } priority_factors_object_t;
 
 typedef struct priority_factors_response_msg {
-	list_t *priority_factors_list;	/* priority_factors_object_t list */
+	List	 priority_factors_list;	/* priority_factors_object_t list */
 } priority_factors_response_msg_t;
 
 typedef struct job_info_msg {
@@ -2623,31 +2264,11 @@ typedef struct job_info_msg {
 	slurm_job_info_t *job_array;	/* the job records */
 } job_info_msg_t;
 
-typedef struct {
-	uint32_t job_id;
-	uint32_t array_job_id;
-	uint32_t array_task_id;
-	bitstr_t *array_task_id_bitmap;
-	/* state of the job; see enum job_states and JOB_* macros */
-	uint32_t het_job_id; /* JobId of hetjob leader */
-	uint32_t state;
-} job_state_response_job_t;
-
-typedef struct {
-	uint32_t jobs_count;
-	job_state_response_job_t *jobs;
-} job_state_response_msg_t;
-
 typedef struct step_update_request_msg {
 	uint32_t job_id;
 	uint32_t step_id;
 	uint32_t time_limit;	/* In minutes */
 } step_update_request_msg_t;
-
-typedef struct suspend_exc_update_msg {
-	char *update_str;
-	update_mode_t mode;
-} suspend_exc_update_msg_t;
 
 typedef struct {
 	char *node_list; /* nodelist corresponding to task layout */
@@ -2662,16 +2283,9 @@ typedef struct {
 } slurm_step_layout_req_t;
 
 typedef struct slurm_step_layout {
-	uint16_t *cpt_compact_array; /* Compressed per-node cpus_per_task.
-				      * Index with slurm_get_rep_count_inx() */
-	uint32_t cpt_compact_cnt; /* number of elements in cpt_compact arrays */
-	uint32_t *cpt_compact_reps; /* number of consecutive nodes on which a
-				     * value in cpt_compact_array is
-				     * duplicated */
 	char *front_end;	/* If a front-end architecture, the name of
 				 * of the node running all tasks,
 				 * NULL otherwise */
-	slurm_node_alias_addrs_t *alias_addrs;
 	uint32_t node_cnt;	/* node count */
 	char *node_list;        /* list of nodes in step */
 	uint16_t plane_size;	/* plane size when task_dist =
@@ -2785,6 +2399,7 @@ typedef struct {
 	char **env;
 	char *container; /* OCI Container bundle path */
 	char *cwd;
+	bool user_managed_io;
 	uint32_t msg_timeout; /* timeout set for sending message */
 	uint16_t ntasks_per_board;/* number of tasks to invoke on each board */
 	uint16_t ntasks_per_core; /* number of tasks to invoke on each core */
@@ -2792,14 +2407,16 @@ typedef struct {
 	uint16_t ntasks_per_socket;/* number of tasks to invoke on
 				    * each socket */
 
-	/* I/O handling */
+	/* START - only used if user_managed_io is false */
 	bool buffered_stdio;
 	bool labelio;
 	char *remote_output_filename;
 	char *remote_error_filename;
 	char *remote_input_filename;
 	slurm_step_io_fds_t local_fds;
+	/*  END  - only used if user_managed_io is false */
 
+	uint32_t gid;
 	bool multi_prog;
 	bool no_alloc;
 	uint32_t slurmd_debug;  /* remote slurmd debug level */
@@ -2832,15 +2449,9 @@ typedef struct {
 	uint16_t max_cores;
 	uint16_t max_threads;
 	uint16_t cpus_per_task;
-	uint16_t *cpt_compact_array; /* Compressed per-node cpus_per_task.
-				      * Index with slurm_get_rep_count_inx() */
-	uint32_t cpt_compact_cnt; /* number of elements in cpt_compact arrays */
-	uint32_t *cpt_compact_reps; /* number of consecutive nodes on which a
-				     * value in cpt_compact_array is
-				     * duplicated */
 	uint16_t threads_per_core;
 	uint32_t task_dist;
-	uint16_t tree_width;
+	char *partition;
 	bool preserve_env;
 
 	char *mpi_plugin_name;
@@ -2865,7 +2476,7 @@ typedef struct {
 	uint32_t style_step;     /*which stepd, 0x001 is sbatch submit, 0x010 is srun submit, 0x100 is salloc submit*/
 #endif
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
-	char *apptype;
+	char* apptype;
 #endif
 } slurm_step_launch_params_t;
 
@@ -2898,7 +2509,6 @@ typedef struct {
 	uint32_t array_task_id;	/* task_id of a job array */
 	char *cluster;		/* cluster that the step is running on. */
 	char *container;	/* OCI container bundle path */
-	char *container_id;	/* OCI container ID */
 	uint32_t cpu_freq_min;	/* Minimum cpu frequency  */
 	uint32_t cpu_freq_max;	/* Maximum cpu frequency  */
 	uint32_t cpu_freq_gov;	/* cpu frequency governor */
@@ -2915,6 +2525,10 @@ typedef struct {
 	char *partition;	/* name of assigned partition */
 	char *resv_ports;	/* ports allocated for MPI */
 	time_t run_time;	/* net run time (factor out time suspended) */
+	dynamic_plugin_data_t *select_jobinfo; /* opaque data type,
+						* process using
+						* select_g_select_jobinfo_*
+						*/
 	char *srun_host;	/* host of srun command */
 	uint32_t srun_pid;	/* PID of srun command */
 	time_t start_time;	/* step start time */
@@ -2937,16 +2551,10 @@ typedef struct {
 	uint32_t user_id;	/* user the job runs as */
 } job_step_info_t;
 
-typedef struct {
-	uint32_t job_id;
-	char *stepmgr;
-} stepmgr_job_info_t;
-
 typedef struct job_step_info_response_msg {
 	time_t last_update;		/* time of latest info */
 	uint32_t job_step_count;	/* number of records */
 	job_step_info_t *job_steps;	/* the job step records */
-	list_t *stepmgr_jobs;
 } job_step_info_response_msg_t;
 
 typedef struct {
@@ -2956,7 +2564,7 @@ typedef struct {
 } job_step_pids_t;
 
 typedef struct {
-	list_t *pid_list;	/* list of job_step_pids_t *'s */
+	List pid_list; /* List of job_step_pids_t *'s */
 	slurm_step_id_t step_id;
 } job_step_pids_response_msg_t;
 
@@ -2968,7 +2576,7 @@ typedef struct {
 } job_step_stat_t;
 
 typedef struct {
-	list_t *stats_list;	/* list of job_step_stat_t *'s */
+	List stats_list;	/* List of job_step_stat_t *'s */
 	slurm_step_id_t step_id;
 } job_step_stat_response_msg_t;
 
@@ -2989,15 +2597,15 @@ typedef struct node_info {
 				   i.e cpus minus specialized cpus*/
 	char *cpu_spec_list;	/* node's specialized cpus */
 	acct_gather_energy_t *energy;	 /* energy data */
+	ext_sensors_data_t *ext_sensors; /* external sensor data */
 	char *extra;		/* arbitrary sting */
+	power_mgmt_data_t *power;        /* power management data */
 	char *features;		/* list of a node's available features */
 	char *features_act;	/* list of a node's current active features,
 				 * Same as "features" if NULL */
 	char *gres;		/* list of a node's generic resources */
 	char *gres_drain;	/* list of drained GRES */
 	char *gres_used;	/* list of GRES in current use */
-	char *instance_id;	/* cloud instance id */
-	char *instance_type;	/* cloud instance type */
 	time_t last_busy;	/* time node was last busy (i.e. no jobs) */
 	char *mcs_label;	/* mcs label if mcs plugin in use */
 	uint64_t mem_spec_limit; /* MB memory limit for specialization */
@@ -3016,19 +2624,12 @@ typedef struct node_info {
 				 * populated by scontrol */
 	uint16_t port;		/* TCP port number of the slurmd */
 	uint64_t real_memory;	/* configured MB of real memory on the node */
-	uint16_t res_cores_per_gpu; /* number of cores per GPU to allow
-				     * to only GPU jobs */
-	char *gpu_spec;         /* node's cores reserved for GPU jobs */
 	char *comment;		/* arbitrary comment */
 	char *reason;		/* reason for node being DOWN or DRAINING */
 	time_t reason_time;	/* Time stamp when reason was set, ignore if
 				 * no reason is set. */
 	uint32_t reason_uid;   	/* User that set the reason, ignore if
 				 * no reason is set. */
-	time_t resume_after;    /* automatically resume DOWN or DRAINED node at
-			         * this point in time */
-	char *resv_name;        /* If node is in a reservation this is
-				 * the name of the reservation */
 	dynamic_plugin_data_t *select_nodeinfo;  /* opaque data structure,
 						  * use
 						  * slurm_get_select_nodeinfo()
@@ -3084,7 +2685,6 @@ typedef struct topo_info {
 typedef struct topo_info_response_msg {
 	uint32_t record_count;		/* number of records */
 	topo_info_t *topo_array;	/* the switch topology records */
-	dynamic_plugin_data_t *topo_info;
 } topo_info_response_msg_t;
 
 typedef struct job_alloc_info_msg {
@@ -3092,12 +2692,7 @@ typedef struct job_alloc_info_msg {
 	char    *req_cluster;   /* requesting cluster */
 } job_alloc_info_msg_t;
 
-#define SLURM_SELECTED_STEP_INITIALIZER \
-	{ NULL, NO_VAL, NO_VAL, { NO_VAL, NO_VAL, NO_VAL } }
-
 typedef struct {
-	bitstr_t *array_bitmap; /* Set with slurm_array_str2bitmap().
-				 * NOT PACKED */
 	uint32_t array_task_id;		/* task_id of a job array or NO_VAL */
 	uint32_t het_job_offset;	/* het_job_offset or NO_VAL */
 	slurm_step_id_t step_id;
@@ -3125,32 +2720,33 @@ typedef struct job_defaults {
 
 /* Current partition state information and used to set partition options
  * using slurm_update_partition(). */
-#define PART_FLAG_DEFAULT	SLURM_BIT(0) /* Set if default partition */
-#define PART_FLAG_HIDDEN	SLURM_BIT(1) /* Set if partition is hidden */
-#define PART_FLAG_NO_ROOT	SLURM_BIT(2) /* Set if user root jobs disabled */
-#define PART_FLAG_ROOT_ONLY	SLURM_BIT(3) /* Set if only root can submit jobs */
-#define PART_FLAG_REQ_RESV	SLURM_BIT(4) /* Set if reservation is required */
-#define PART_FLAG_LLN		SLURM_BIT(5) /* Set if least loaded node selection
-					      * is desired */
-#define PART_FLAG_EXCLUSIVE_USER SLURM_BIT(6)/* Set if nodes allocated exclusively
-					      * by user */
-#define PART_FLAG_PDOI		SLURM_BIT(7) /* Set if nodes POWER_DOWN on IDLE,
-					      * after running jobs */
+#define PART_FLAG_DEFAULT	0x0001	/* Set if default partition */
+#define PART_FLAG_HIDDEN	0x0002	/* Set if partition is hidden */
+#define PART_FLAG_NO_ROOT	0x0004	/* Set if user root jobs disabled */
+#define PART_FLAG_ROOT_ONLY	0x0008	/* Set if only root can submit jobs */
+#define PART_FLAG_REQ_RESV	0x0010	/* Set if reservation is required */
+#define PART_FLAG_LLN		0x0020	/* Set if least loaded node selection
+					 * is desired */
+#define PART_FLAG_EXCLUSIVE_USER 0x0040	/* Set if nodes allocated exclusively
+					 * by user */
+#ifdef __METASTACK_NEW_PART_LLS
+#define PART_FLAG_LLS		0x0080	/* Set if least loaded socket selection is desired */
+#endif
+
 /* Used with slurm_update_partition() to clear flags associated with existing
  * partitions. For example, if a partition is currently hidden and you want
  * to make it visible then set flags to PART_FLAG_HIDDEN_CLR and call
  * slurm_update_partition(). */
-#define PART_FLAG_DEFAULT_CLR	SLURM_BIT(8)  /* Clear DEFAULT partition flag */
-#define PART_FLAG_HIDDEN_CLR	SLURM_BIT(9)  /* Clear HIDDEN partition flag */
-#define PART_FLAG_NO_ROOT_CLR	SLURM_BIT(10) /* Clear NO_ROOT partition flag */
-#define PART_FLAG_ROOT_ONLY_CLR	SLURM_BIT(11) /* Clear ROOT_ONLY partition flag */
-#define PART_FLAG_REQ_RESV_CLR	SLURM_BIT(12) /* Clear RES_REQ partition flag */
-#define PART_FLAG_LLN_CLR	SLURM_BIT(13) /* Clear LLN partition flag */
-#define PART_FLAG_EXC_USER_CLR	SLURM_BIT(14) /* Clear EXCLUSIVE_USER flag */
-#define PART_FLAG_PDOI_CLR	SLURM_BIT(15) /* Clear PDOI partition flag */
-
-#define PART_FLAG_EXCLUSIVE_TOPO SLURM_BIT(16)/* Set if Topo allocated exclusively */
-#define PART_FLAG_EXC_TOPO_CLR SLURM_BIT(17) /* Clear EXCLUSIVE_TOPO flag */
+#define PART_FLAG_DEFAULT_CLR	0x0100	/* Clear DEFAULT partition flag */
+#define PART_FLAG_HIDDEN_CLR	0x0200	/* Clear HIDDEN partition flag */
+#define PART_FLAG_NO_ROOT_CLR	0x0400	/* Clear NO_ROOT partition flag */
+#define PART_FLAG_ROOT_ONLY_CLR	0x0800	/* Clear ROOT_ONLY partition flag */
+#define PART_FLAG_REQ_RESV_CLR	0x1000	/* Clear RES_REQ partition flag */
+#define PART_FLAG_LLN_CLR	0x2000	/* Clear LLN partition flag */
+#define PART_FLAG_EXC_USER_CLR	0x4000	/* Clear EXCLUSIVE_USER flag */
+#ifdef __METASTACK_NEW_PART_LLS
+#define PART_FLAG_LLS_CLR	    0x8000	/* Clear LLS partition flag */
+#endif
 
 #ifdef __METASTACK_NEW_HETPART_SUPPORT
 #define PART_METAFLAG_HETPART		0x0001	/* Set if Heterogeneous partition */
@@ -3162,9 +2758,11 @@ typedef struct job_defaults {
 #define PART_METAFLAG_RBN_CLR 	0x0200  /* Clear RBN partition flag */
 #endif
 
-#ifdef __METASTACK_NEW_PART_LLS
-#define PART_METAFLAG_LLS 	0x0003  /* Set if least loaded socket selection is desired */
-#define PART_METAFLAG_LLS_CLR 	0x0300  /* Clear LLS partition flag */
+#ifdef __METASTACK_NEW_AUTO_SUPPLEMENT_AVAIL_NODES
+#define PART_METAFLAG_NODE_BORROW 	0x0001
+#endif
+#ifdef __METASTACK_PART_PRIORITY_WEIGHT
+#define PART_METAFLAG_PRIO_PARAMS 	0x0010
 #endif
 
 #ifdef __METASTACK_NEW_HETPART_SUPPORT
@@ -3174,15 +2772,6 @@ enum hetpart_resv_stage {
 	RESV_STAGE_SUBMIT_OR_BACKFILL	/* Job submission or backfill scheduling */
 };
 #endif
-
-#ifdef __METASTACK_NEW_AUTO_SUPPLEMENT_AVAIL_NODES
-#define PART_METAFLAG_NODE_BORROW 	0x0001
-#endif
-
-#ifdef __METASTACK_PART_PRIORITY_WEIGHT
-#define PART_METAFLAG_PRIO_PARAMS 	0x0010
-#endif
-
 
 typedef struct partition_info {
 	char *allow_alloc_nodes;/* list names of allowed allocating
@@ -3202,13 +2791,12 @@ typedef struct partition_info {
 	uint32_t default_time;	/* minutes, NO_VAL or INFINITE */
 	char *deny_accounts;    /* comma delimited list of denied accounts */
 	char *deny_qos;		/* comma delimited list of denied qos */
-	uint32_t flags;		/* see PART_FLAG_* above */
+	uint16_t flags;		/* see PART_FLAG_* above */
 	uint32_t grace_time; 	/* preemption grace time in seconds */
-	list_t *job_defaults_list; /* List of job_defaults_t elements */
+	List job_defaults_list;	/* List of job_defaults_t elements */
 	char *job_defaults_str;	/* String of job defaults,
 				 * used only for partition update RPC */
 	uint32_t max_cpus_per_node; /* maximum allocated CPUs per node */
-	uint32_t max_cpus_per_socket; /* maximum allocated CPUs per socket */
 	uint64_t max_mem_per_cpu; /* maximum MB memory per allocated CPU */
 	uint32_t max_nodes;	/* per job or INFINITE */
 	uint16_t max_share;	/* number of jobs to gang schedule */
@@ -3218,9 +2806,9 @@ typedef struct partition_info {
 	int32_t *node_inx;	/* list index pairs into node_table:
 				 * start_range_1, end_range_1,
 				 * start_range_2, .., -1  */
-	char *nodes;		/* list names of nodes in partition */
+	char *nodes;		/* list names of nodes in partition */	
 	char *nodesets;		/* list of nodesets used by partition */
-#if (defined __METASTACK_NEW_HETPART_SUPPORT) || (defined __METASTACK_NEW_PART_RBN) || (defined __METASTACK_NEW_PART_LLS)
+#if (defined __METASTACK_NEW_HETPART_SUPPORT) || (defined __METASTACK_NEW_PART_RBN)
 	uint16_t meta_flags;		/* see PART_NEWFLAG_* above */
 #endif
 	uint16_t over_time_limit; /* job's time limit can be exceeded by this
@@ -3230,7 +2818,7 @@ typedef struct partition_info {
 	uint16_t priority_tier;	/* tier for scheduling and preemption */
 	char *qos_char;	        /* The partition QOS name */
 	uint16_t resume_timeout; /* time required in order to perform a node
-				  * resume operation */
+				  * resume operation */					 
 	uint16_t state_up;	/* see PARTITION_ states above */
 	uint32_t suspend_time;  /* node idle for this long before power save
 				 * mode */
@@ -3278,34 +2866,7 @@ typedef struct {
 
 } watch_dog_record_t;
 #endif
-#ifdef __METASTACK_OPT_APP  
-/*    
- * app_record_t - Core application record.    
- *    
- * Represents a registered application (e.g. "vasp") in the system.    
- * AppName is the unique primary key. Version is an optional comma-separated    
- * list of allowed versions (like partition's AllowAccounts).    
- *    
- * Managed by slurmctld; stored in app_list (ownership) and    
- * app_hash_table (O(1) lookup by app_name, references only).    
- * A secondary hash (app_combined_hash) maps "appname-version" strings    
- * to app records for O(1) --app validation.    
- *    
- * Lifecycle: created by slurm.conf parsing or scontrol create app,    
- * persisted to app_state file, recovered on slurmctld restart.    
- *    
- * Memory ownership: app_list owns the records via _list_delete_app;    
- * app_hash_table holds non-owning references (freefunc=NULL).    
- * app_combined_hash owns its entry wrappers (freefunc frees them).    
- */  
-typedef struct {    
-	char    *app_name;      /* application name, unique primary key */    
-	char    *versions;      /* comma-separated version list, optional (NULL = no version restriction) */    
-	char    *description;   /* description */    
-	char    *watchdog;      /* bound watchdog name */  
-	bool     default_flag;  /* true if this app is the cluster default */    
-} app_record_t;  
-#endif
+
 typedef struct delete_partition_msg {
 	char *name;		/* name of partition to be delete */
 } delete_part_msg_t;
@@ -3324,8 +2885,6 @@ typedef struct resource_allocation_response_msg {
 	char **environment;	/* environment variables to set for job,
 				 *  name=value pairs, one per line */
 	uint32_t error_code;	/* error code for warning message */
-	gid_t gid; /* resolved group id of job */
-	char *group_name; /* resolved group name of job */
 	char *job_submit_user_msg;/* job_submit plugin user_msg */
 	slurm_addr_t *node_addr;  /* network addresses */
 	uint32_t node_cnt;	/* count of nodes */
@@ -3342,24 +2901,13 @@ typedef struct resource_allocation_response_msg {
 				  * default=0 (no limit) */
 	char *qos;               /* allocation qos */
 	char *resv_name;         /* allocation reservation */
-	char *tres_per_node; /* comma delimited list of TRES=# values */
-#ifdef __METASTACK_BUG_UPDATE_JOB_ENV
-	char *tres_per_task; /* comma delimited list of TRES=# values */
-	char *tres_bind;
-#endif
-	uid_t uid; /* resolved user id of job */
-	char *user_name; /* resolved user name of job */
+	dynamic_plugin_data_t *select_jobinfo;	/* opaque data structure,
+						 * use
+						 * select_g_select_jobinfo_*
+						 * to access contents */
 	void *working_cluster_rec; /* Cluster to direct remaining messages to.
 				    * slurmdb_cluster_rec_t* because slurm.h
 				    * doesn't know about slurmdb.h. */
-#ifdef __METASTACK_OPT_APP  
-	/* App info propagated to srun/salloc for environment injection.  
-	 * Set by slurmctld in _fill_job_alloc_info, consumed by  
-	 * setup_env() to set SLURM_JOB_APP_NAME/VERSION/SOURCE. */  
-	char *app_name;  
-	char *app_version;  
-	uint8_t app_source;  
-#endif
 } resource_allocation_response_msg_t;
 
 typedef struct partition_info_msg {
@@ -3370,74 +2918,10 @@ typedef struct partition_info_msg {
 
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
 typedef struct slurm_ctl_conf_info_msg_watch_dog {
-	time_t last_update;
-	uint32_t record_count;	/* number of records */
-	watch_dog_record_t * watch_dog_array;	/* the watch dog records */
+	time_t          last_update;
+	uint32_t        record_count;	         /* number of records */
+    watch_dog_record_t * watch_dog_array;    /* the watch dog records */
 } slurm_ctl_conf_info_msg_watch_dog_t;
-#endif
-
-#ifdef __METASTACK_OPT_APP
-/*  
- * slurm_ctl_conf_info_msg_app_t — Response message for REQUEST_BUILD_APP_INFO.  
- * Contains an array of app_record_t returned by slurmctld to client commands  
- * (scontrol show app). Freed by slurm_free_app_info_msg().  
- */  
-typedef struct slurm_ctl_conf_info_msg_app {  
-	time_t last_update;  
-	uint32_t record_count;  
-	app_record_t *app_array;  
-} slurm_ctl_conf_info_msg_app_t;
-
-/*
- * Tri-state for app_desc_msg_t.default_spec (RPC create/update).
- * Semantics differ from app_record_t.default_flag (runtime bool).
- */
-#define APP_DESC_DEFAULT_NO     ((uint8_t)0)
-#define APP_DESC_DEFAULT_YES    ((uint8_t)1)
-#define APP_DESC_DEFAULT_IGNORE ((uint8_t)0xff) /* update: leave default unchanged */
-
-/*    
- * app_desc_msg_t - RPC message for create/update app.    
- *    
- * Used by both REQUEST_CREATE_APP and REQUEST_UPDATE_APP.    
- * For update: fields set to NULL mean "don't change".    
- * default_spec uses APP_DESC_DEFAULT_* (tri-state).  
- */  
-typedef struct app_desc_msg {    
-	char *app_name;    
-	char *versions;     /* comma-separated version list, optional */    
-	char *description;    
-	char *watchdog;    
-	uint8_t default_spec; /* APP_DESC_DEFAULT_* */  
-} app_desc_msg_t;
-  
-/* Message for delete app */  
-typedef struct delete_app_msg {  
-	char *name; /* app_name, e.g. "vasp" */
-} delete_app_msg_t;  
-  
-/* API functions */  
-extern int slurm_load_app(time_t update_time,  
-                          slurm_ctl_conf_info_msg_app_t **app_info_ptr);  
-extern int slurm_create_app(app_desc_msg_t *app_msg);  
-extern int slurm_update_app(app_desc_msg_t *app_msg);  
-extern int slurm_delete_app(delete_app_msg_t *app_msg); 
-/*  
- * App message memory management functions.  
- * slurm_free_app_info_members — free internal strings of a single app_record_t  
- * slurm_free_app_info_msg     — free the entire RESPONSE_BUILD_APP_INFO message  
- * slurm_free_app_desc_msg     — free a REQUEST_CREATE/UPDATE_APP message  
- * slurm_free_delete_app_msg   — free a REQUEST_DELETE_APP message  
- * slurm_init_app_desc_msg     — default_spec=APP_DESC_DEFAULT_IGNORE  
- */   
-extern void slurm_free_app_info_msg(slurm_ctl_conf_info_msg_app_t *msg);  
-extern void slurm_free_app_info_members(app_record_t *app);  
-extern void slurm_free_app_desc_msg(app_desc_msg_t *msg);  
-extern void slurm_free_delete_app_msg(delete_app_msg_t *msg);  
-extern void slurm_init_app_desc_msg(app_desc_msg_t *msg);  
-extern void slurm_print_app_info(FILE *out, app_record_t *app_ptr, int one_liner);  
-extern char *slurm_sprint_app_info(app_record_t *app_ptr, int one_liner);
-extern void slurm_print_app_list(slurm_ctl_conf_info_msg_app_t *app_info);
 #endif
 
 typedef struct will_run_response_msg {
@@ -3445,7 +2929,7 @@ typedef struct will_run_response_msg {
 	char *job_submit_user_msg; /* job submit plugin user_msg */
 	char *node_list;	/* nodes where job will start */
 	char *part_name;	/* partition where job will start */
-	list_t *preemptee_job_id; /* jobs preempted to start this job */
+	List preemptee_job_id;	/* jobs preempted to start this job */
 	uint32_t proc_cnt;	/* CPUs allocated to job at start */
 	time_t start_time;	/* time when job will start */
 	double sys_usage_per;	/* System usage percentage */
@@ -3477,7 +2961,8 @@ typedef struct will_run_response_msg {
 						  * nodes only flag */
 #define RESERVE_FLAG_OVERLAP	   SLURM_BIT(14) /* Permit to overlap others */
 #define RESERVE_FLAG_SPEC_NODES	   SLURM_BIT(15) /* Contains specific nodes */
-/* SLURM_BIT(16) Available 2 versions after 23.11 */
+#define RESERVE_FLAG_FIRST_CORES   SLURM_BIT(16) /* Use only first cores
+						  * on each node */
 #define RESERVE_FLAG_TIME_FLOAT	   SLURM_BIT(17) /* Time offset is relative */
 #define RESERVE_FLAG_REPLACE	   SLURM_BIT(18) /* Replace resources
 						  * as assigned to jobs */
@@ -3517,15 +3002,8 @@ typedef struct will_run_response_msg {
 						  * reservation proper */
 #define RESERVE_FLAG_HOURLY	   SLURM_BIT(35) /* Set HOURLY flag */
 #define RESERVE_FLAG_NO_HOURLY	   SLURM_BIT(36) /* Clear HOURLY flag */
-#define RESERVE_FLAG_GRES_REQ	   SLURM_BIT(37) /* There has been GRES
-						  * requested */
-#define RESERVE_TRES_PER_NODE      SLURM_BIT(38) /* If the tres_str is per-node
-						  * instead of per-job */
-#define RESERVE_FLAG_USER_DEL	   SLURM_BIT(39) /* Allow users in the ACL to
-						    delete this reservation */
-#define RESERVE_FLAG_NO_USER_DEL   SLURM_BIT(40) /* Clear USER_DEL flag */
 
-#define RESERVE_REOCCURRING	(RESERVE_FLAG_HOURLY | RESERVE_FLAG_DAILY | \
+#define RESERVE_REOCCURING	(RESERVE_FLAG_HOURLY | RESERVE_FLAG_DAILY | \
 				 RESERVE_FLAG_WEEKLY | RESERVE_FLAG_WEEKDAY | \
 				 RESERVE_FLAG_WEEKEND)
 
@@ -3537,7 +3015,6 @@ typedef struct resv_core_spec {
 typedef struct reserve_info {
 	char *accounts;		/* names of accounts permitted to use */
 	char *burst_buffer;	/* burst buffer resources to be included */
-	char *comment;		/* arbitrary comment */
 	uint32_t core_cnt;	/* count of cores required */
 	uint32_t core_spec_cnt;	/* count of core_spec records */
 	resv_core_spec_t *core_spec; /* reserved cores specification */
@@ -3562,6 +3039,7 @@ typedef struct reserve_info {
 				   * until it is revoked.
 				   */
 	time_t start_time;	/* start time of reservation */
+	uint32_t resv_watts;    /* amount of power to reserve  */
 	char *tres_str;         /* list of TRES's used by reservation */
 	char *users;		/* names of users permitted to use */
 } reserve_info_t;
@@ -3575,21 +3053,23 @@ typedef struct reserve_info_msg {
 typedef struct resv_desc_msg {
 	char *accounts;		/* names of accounts permitted to use */
 	char *burst_buffer;	/* burst buffer resources to be included */
-	char *comment;		/* arbitrary comment */
-	uint32_t core_cnt;	/* Count of cores required */
+	uint32_t *core_cnt;	/* Count of cores required */
 	uint32_t duration;	/* duration of reservation in minutes */
 	time_t end_time;	/* end time of reservation */
 	char *features;		/* required node features */
 	uint64_t flags;		/* see RESERVE_FLAG_* above */
 	char *groups;		/* names of linux groups permitted to use */
-	void *job_ptr;          /* internal use only DON'T PACK */
 	char *licenses;		/* names of licenses to be reserved */
 	uint32_t max_start_delay;/* Maximum delay in which jobs outside of the
 				  * reservation will be permitted to overlap
 				  * once any jobs are queued for the
 				  * reservation */
 	char *name;		/* name of reservation (optional on create) */
-	uint32_t node_cnt;	/* Count of nodes required. */
+	uint32_t *node_cnt;	/* Count of nodes required. Specify set of job
+				 * sizes with trailing zero to optimize layout
+				 * for those jobs just specify their total size
+				 * to ignore optimized topology. For example,
+				 * {512,512,1024,0} OR {2048,0}. */
 	char *node_list;	/* list of reserved nodes or ALL */
 	char *partition;	/* name of partition to be used */
 	uint32_t purge_comp_time; /* If PURGE_COMP flag is set the amount of
@@ -3597,6 +3077,7 @@ typedef struct resv_desc_msg {
 				   * until it is revoked.
 				   */
 	time_t start_time;	/* start time of reservation */
+	uint32_t resv_watts;    /* amount of power to reserve  */
 	char *tres_str;         /* list of TRES's used by reservation */
 	char *users;		/* names of users permitted to use */
 } resv_desc_msg_t;
@@ -3631,19 +3112,19 @@ typedef struct reservation_name_msg {
 #define DEBUG_FLAG_GANG		SLURM_BIT(13) /* debug gang scheduler */
 #define DEBUG_FLAG_RESERVATION	SLURM_BIT(14) /* advanced reservations */
 #define DEBUG_FLAG_FRONT_END	SLURM_BIT(15) /* front-end nodes */
-#define DEBUG_FLAG_SACK		SLURM_BIT(16) /* SACK handling */
+/* #define 		 	SLURM_BIT(16) /\* UNUSED *\/ */
 #define DEBUG_FLAG_SWITCH	SLURM_BIT(17) /* SwitchType plugin */
 #define DEBUG_FLAG_ENERGY	SLURM_BIT(18) /* AcctGatherEnergy plugin */
-#define DEBUG_FLAG_TLS		SLURM_BIT(19) /* TLS plugin */
+#define DEBUG_FLAG_EXT_SENSORS	SLURM_BIT(19) /* ExtSensorsType plugin */
 #define DEBUG_FLAG_LICENSE	SLURM_BIT(20) /* AcctGatherProfile
 						    * plugin */
 #define DEBUG_FLAG_PROFILE	SLURM_BIT(21) /* AcctGatherProfile
 						    * plugin */
 #define DEBUG_FLAG_INTERCONNECT	SLURM_BIT(22) /* AcctGatherInterconnect
 						    * plugin */
-#define DEBUG_FLAG_GLOB_SILENCE SLURM_BIT(23) /* Supresses the glob error */
+/* #define 		 	SLURM_BIT(23) /\* UNUSED *\/ */
 #define DEBUG_FLAG_JOB_CONT 	SLURM_BIT(24) /* JobContainer plugin */
-#define	DEBUG_FLAG_AUDIT_RPCS	SLURM_BIT(25) /* Audit RPCs */
+/* #define			SLURM_BIT(25) /\* UNUSED *\/ */
 #define DEBUG_FLAG_PROTOCOL	SLURM_BIT(26) /* Communication protocol */
 #define DEBUG_FLAG_BACKFILL_MAP	SLURM_BIT(27) /* Backfill scheduler node
 						    * map */
@@ -3663,15 +3144,15 @@ typedef struct reservation_name_msg {
 #define DEBUG_FLAG_BURST_BUF    SLURM_BIT(40) /* Burst buffer plugin */
 #define DEBUG_FLAG_CPU_FREQ     SLURM_BIT(41) /* --cpu_freq debug */
 #define DEBUG_FLAG_POWER        SLURM_BIT(42) /* Power plugin debug */
-/* #define			SLURM_BIT(43) /\* UNUSED *\/ */
+#define DEBUG_FLAG_TIME_CRAY    SLURM_BIT(43) /* Time Cray components */
 #define DEBUG_FLAG_DB_ARCHIVE	SLURM_BIT(44) /* DBD Archiving/Purging */
 #define DEBUG_FLAG_DB_TRES      SLURM_BIT(45) /* Database TRES debug */
-#define DEBUG_FLAG_JOBCOMP      SLURM_BIT(46) /* JobComp debug */
+#define DEBUG_FLAG_ESEARCH      SLURM_BIT(46) /* Elasticsearch debug */
 #define DEBUG_FLAG_NODE_FEATURES SLURM_BIT(47) /* Node Features debug */
 #define DEBUG_FLAG_FEDR         SLURM_BIT(48) /* Federation debug */
 #define DEBUG_FLAG_HETJOB	SLURM_BIT(49) /* Heterogeneous job debug */
 #define DEBUG_FLAG_ACCRUE       SLURM_BIT(50) /* Accrue counters debug */
-#define DEBUG_FLAG_DBD_AGENT	SLURM_BIT(51) /* DBD Agent debug */
+/* #define     		 	SLURM_BIT(51) /\* UNUSED *\/ */
 #define DEBUG_FLAG_AGENT	SLURM_BIT(52) /* RPC Agent debug */
 #define DEBUG_FLAG_DEPENDENCY	SLURM_BIT(53) /* Dependency debug */
 #define DEBUG_FLAG_JAG		SLURM_BIT(54) /* Job Account Gather debug */
@@ -3679,7 +3160,7 @@ typedef struct reservation_name_msg {
 #define DEBUG_FLAG_SCRIPT	SLURM_BIT(56) /* slurmscriptd debug */
 
 #ifdef __METASTACK_OPT_SACCTMGR_ADD_USER
-#define DEBUG_FLAG_ASSOC	SLURM_BIT(57) /*Association Details debug*/
+#define DEBUG_FLAG_ASSOC	SLURM_BIT(57) /*slurmctld association debug*/
 #endif
 
 #define PREEMPT_MODE_OFF	0x0000	/* disable job preemption */
@@ -3691,18 +3172,12 @@ typedef struct reservation_name_msg {
 #define PREEMPT_MODE_WITHIN	0x4000	/* enable preemption within qos */
 #define PREEMPT_MODE_GANG	0x8000	/* enable gang scheduling */
 
-#define RECONFIG_KEEP_PART_INFO SLURM_BIT(0) /* keep dynamic partition info on scontrol reconfig */
-#define RECONFIG_KEEP_PART_STAT SLURM_BIT(1) /* keep dynamic partition state on scontrol reconfig */
-#define RECONFIG_KEEP_POWER_SAVE_SETTINGS SLURM_BIT(2) /* keep dynamic power save settings on scontrol reconfig */
-#ifdef __METASTACK_OPT_APP  
-#define RECONFIG_KEEP_APP_INFO SLURM_BIT(3)  
-#endif
+#define RECONFIG_KEEP_PART_INFO 0x0001 /* keep dynamic partition info on scontrol reconfig */
+#define RECONFIG_KEEP_PART_STAT 0x0002 /* keep dynamic partition state on scontrol reconfig */
 
 #define HEALTH_CHECK_NODE_IDLE	0x0001	/* execute on idle nodes */
 #define HEALTH_CHECK_NODE_ALLOC	0x0002	/* execute on fully allocated nodes */
 #define HEALTH_CHECK_NODE_MIXED	0x0004	/* execute on partially allocated nodes */
-#define HEALTH_CHECK_NODE_NONDRAINED_IDLE 0x0008 /* execute on idle nodes that
-						  * are not drained */
 #define HEALTH_CHECK_CYCLE	0x8000	/* cycle through nodes node */
 #define HEALTH_CHECK_NODE_ANY	0x000f	/* execute on all node states */
 
@@ -3715,41 +3190,30 @@ typedef struct reservation_name_msg {
 #define PROLOG_FLAG_SERIAL 	0x0008 /* serially execute prolog/epilog */
 #define PROLOG_FLAG_X11		0x0010 /* enable slurm x11 forwarding support */
 #define PROLOG_FLAG_DEFER_BATCH	0x0020 /* defer REQUEST_BATCH_JOB_LAUNCH until prolog end on all nodes */
-#define PROLOG_FLAG_FORCE_REQUEUE_ON_FAIL 0x0040 /* always requeue job on prolog failure */
-#define PROLOG_FLAG_RUN_IN_JOB 0x0080 /* run prolog/epilog in slurmstepd */
 
-#define CONF_FLAG_OR		SLURM_BIT(0) /* SlurmdParameters=config_overrides */
-#define CONF_FLAG_SJC		SLURM_BIT(1) /* AccountingStoreFlags=job_comment */
-#define CONF_FLAG_DRJ		SLURM_BIT(2) /* DisableRootJobs */
-#define CONF_FLAG_ASRU		SLURM_BIT(3) /* AllowSpecResourcesUsage */
-#define CONF_FLAG_PAM		SLURM_BIT(4) /* UsePam */
-#define CONF_FLAG_WCKEY		SLURM_BIT(5) /* TrackWCKey */
-#define CONF_FLAG_IPV4_ENABLED	SLURM_BIT(6) /* IPv4 is enabled */
-#define CONF_FLAG_IPV6_ENABLED	SLURM_BIT(7) /* IPv6 is enabled */
-#define CONF_FLAG_SJX		SLURM_BIT(8) /* AccountingStoreFlags=job_extra */
-#define CONF_FLAG_SJS		SLURM_BIT(9) /* AccountingStoreFlags=job_script */
-#define CONF_FLAG_SJE		SLURM_BIT(10) /* AccountingStoreFlags=job_env */
-#define CONF_FLAG_L3CSOCK	SLURM_BIT(11) /* SlurmdParameters=l3cache_as_socket */
-#define CONF_FLAG_NNSOCK	SLURM_BIT(12) /* SlurmdParameters=numa_node_as_socket */
-#define CONF_FLAG_ECORE		SLURM_BIT(13) /* SlurmdParameters=allow_ecores */
-#define CONF_FLAG_SHR		SLURM_BIT(14) /* SlurmdParameters=shutdown_on_reboot */
-#define CONF_FLAG_CONTAIN_SPANK SLURM_BIT(15) /* SlurmdParameters=contain_spank */
-#define CONF_FLAG_NO_STDIO	SLURM_BIT(16) /* AccountingStoreFlags=no_stdio */
+#define CTL_CONF_OR             SLURM_BIT(0) /*SlurmdParameters=config_overrides*/
+#define CTL_CONF_SJC            SLURM_BIT(1) /* AccountingStoreFlags=job_comment*/
+#define CTL_CONF_DRJ            SLURM_BIT(2) /* DisableRootJobs */
+#define CTL_CONF_ASRU           SLURM_BIT(3) /* AllowSpecResourcesUsage */
+#define CTL_CONF_PAM            SLURM_BIT(4) /* UsePam */
+#define CTL_CONF_WCKEY          SLURM_BIT(5) /* TrackWCKey */
+#define CTL_CONF_IPV4_ENABLED   SLURM_BIT(6) /* IPv4 is enabled */
+#define CTL_CONF_IPV6_ENABLED   SLURM_BIT(7) /* IPv6 is enabled */
+/*                              SLURM_BIT(8) UNUSED */
+#define CTL_CONF_SJS            SLURM_BIT(9) /* AccountingStoreFlags=job_script */
+#define CTL_CONF_SJE            SLURM_BIT(10) /* AccountingStoreFlags=job_env */
 #ifdef __METASTACK_OPT_RPC_USER_FIX
-#define CONF_FLAG_ASS		SLURM_BIT(24) /* AssocServerSort, Add User or
+#define CTL_CONF_ASS			SLURM_BIT(24) /* AssocServerSort, Add User or
 					* Account with no slurmdb_sort_hierarchical_assoc_list */
 #endif
-
-
 #ifdef __METASTACK_OPT_REGISTRATION_FIX
-#define CONF_FLAG_DNR		SLURM_BIT(25) /* DownNodeToReg, Control whether down*
+#define CTL_CONF_DNR			SLURM_BIT(25) /* DownNodeToReg, Control whether down*
 					* nodes perform node registration */
 #endif
 #ifdef __METASTACK_NEW_STATE_TO_NHC
-#define CONF_FLAG_HCN			SLURM_BIT(26) /* HealthCheckCarryNode, Control HealthCheck
+#define CTL_CONF_HCN			SLURM_BIT(26) /* HealthCheckCarryNode, Control HealthCheck
 					* carry node state to computer node */
 #endif
-
 #define LOG_FMT_ISO8601_MS      0
 #define LOG_FMT_ISO8601         1
 #define LOG_FMT_RFC5424_MS      2
@@ -3757,14 +3221,7 @@ typedef struct reservation_name_msg {
 #define LOG_FMT_CLOCK           4
 #define LOG_FMT_SHORT           5
 #define LOG_FMT_THREAD_ID       6
-#define LOG_FMT_RFC3339         7
-#define LOG_FMT_FORMAT_STDERR   SLURM_BIT(15)
 
-/*
- * If adding to slurm_conf_t contents that need to be used in the slurmstepd
- * please remember to add those to [un]pack_slurm_conf_lite() in
- * src/slurmd/common/slurmstepd_init.[h|c]
- */
 typedef struct {
 	time_t last_update;	/* last update time of the build parameters */
 	char *accounting_storage_tres; /* list of tres */
@@ -3797,11 +3254,13 @@ typedef struct {
 	time_t boot_time;	/* time slurmctld last booted */
 	void *cgroup_conf;	/* cgroup support config file */
 	char *cli_filter_plugins; /* List of cli_filter plugins to use */
+	char *core_spec_plugin;	/* core specialization plugin name */
 	char *cluster_name;     /* general name of the entire cluster */
 	char *comm_params;     /* Communication parameters */
 	uint16_t complete_wait;	/* seconds to wait for job completion before
 				 * scheduling another job */
-	uint32_t conf_flags;   	/* CONF_FLAG_* flags */
+	uint32_t conf_flags;   	/* various CTL_CONF_* flags to determine
+				 * settings */
 	char **control_addr;	/* comm path of slurmctld
 				 * primary server and backups */
 	uint32_t control_cnt;	/* Length of control_addr & control_machine */
@@ -3816,26 +3275,25 @@ typedef struct {
 	uint16_t eio_timeout;     /* timeout for the eio thread */
 	uint16_t enforce_part_limits;	/* if set, reject job exceeding
 					 * partition size and/or time limits */
-	char **epilog;		/* pathname of job epilog run by slurmd */
-	uint32_t epilog_cnt;	/* number of epilog values */
+	char *epilog;		/* pathname of job epilog */
 	uint32_t epilog_msg_time;  /* usecs for slurmctld to process an
 				    * epilog complete message */
-	char **epilog_slurmctld; /* pathname of job epilog run by slurmctld */
-	uint32_t epilog_slurmctld_cnt; /* number of epilog_slurmctld values */
+	char *epilog_slurmctld;	/* pathname of job epilog run by slurmctld */
+	char *ext_sensors_type; /* external sensors plugin type */
+	uint16_t ext_sensors_freq; /* secs between ext sensors sampling */
+	void *ext_sensors_conf; /* external sensors config file*/
 #ifdef __METASTACK_OPT_MSG_OUTPUT
-	char *extra_msg_file;
+    char *extra_msg_file;
 #endif
 	char *fed_params;       /* Federation parameters */
 	uint32_t first_job_id;	/* first slurm generated job_id to assign */
 	uint16_t fs_dampening_factor; /* dampening for Fairshare factor */
-	uint16_t getnameinfo_cache_timeout; /* for getnameinfo() cache*/
 	uint16_t get_env_timeout; /* timeout for srun --get-user-env option */
 	char * gres_plugins;	/* list of generic resource plugins */
 	uint16_t group_time;    /* update group time interval */
 	uint16_t group_force;   /* update group/partition info even if no change
 				 * detected */
 	char *gpu_freq_def;	/* default GPU frequency / voltage */
-	char *hash_plugin;	/* hash plugin type */
 	uint32_t hash_val;      /* Hash value of the slurm.conf file */
 	uint16_t health_check_interval;	/* secs between health checks */
 	uint16_t health_check_node_state; /* Node states on which to execute
@@ -3858,7 +3316,9 @@ typedef struct {
 	char *job_comp_type;	/* job completion storage type */
 	char *job_comp_user;	/* job completion storage user */
 	char *job_container_plugin; /* job container plugin type */
-	list_t *job_defaults_list; /* list of job_defaults_t elements */
+	char *job_credential_private_key;	/* path to private key */
+	char *job_credential_public_certificate;/* path to public certificate*/
+	List job_defaults_list;	/* List of job_defaults_t elements */
 	uint16_t job_file_append; /* if set, append to stdout/err file */
 	uint16_t job_requeue;	/* If set, jobs get requeued on node failre */
 	char *job_submit_plugins;  /* List of job_submit plugins to use */
@@ -3871,12 +3331,12 @@ typedef struct {
 	uint16_t kill_wait;	/* seconds between SIGXCPU to SIGKILL
 				 * on job termination */
 	char *launch_params;	/* step launcher plugin options */
+	char *launch_type;	/* type of step launcher to use */
 	char *licenses;		/* licenses available on this cluster */
 	uint16_t log_fmt;       /* Log file timestamp format */
 	char *mail_domain;	/* default domain to append to usernames */
 	char *mail_prog;	/* pathname of mail program */
 	uint32_t max_array_sz;	/* Maximum job array size */
-	uint32_t max_batch_requeue; /* maximum number of requeues */
 	uint32_t max_dbd_msgs;	/* maximum number of messages queued while DBD
 				 * is not connected */
 	uint32_t max_job_cnt;	/* maximum number of active jobs */
@@ -3902,9 +3362,10 @@ typedef struct {
 				   * number of minutes before cancellation */
 	char *plugindir;	/* pathname to plugins */
 	char *plugstack;        /* pathname to plugin stack config file */
+	char *power_parameters;	/* power management parameters */
+	char *power_plugin;	/* power management plugin type */
 	uint32_t preempt_exempt_time; /* Time before jobs are preemptable */
 	uint16_t preempt_mode;	/* See PREEMPT_MODE_* in slurm/slurm.h */
-	char *preempt_params; /* PreemptParameters to tune preemption */
 	char *preempt_type;	/* job preemption selection plugin */
 	char *prep_params;	/* PrEp parameters */
 	char *prep_plugins;	/* PrEp plugins */
@@ -3928,17 +3389,15 @@ typedef struct {
 	uint32_t priority_weight_part; /* weight for Partition factor */
 	uint32_t priority_weight_qos; /* weight for QOS factor */
 	char    *priority_weight_tres; /* weights (str) for different TRES' */
-#ifdef __METASTACK_OPT_PRIORITY_JOBSIZE
+#ifdef __METASTACK_PRIORITY_JOBSIZE
 	char    *priority_jobsize_maxvalue; /* maxvalue (str) for JobSize' */
 #endif
 	uint16_t private_data;	/* block viewing of information,
 				 * see PRIVATE_DATA_* */
 	char *proctrack_type;	/* process tracking plugin type */
-	char **prolog;		/* pathname of job prolog run by slurmd */
-	uint32_t prolog_cnt;	/* number of prolog values */
+	char *prolog;		/* pathname of job prolog run by slurmd */
 	uint16_t prolog_epilog_timeout; /* prolog/epilog timeout */
-	char **prolog_slurmctld; /* pathname of job prolog run by slurmctld */
-	uint32_t prolog_slurmctld_cnt;	/* number of prolog_slurmctld values */
+	char *prolog_slurmctld;	/* pathname of job prolog run by slurmctld */
 	uint16_t propagate_prio_process; /* process priority propagation,
 					  * see PROP_PRIO_* */
 	uint16_t prolog_flags; /* set some flags for prolog configuration
@@ -3960,6 +3419,7 @@ typedef struct {
 	char *resv_prolog;	/* path of reservation prolog run by slurmctld */
 	uint16_t ret2service;	/* 1 return DOWN node to service at
 				 * registration */
+	char *route_plugin;     /* route plugin */
 	char *sched_logfile;    /* where slurm Scheduler log gets written */
 	uint16_t sched_log_level;  /* configured level of slurm Scheduler log */
 	char *sched_params;	/* SchedulerParameters OR
@@ -3984,6 +3444,8 @@ typedef struct {
 	uint16_t slurmctld_debug; /* slurmctld logging level */
 	char *slurmctld_logfile;/* where slurmctld error log gets written */
 	char *slurmctld_pidfile;/* where to put slurmctld pidfile         */
+	char *slurmctld_plugstack;/* generic slurmctld plugins */
+	void *slurmctld_plugstack_conf ;/* generic slurmctld plugins configs */
 	uint32_t slurmctld_port;  /* default communications port to slurmctld */
 	uint16_t slurmctld_port_count; /* number of slurmctld comm ports */
 	char *slurmctld_primary_off_prog; /* Run when becomes slurmctld backup */
@@ -3995,10 +3457,7 @@ typedef struct {
 	char *slurmctld_params;	/* SlurmctldParameters */
 #ifdef  __METASTACK_OPT_GRES_CONFIG
 	uint16_t slurmctld_load_gres; /* slurmctld load gres */
-#endif
-#ifdef __METASTACK_OPT_SACCT_OUTPUT
-	uint16_t skip_save_sacct_again;
-#endif
+#endif	
 	uint16_t slurmd_debug;	/* slurmd logging level */
 	char *slurmd_logfile;	/* where slurmd error log gets written */
 	char *slurmd_params;	/* SlurmdParameters */
@@ -4016,7 +3475,6 @@ typedef struct {
 				   * directory */
 	char *suspend_exc_nodes;/* nodes to not make power saving */
 	char *suspend_exc_parts;/* partitions to not make power saving */
-	char *suspend_exc_states; /* states that should not be powered down */
 	char *suspend_program;	/* program to make nodes power saving */
 	uint16_t suspend_rate;	/* nodes to make power saving, per minute */
 	uint32_t suspend_time;	/* node idle for this long before power save mode */
@@ -4031,13 +3489,11 @@ typedef struct {
 	char *task_plugin;	/* task launch plugin */
 	uint32_t task_plugin_param;	/* see CPU_BIND_* */
 	char *task_prolog;	/* pathname of task launch prolog */
-#ifdef __METASTACK_NEW_TIME_SYNC_CHECK
+#ifdef __METASTACK_TIME_SYNC_CHECK
 	uint16_t time_sync_check;
 	uint16_t time_sync_check_time_diff;
 	uint16_t time_sync_check_retry_count;
 #endif
-	char *tls_params;	/* TLSParameters */
-	char *tls_type;		/* tls plugin type */
 	uint16_t tcp_timeout;	/* tcp timeout */
 	char *tmp_fs;		/* pathname of temporary file system */
 	char *topology_param;	/* network topology parameters */
@@ -4052,19 +3508,19 @@ typedef struct {
 	uint16_t vsize_factor;	/* virtual memory limit size factor */
 	uint16_t wait_time;	/* default job --wait time */
 	char *x11_params;	/* X11Parameters */
-#ifdef __METASTACK_NEW_RPC_RATE_LIMIT
-	void *rl_config;
-	void *rl_users;
-#endif
-#ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
-	char *watch_dog;     /*--watch dog*/
-#endif
 #ifdef __METASTACK_OPT_CACHE_QUERY
 	uint32_t query_port;  /* The default communication port for caching queries */
 	uint16_t query_port_count; /* Cache query number of communication ports */
 	uint16_t cachedup_interval; /*Data copy time interval*/ 
 	uint16_t cache_query; /*High Performance Query Switch*/
 	uint16_t cachedup_abs_realtime; /*Real-time cache data update*/ 
+#endif
+#ifdef __METASTACK_NEW_RPC_RATE_LIMIT
+	void *rl_config;
+	void *rl_users;
+#endif
+#ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
+	char *watch_dog;     /*--watch dog*/
 #endif
 } slurm_conf_t;
 
@@ -4102,8 +3558,6 @@ typedef struct slurm_update_node_msg {
 	char *features;		/* new available feature for node */
 	char *features_act;	/* new active feature for node */
 	char *gres;		/* new generic resources for node */
-	char *instance_id;	/* cloud instance id */
-	char *instance_type;	/* cloud instance type */
 	char *node_addr;	/* communication name (optional) */
 	char *node_hostname;	/* node's hostname (optional) */
 	char *node_names;	/* nodelist expression */
@@ -4111,8 +3565,6 @@ typedef struct slurm_update_node_msg {
 	char *reason;		/* reason for node being DOWN or DRAINING */
 	uint32_t reason_uid;	/* user ID of sending (needed if user
 				 * root is sending message) */
-	uint32_t resume_after;	/* automatically resume DOWN or DRAINED node
-				 * after this amount of seconds */
 	uint32_t weight;	/* new weight for node */
 } update_node_msg_t;
 
@@ -4129,7 +3581,7 @@ typedef struct partition_info update_part_msg_t;
 typedef struct job_sbcast_cred_msg {
 	uint32_t      job_id;		/* assigned job id */
 	char         *node_list;	/* assigned list of nodes */
-	void *sbcast_cred;		/* opaque data structure */
+	sbcast_cred_t *sbcast_cred;	/* opaque data structure */
 } job_sbcast_cred_msg_t;
 
 typedef struct {
@@ -4166,8 +3618,6 @@ typedef struct stats_info_response_msg {
 	uint32_t schedule_cycle_sum;
 	uint32_t schedule_cycle_counter;
 	uint32_t schedule_cycle_depth;
-	uint32_t *schedule_exit;
-	uint32_t schedule_exit_cnt;
 	uint32_t schedule_queue_len;
 
 	uint32_t jobs_submitted;
@@ -4187,8 +3637,6 @@ typedef struct stats_info_response_msg {
 	uint64_t bf_cycle_sum;
 	uint32_t bf_cycle_last;
 	uint32_t bf_cycle_max;
-	uint32_t *bf_exit;
-	uint32_t bf_exit_cnt;
 	uint32_t bf_last_depth;
 	uint32_t bf_last_depth_try;
 	uint32_t bf_depth_sum;
@@ -4204,11 +3652,6 @@ typedef struct stats_info_response_msg {
 	uint16_t *rpc_type_id;
 	uint32_t *rpc_type_cnt;
 	uint64_t *rpc_type_time;
-	uint8_t rpc_queue_enabled;
-	uint16_t *rpc_type_queued;
-	uint64_t *rpc_type_dropped;
-	uint16_t *rpc_type_cycle_last;
-	uint16_t *rpc_type_cycle_max;
 
 	uint32_t rpc_user_size;
 	uint32_t *rpc_user_id;
@@ -4255,8 +3698,6 @@ typedef struct stats_info_response_msg {
 #define TRIGGER_TYPE_PRI_DB_FAIL        SLURM_BIT(18)
 #define TRIGGER_TYPE_PRI_DB_RES_OP      SLURM_BIT(19)
 #define TRIGGER_TYPE_BURST_BUFFER       SLURM_BIT(20)
-#define TRIGGER_TYPE_DRAINING           SLURM_BIT(21)
-#define TRIGGER_TYPE_RESUME             SLURM_BIT(22)
 
 
 typedef struct trigger_info {
@@ -4281,17 +3722,18 @@ typedef struct trigger_info_msg {
  */
 typedef struct slurm_license_info {
 	char *name;          /* license name */
+#ifdef __METASTACK_NEW_LICENSE_OCCUPIED
+	char *server;	     /* license server */
+#endif
 	uint32_t total;      /* total number of available licenses */
 	uint32_t in_use;     /* number of license in use */
 	uint32_t available;  /* number of available license */
+#ifdef __METASTACK_NEW_LICENSE_OCCUPIED
+	uint32_t occupied;   /* number of license occupied outside the slurm */
+#endif
 	uint8_t remote;      /* non-zero if remote license (not
 			      * defined in slurm.conf) */
 	uint32_t reserved;   /* number of licenses reserved */
-	uint32_t last_consumed; /* number of licenses last known to be
-				   consumed in the license manager
-				   (for remote) */
-	uint32_t last_deficit;
-	time_t last_update;  /* last updated (for remote) */
 } slurm_license_info_t;
 
 /* License information array as returned by the controller.
@@ -4306,16 +3748,15 @@ typedef struct {
 	uint32_t  job_array_count;
 	char    **job_array_id; /* Note: The string may be truncated */
 	uint32_t *error_code;
-	char **err_msg;
 } job_array_resp_msg_t;
 
 /* Association manager state running in the slurmctld */
 typedef struct {
-	list_t *assoc_list; /* list of slurmdb_assoc_rec_t with usage packed */
-	list_t *qos_list; /* list of slurmdb_qos_rec_t with usage packed */
+	List assoc_list; /* list of slurmdb_assoc_rec_t with usage packed */
+	List qos_list;   /* list of slurmdb_qos_rec_t with usage packed */
 	uint32_t tres_cnt;
 	char **tres_names;
-	list_t *user_list; /* list of slurmdb_user_rec_t */
+	List user_list;  /* list of slurmdb_user_rec_t */
 } assoc_mgr_info_msg_t;
 
 #define ASSOC_MGR_INFO_FLAG_ASSOC 0x00000001
@@ -4323,10 +3764,10 @@ typedef struct {
 #define ASSOC_MGR_INFO_FLAG_QOS   0x00000004
 
 typedef struct {
-	list_t *acct_list; /* char * list of account names */
+	List acct_list; /* char * list of account names */
 	uint32_t flags; /* flags determining what is returned */
-	list_t *qos_list; /* char * list of qos names */
-	list_t *user_list; /* char * list of user names */
+	List qos_list;  /* char * list of qos names */
+	List user_list; /* char * list of user names */
 } assoc_mgr_info_request_msg_t;
 
 typedef struct network_callerid_msg {
@@ -4336,23 +3777,6 @@ typedef struct network_callerid_msg {
 	uint32_t port_dst;
 	int32_t af;	/* NOTE: un/packed as uint32_t */
 } network_callerid_msg_t;
-
-/*****************************************************************************\
- *      SLURM CLUSTER FUNCTIONS
-\*****************************************************************************/
-
-/*
- * slurm_get_cluster_info - get list of cluster records
- * OUT cluster_records - list of slurmdb_cluster_rec_t
- * IN cluster_names - char list of cluster names. Set to NULL for all clusters
- * IN show_flags - set SHOW_FEDERATION to get cluster info from slurmctld when
- *     running in a federated setup. Otherwise, cluster info is retrieved from
- *     the slurmdbd.
- * RET SLURM_SUCCESS on success, otherwise return SLURM_ERROR
- * NOTE: free the response using slurm_free_node_info_msg
- */
-extern int slurm_get_cluster_info(list_t **cluster_records, char *cluster_names,
-				  uint16_t show_flags);
 
 /*****************************************************************************\
  *	RESOURCE ALLOCATION FUNCTIONS
@@ -4415,7 +3839,7 @@ extern void slurm_free_resource_allocation_response_msg(resource_allocation_resp
  *	allocate resources for a list of job requests.  This call will block
  *	until the entire allocation is granted, or the specified timeout limit
  *	is reached.
- * IN job_req_list - list of resource allocation requests, type job_desc_msg_t
+ * IN job_req_list - List of resource allocation requests, type job_desc_msg_t
  * IN timeout - amount of time, in seconds, to wait for a response before
  * 	giving up.
  *	A timeout of zero will wait indefinitely.
@@ -4424,15 +3848,13 @@ extern void slurm_free_resource_allocation_response_msg(resource_allocation_resp
  *      pending callback is not NULL, it will be called with the job_id
  *      of the pending job as the sole parameter.
  *
- * RET list of allocation structures on success, NULL on error set errno to
+ * RET List of allocation structures on success, NULL on error set errno to
  *	indicate the error (errno will be ETIMEDOUT if the timeout is reached
  *      with no allocation granted)
  * NOTE: free the response using list_destroy()
  */
-extern list_t *slurm_allocate_het_job_blocking(
-	list_t *job_req_list,
-	time_t timeout,
-	void(*pending_callback)(uint32_t job_id));
+List slurm_allocate_het_job_blocking(List job_req_list, time_t timeout,
+				      void(*pending_callback)(uint32_t job_id));
 
 /*
  * slurm_allocation_lookup - retrieve info for an existing resource
@@ -4455,7 +3877,7 @@ extern int slurm_allocation_lookup(uint32_t job_id,
  * NOTE: returns information an individual job as well
  * NOTE: free the response using list_destroy()
  */
-extern int slurm_het_job_lookup(uint32_t jobid, list_t **resp);
+extern int slurm_het_job_lookup(uint32_t jobid, List *resp);
 
 /*
  * slurm_read_hostfile - Read a Slurm hostfile specified by "filename".
@@ -4508,11 +3930,11 @@ extern int slurm_submit_batch_job(job_desc_msg_t *job_desc_msg,
  * slurm_submit_batch_het_job - issue RPC to submit a heterogeneous job for
  *				 later execution
  * NOTE: free the response using slurm_free_submit_response_response_msg
- * IN job_req_list - list of resource allocation requests, type job_desc_msg_t
+ * IN job_req_list - List of resource allocation requests, type job_desc_msg_t
  * OUT slurm_alloc_msg - response to request
  * RET SLURM_SUCCESS on success, otherwise return SLURM_ERROR with errno set
  */
-extern int slurm_submit_batch_het_job(list_t *job_req_list,
+extern int slurm_submit_batch_het_job(List job_req_list,
 				      submit_response_msg_t **slurm_alloc_msg);
 
 /*
@@ -4540,11 +3962,11 @@ extern int slurm_job_will_run(job_desc_msg_t *job_desc_msg);
 /*
  * slurm_het_job_will_run - determine if a heterogeneous job would execute
  *	immediately if submitted now
- * IN job_req_list - list of job_desc_msg_t structures describing the resource
+ * IN job_req_list - List of job_desc_msg_t structures describing the resource
  *		allocation request
  * RET SLURM_SUCCESS on success, otherwise return SLURM_ERROR with errno set
  */
-extern int slurm_het_job_will_run(list_t *job_req_list);
+extern int slurm_het_job_will_run(List job_req_list);
 
 
 /*
@@ -4580,6 +4002,10 @@ extern void slurm_free_sbcast_cred_msg(job_sbcast_cred_msg_t *msg);
  */
 extern int slurm_load_licenses(time_t, license_info_msg_t **, uint16_t);
 extern void slurm_free_license_info_msg(license_info_msg_t *);
+#ifdef __METASTACK_NEW_LICENSE_OCCUPIED
+	extern void slurm_free_lics_info_msg(slurm_license_info_t *);
+	extern int slurm_update_lics(slurm_license_info_t *);
+#endif
 
 /* get the running assoc_mgr info
  * IN assoc_mgr_info_request_msg_t: request filtering data returned
@@ -4601,49 +4027,16 @@ extern void slurm_free_assoc_mgr_info_request_msg(assoc_mgr_info_request_msg_t *
 typedef struct job_step_kill_msg {
 	char *sjob_id;
 	uint16_t signal;
-	uint16_t flags; /* KILL_* flags below */
+	uint16_t flags;
 	char *sibling;
 	slurm_step_id_t step_id;
 } job_step_kill_msg_t;
-
-typedef struct {
-	char *account;
-	uint16_t flags; /* KILL_* flags below */
-	char *job_name;
-	char **jobs_array;
-	uint32_t jobs_cnt;
-	char *partition;
-	char *qos;
-	char *reservation;
-	uint16_t signal;
-	uint32_t state;
-	uint32_t user_id;
-	char *user_name;
-	char *wckey;
-	char *nodelist;
-} kill_jobs_msg_t;
-
-typedef struct {
-	uint32_t error_code;
-	char *error_msg;
-	slurm_selected_step_t *id; /* Note: if the job is an array job, then
-				    * id.step_id.job_id is the array_job_id or
-				    * het_job_id, respectively. */
-	uint32_t real_job_id; /* The actual job id if the job was found, or
-			       * NO_VAL if the job was not found */
-	char *sibling_name;
-} kill_jobs_resp_job_t;
-
-typedef struct {
-	kill_jobs_resp_job_t *job_responses;
-	uint32_t jobs_cnt;
-} kill_jobs_resp_msg_t;
 
 /*
  * NOTE:  See _signal_batch_job() controller and _rpc_signal_tasks() in slurmd.
  */
 #define KILL_JOB_BATCH   SLURM_BIT(0) /* signal batch shell only */
-#define KILL_ARRAY_TASK  SLURM_BIT(1) /* kill single task of a job array */
+#define KILL_JOB_ARRAY   SLURM_BIT(1) /* kill all elements of a job array */
 #define KILL_STEPS_ONLY  SLURM_BIT(2) /* Do not signal batch script */
 #define KILL_FULL_JOB    SLURM_BIT(3) /* Signal all steps, including batch
 				       * script */
@@ -4653,12 +4046,6 @@ typedef struct {
 #define KILL_NO_SIBS     SLURM_BIT(7) /* Don't kill other sibling jobs */
 #define KILL_JOB_RESV    SLURM_BIT(8) /* Job is willing to run on nodes in a
 				       * magnetic reservation. */
-#define KILL_NO_CRON     SLURM_BIT(9) /* Do not request killing cron Jobs.
-				       * Remove this two versions after 23.11.
-				       */
-#define KILL_NO_SIG_FAIL SLURM_BIT(10) /* Don't fail job due to signal (steps only) */
-#define KILL_JOBS_VERBOSE SLURM_BIT(11) /* Verbose response requested */
-#define KILL_CRON SLURM_BIT(12) /* Request killing cron jobs */
 
 /* Use top bit of uint16_t in conjuction with KILL_* flags to indicate signal
  * has been sent to job previously. Does not need to be passed to slurmd. */
@@ -4679,11 +4066,11 @@ extern int slurm_kill_job(uint32_t job_id, uint16_t signal, uint16_t flags);
  * IN job_id  - the job's id
  * IN step_id - the job step's id
  * IN signal  - signal number
- * IN flags - see KILL_* or 0 for no flags
  * RET SLURM_SUCCESS on success, otherwise return SLURM_ERROR with errno set
  */
-extern int slurm_kill_job_step(uint32_t job_id, uint32_t step_id,
-			       uint16_t signal, uint16_t flags);
+extern int slurm_kill_job_step(uint32_t job_id,
+			       uint32_t step_id,
+			       uint16_t signal);
 /*
  * slurm_kill_job2 - send REQUEST_KILL_JOB msg to an existing job or step.
  * IN job_id - the job's id (in a string format)
@@ -4694,15 +4081,6 @@ extern int slurm_kill_job_step(uint32_t job_id, uint32_t step_id,
  */
 extern int slurm_kill_job2(const char *job_id, uint16_t signal, uint16_t flags,
 			   const char *sibling);
-
-/*
- * slurm_kill_jobs - Kill all jobs matching the filters specified in msg.
- * IN kill_msg - Message that specifies the jobs to be killed.
- * IN/OUT kill_msg_resp - Pointer to a response message, filled in by the api.
- * RET SLURM_SUCCESS on success, otherwise return an error.
- */
-extern int slurm_kill_jobs(kill_jobs_msg_t *kill_msg,
-			   kill_jobs_resp_msg_t **kill_msg_resp);
 
 /*
  * slurm_signal_job - send the specified signal to all steps of an existing job
@@ -4830,7 +4208,6 @@ extern void slurm_step_launch_fwd_wake(slurm_step_ctx_t *ctx);
  */
 extern long slurm_api_version(void);
 
-
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
 /*
  * slurm_load_ctl_conf_watch_dog - issue RPC to get slurm control configuration
@@ -4843,6 +4220,7 @@ extern long slurm_api_version(void);
  */
 int slurm_load_ctl_conf_watch_dog(time_t update_time, slurm_ctl_conf_info_msg_watch_dog_t **confp);
 #endif
+
 /*
  * slurm_load_ctl_conf - issue RPC to get slurm control configuration
  *	information if changed since update_time
@@ -4863,12 +4241,6 @@ extern int slurm_load_ctl_conf(time_t update_time,
 extern void slurm_free_ctl_conf(slurm_conf_t *slurm_ctl_conf_ptr);
 
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
-/*
- * slurm_print_watch_dog_conf - output the contents of slurm watch dog configuration
- *	message as loaded using slurm_load_ctl_conf
- * IN out - file to write to
- * IN watch_dog_record_t - slurm watch dog configuration pointer
- */
 extern void slurm_print_watch_dog_conf(FILE *out, watch_dog_record_t *watch_dog_ptr, int one_liner);
 #endif
 /*
@@ -4887,27 +4259,17 @@ extern void slurm_print_ctl_conf(FILE *out, slurm_conf_t *slurm_ctl_conf_ptr);
  * IN node_info_ptr - pointer to node table of information
  * IN part_info_ptr - pointer to partition information
  */
-#if defined(__METASTACK_OPT_APP)  
-extern void slurm_write_ctl_conf(slurm_conf_t *slurm_ctl_conf_ptr,  
-                                 node_info_msg_t *node_info_ptr,  
-                                 partition_info_msg_t *part_info_ptr,  
-                                 slurm_ctl_conf_info_msg_watch_dog_t *slurm_watch_dog_ptr,  
-                                 slurm_ctl_conf_info_msg_app_t *slurm_app_ptr);
-#elif defined(__METASTACK_NEW_CUSTOM_EXCEPTION)
+#ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
 extern void slurm_write_ctl_conf(slurm_conf_t *slurm_ctl_conf_ptr,
                                  node_info_msg_t *node_info_ptr,
                                  partition_info_msg_t *part_info_ptr,
-                                 slurm_ctl_conf_info_msg_watch_dog_t  *slurm_watch_dog_ptr);
-#else
-extern void slurm_write_ctl_conf(slurm_conf_t *slurm_ctl_conf_ptr,
-                                 node_info_msg_t *node_info_ptr,
-                                 partition_info_msg_t *part_info_ptr);
+								 slurm_ctl_conf_info_msg_watch_dog_t  *slurm_watch_dog_ptr);
 #endif
 /*
  * slurm_ctl_conf_2_key_pairs - put the slurm_conf_t variables into
- *	a list_t of opaque data type config_key_pair_t
+ *	a List of opaque data type config_key_pair_t
  * IN slurm_ctl_conf_ptr - slurm control configuration pointer
- * RET list of opaque data type config_key_pair_t
+ * RET List of opaque data type config_key_pair_t
  */
 extern void *slurm_ctl_conf_2_key_pairs(slurm_conf_t *slurm_ctl_conf_ptr);
 
@@ -4915,7 +4277,7 @@ extern void *slurm_ctl_conf_2_key_pairs(slurm_conf_t *slurm_ctl_conf_ptr);
  * slurm_print_key_pairs - output the contents of key_pairs
  * which is a list of opaque data type config_key_pair_t
  * IN out - file to write to
- * IN key_pairs - list containing key pairs to be printed
+ * IN key_pairs - List containing key pairs to be printed
  * IN title - title of key pair list
  */
 extern void slurm_print_key_pairs(FILE *out, void *key_pairs, char *title);
@@ -5025,9 +4387,6 @@ extern int slurm_job_cpus_allocated_str_on_node(char *cpus,
  */
 extern void slurm_free_job_info_msg(job_info_msg_t *job_buffer_ptr);
 
-/* Free jobs states response message */
-extern void slurm_free_job_state_response_msg(job_state_response_msg_t *msg);
-
 /*
  * slurm_free_priority_factors_response_msg - free the job priority factor
  *	information response message
@@ -5081,14 +4440,19 @@ extern int slurm_load_job(job_info_msg_t **resp,
 			  uint16_t show_flags);
 
 /*
- * slurm_load_job_prio - issue RPC to get job priority information for jobs
+ * slurm_load_job_prio - issue RPC to get job priority information for
+ *	jobs which pass filter test
  * OUT factors_resp - job priority factors
+ * IN job_id_list - list of job IDs to be reported
+ * IN partitions - comma delimited list of partition names to be reported
+ * IN uid_list - list of user IDs to be reported
  * IN show_flags -  job filtering option: 0 or SHOW_LOCAL
  * RET 0 or -1 on error
  * NOTE: free the response using slurm_free_priority_factors_response_msg()
  */
 extern int slurm_load_job_prio(priority_factors_response_msg_t **factors_resp,
-			       uint16_t show_flags);
+			       List job_id_list, char *partitions,
+			       List uid_list, uint16_t show_flags);
 
 /*
  * slurm_load_job_user - issue RPC to get slurm information about all jobs
@@ -5115,19 +4479,6 @@ extern int slurm_load_job_user(job_info_msg_t **job_info_msg_pptr,
 extern int slurm_load_jobs(time_t update_time,
 			   job_info_msg_t **job_info_msg_pptr,
 			   uint16_t show_flags);
-
-/*
- * slurm_load_job_state - issue RPC to get state of requested jobs
- * IN job_id_count - number of jobs in job_ids pointer.
- * 	job_id_count may be 0 to indicate all jobs are requested.
- * IN job_ids - ptr to array of jobs with job_ids to query
- * IN/OUT jsr_pptr - place to store a query response pointer
- * RET SLURM_SUCCESS or error
- * NOTE: free the response using slurm_free_job_state_response_msg
- */
-extern int slurm_load_job_state(int job_id_count,
-				slurm_selected_step_t *job_ids,
-				job_state_response_msg_t **jsr_pptr);
 
 /*
  * slurm_notify_job - send message to the job's stdout,
@@ -5199,6 +4550,16 @@ extern int slurm_update_job(job_desc_msg_t *job_msg);
 extern int slurm_update_job2(job_desc_msg_t *job_msg,
 			     job_array_resp_msg_t **resp);
 
+/*
+ * slurm_xlate_job_id - Translate a Slurm job ID string into a slurm job ID
+ *	number. If this job ID contains an array index, map this to the
+ *	equivalent Slurm job ID number (e.g. "123_2" to 124)
+ *
+ * IN job_id_str - String containing a single job ID number
+ * RET - equivalent job ID number or 0 on error
+ */
+extern uint32_t slurm_xlate_job_id(char *job_id_str);
+
 
 /*****************************************************************************\
  *	SLURM JOB STEP CONFIGURATION READ/PRINT/UPDATE FUNCTIONS
@@ -5223,17 +4584,6 @@ extern int slurm_get_job_steps(time_t update_time,
 			       uint32_t step_id,
 			       job_step_info_response_msg_t **step_response_pptr,
 			       uint16_t show_flags);
-
-/*
- * Issue RPC to find all steps matching container id and uid (unless uid=NO_VAL)
- * IN show_flags - job step filtering options
- * IN/OUT steps - List (of slurm_step_id_t*) to populate.
- * 	Must free step ids with slurm_free_step_id().
- * RET SLURM_SUCCESS or error
- */
-extern int slurm_find_step_ids_by_container_id(uint16_t show_flags, uid_t uid,
-					       const char *container_id,
-					       list_t *steps);
 
 /*
  * slurm_free_job_step_info_response_msg - free the job step
@@ -5390,9 +4740,6 @@ extern int slurm_get_node_energy(char *host,
 				 uint16_t delta,
 				 uint16_t *sensors_cnt,
 				 acct_gather_energy_t **energy);
-
-extern int slurm_get_node_alias_addrs(char *node_list,
-				      slurm_node_alias_addrs_t **alias_addrs);
 
 /*
  * slurm_free_node_info_msg - free the node information response message
@@ -5559,12 +4906,24 @@ extern void slurm_free_topo_info_msg(topo_info_response_msg_t *msg);
  *	slurm_load_topo
  * IN out - file to write to
  * IN topo_info_msg_ptr - switch topology information message pointer
- * IN node_list - NULL to print all topology information
  * IN one_liner - print as a single line if not zero
  */
 extern void slurm_print_topo_info_msg(FILE *out,
 				      topo_info_response_msg_t *topo_info_msg_ptr,
-				      char *node_list, int one_liner);
+				      int one_liner);
+
+/*
+ * slurm_print_topo_record - output information about a specific Slurm topology
+ *	record based upon message as loaded using slurm_load_topo
+ * IN out - file to write to
+ * IN topo_ptr - an individual switch information record pointer
+ * IN one_liner - print as a single line if not zero
+ * RET out - char * containing formatted output (must be freed after call)
+ *	   NULL is returned on failure.
+ */
+extern void slurm_print_topo_record(FILE *out,
+				    topo_info_t *topo_ptr,
+				    int one_liner);
 
 /*****************************************************************************\
  *	SLURM SELECT READ/PRINT/UPDATE FUNCTIONS
@@ -5658,7 +5017,6 @@ extern void _slurm_print_partition_info(FILE *out,
 extern char *_slurm_sprint_partition_info(partition_info_t *part_ptr,
 					 int one_liner, uint16_t meta_flags);
 #endif
-
 /*
  * slurm_print_partition_info - output information about a specific Slurm
  *	partition based upon message as loaded using slurm_load_partitions
@@ -5668,11 +5026,10 @@ extern char *_slurm_sprint_partition_info(partition_info_t *part_ptr,
  */
 extern void slurm_print_partition_info(FILE *out,
 				       partition_info_t *part_ptr,
-				       int one_liner);
-
+				       int one_liner);			
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
-extern char *slurm_print_watch_dog_info(watch_dog_record_t *watch_dog_ptr, int one_liner);
-#endif
+extern char *slurm_print_watch_dog_info(watch_dog_record_t *watch_dog_ptr, int one_liner);	
+#endif		 					   
 /*
  * slurm_sprint_partition_info - output information about a specific Slurm
  *	partition based upon message as loaded using slurm_load_partitions
@@ -5683,7 +5040,6 @@ extern char *slurm_print_watch_dog_info(watch_dog_record_t *watch_dog_ptr, int o
  */
 extern char *slurm_sprint_partition_info(partition_info_t *part_ptr,
 					 int one_liner);
-
 /*
  * slurm_create_partition - create a new partition, only usable by user root
  * IN part_msg - description of partition configuration
@@ -5794,23 +5150,6 @@ char *slurm_sprint_reservation_info(reserve_info_t *resv_ptr, int one_liner);
 extern void slurm_free_reservation_info_msg(reserve_info_msg_t *resv_info_ptr);
 
 /*****************************************************************************\
- *	SLURM PING/RECONFIGURE/SHUTDOWN STRUCTURES
-\*****************************************************************************/
-
-typedef struct {
-	char *hostname; /* symlink - do not xfree() */
-	bool pinged; /* true on successful ping */
-	long latency; /* time to ping or timeout on !pinged */
-	/*
-	 * controller offset which defines default mode:
-	 * 0: primary
-	 * 1: backup
-	 * 2+: backup#
-	 */
-	int offset;
-} controller_ping_t;
-
-/*****************************************************************************\
  *	SLURM PING/RECONFIGURE/SHUTDOWN FUNCTIONS
 \*****************************************************************************/
 
@@ -5820,12 +5159,6 @@ typedef struct {
  * RET 0 or a slurm error code
  */
 extern int slurm_ping(int dest);
-
-/*
- * RET array of each ping result (NULL terminated).
- * Caller must xfree() the result.
- */
-extern controller_ping_t *ping_all_controllers();
 
 /*
  * slurm_reconfigure - issue RPC to have Slurm controller (slurmctld)
@@ -5862,23 +5195,6 @@ extern int slurm_takeover(int backup_inx);
  */
 extern int slurm_set_debugflags(uint64_t debug_flags_plus,
 				uint64_t debug_flags_minus);
-/*
- * slurm_set_slurmd_debug_flags - issue RPC to set slurmd debug flags
- * IN debug_flags_plus  - debug flags to be added
- * IN debug_flags_minus - debug flags to be removed
- * IN debug_flags_set   - new debug flags value
- * RET SLURM_SUCCESS on success, otherwise return SLURM_ERROR
- */
-extern int slurm_set_slurmd_debug_flags(char *node_list,
-				        uint64_t debug_flags_plus,
-				        uint64_t debug_flags_minus);
-
-/*
- * slurm_set_slurmd_debug_level - issue RPC to set slurmd debug level
- * IN debug_level - requested debug level
- * RET SLURM_SUCCESS on success, otherwise return SLURM_ERROR
- */
-extern int slurm_set_slurmd_debug_level(char *node_list, uint32_t debug_level);
 
 /*
  * slurm_set_debug_level - issue RPC to set slurm controller debug level
@@ -5900,30 +5216,6 @@ extern int slurm_set_schedlog_level(uint32_t schedlog_level);
  * RET SLURM_SUCCESS on success, otherwise return SLURM_ERROR with errno set
  */
 extern int slurm_set_fs_dampeningfactor(uint16_t factor);
-
-/*
- * slurm_update_suspend_exc_nodes - issue RPC to set SuspendExcNodes
- * IN nodes - string to set
- * IN mode - Whether to set, append or remove nodes from the setting
- * RET SLURM_SUCCESS on success, otherwise return SLURM_ERROR with errno set
- */
-extern int slurm_update_suspend_exc_nodes(char *nodes, update_mode_t mode);
-
-/*
- * slurm_update_suspend_exc_parts - issue RPC to set SuspendExcParts
- * IN parts - string to set
- * IN mode - Whether to set, append or remove partitions from the setting
- * RET SLURM_SUCCESS on success, otherwise return SLURM_ERROR with errno set
- */
-extern int slurm_update_suspend_exc_parts(char *parts, update_mode_t mode);
-
-/*
- * slurm_update_suspend_exc_states - issue RPC to set SuspendExcStates
- * IN states - string to set
- * IN mode - Whether to set, append or remove states from the setting
- * RET SLURM_SUCCESS on success, otherwise return SLURM_ERROR with errno set
- */
-extern int slurm_update_suspend_exc_states(char *states, update_mode_t mode);
 
 /*****************************************************************************\
  *      SLURM JOB SUSPEND FUNCTIONS
@@ -6120,7 +5412,6 @@ typedef struct {
 	uint32_t pool_cnt;		/* Count of records in pool_ptr */
 	burst_buffer_pool_t *pool_ptr;
 	char *name;			/* Plugin name */
-	uint32_t poll_interval;
 	uint32_t other_timeout;		/* Seconds or zero */
 	uint32_t stage_in_timeout;	/* Seconds or zero */
 	uint32_t stage_out_timeout;	/* Seconds or zero */
@@ -6275,13 +5566,12 @@ typedef struct {
 	char *failed_lines;
 	uint32_t *jobids;
 	uint32_t jobids_count;
-	char *job_submit_user_msg;
 	uint32_t return_code;
 } crontab_update_response_msg_t;
 
 extern crontab_update_response_msg_t *slurm_update_crontab(uid_t uid, gid_t gid,
 							   char *crontab,
-							   list_t *jobs);
+							   List jobs);
 
 extern int slurm_remove_crontab(uid_t uid, gid_t gid);
 

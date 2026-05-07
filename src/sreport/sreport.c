@@ -1,7 +1,7 @@
 /*****************************************************************************\
  *  sreport.c - report generating tool for slurm accounting.
  *****************************************************************************
- *  Copyright (C) SchedMD LLC.
+ *  Portions Copyright (C) 2010-2017 SchedMD LLC.
  *  Copyright (C) 2008 Lawrence Livermore National Security.
  *  Copyright (C) 2002-2007 The Regents of the University of California.
  *  Produced at Lawrence Livermore National Laboratory (cf, DISCLAIMER).
@@ -51,7 +51,6 @@
 
 #define OPT_LONG_LOCAL		0x101
 #define OPT_LONG_FEDR		0x102
-#define OPT_LONG_AUTOCOMP	0x103
 
 char *command_name;
 int exit_code;		/* sreport's exit code, =1 on any error at any time */
@@ -95,7 +94,6 @@ main (int argc, char **argv)
 	int option_index;
 	uint16_t persist_conn_flags = 0;
 	static struct option long_options[] = {
-		{"autocomplete", required_argument, 0, OPT_LONG_AUTOCOMP},
 		{"all_clusters", 0, 0, 'a'},
 		{"cluster",  1, 0, 'M'},
 		{"federation", no_argument, 0, OPT_LONG_FEDR},
@@ -120,7 +118,7 @@ main (int argc, char **argv)
 	federation_flag   = false;
 	local_flag        = false;
 	quiet_flag        = 0;
-	slurm_init(NULL);
+	slurm_conf_init(NULL);
 	log_init("sreport", opts, SYSLOG_FACILITY_DAEMON, NULL);
 
 	/* Check to see if we are running a supported accounting plugin */
@@ -200,10 +198,6 @@ main (int argc, char **argv)
 			_print_version();
 			exit(exit_code);
 			break;
-		case OPT_LONG_AUTOCOMP:
-			suggest_completion(long_options, optarg);
-			exit(0);
-			break;
 		default:
 			fprintf(stderr, "getopt error, returned %c\n",
 				opt_char);
@@ -269,7 +263,7 @@ main (int argc, char **argv)
 	xfree(cluster_flag);
 
 	slurmdb_connection_close(&db_conn);
-	acct_storage_g_fini();
+	slurm_acct_storage_fini();
 	exit(exit_code);
 }
 
@@ -315,7 +309,7 @@ static char *_build_cluster_string(void)
 
 static void _build_tres_list(void)
 {
-	list_itr_t *iter;
+	ListIterator iter;
 	slurmdb_tres_rec_t *tres;
 	char *save_ptr = NULL, *tok;
 

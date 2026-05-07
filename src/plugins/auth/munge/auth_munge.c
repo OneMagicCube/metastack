@@ -105,7 +105,6 @@ typedef struct {
 	int index; /* MUST ALWAYS BE FIRST. DO NOT PACK. */
 	int magic;         /* magical munge validity magic                   */
 	char   *m_str;     /* munged string                                  */
-	bool m_xstr;       /* set if m_str allocated by xmalloc, not malloc  */
 	struct in_addr addr; /* IP addr where cred was encoded               */
 	bool    verified;  /* true if this cred has been verified            */
 	uid_t   uid;       /* UID. valid only if verified == true            */
@@ -116,7 +115,7 @@ typedef struct {
 
 extern auth_credential_t *auth_p_create(char *opts, uid_t r_uid, void *data,
 					int dlen);
-extern void auth_p_destroy(auth_credential_t *cred);
+extern int auth_p_destroy(auth_credential_t *cred);
 
 /* Static prototypes */
 
@@ -141,30 +140,23 @@ int init(void)
 	 * This must not be enabled. Protect against it by ensuring we cannot
 	 * decode a credential restricted to a different uid.
 	 */
-	if (!running_in_slurmstepd() && running_in_daemon()) {
+	if (running_in_daemon()) {
 		auth_credential_t *cred = NULL;
 		char *socket = slurm_auth_opts_to_socket(slurm_conf.authinfo);
 		uid_t uid = getuid() + 1;
 
 		cred = auth_p_create(slurm_conf.authinfo, uid, NULL, 0);
-		if (!cred) {
-			error("Failed to create MUNGE Credential");
-			rc = SLURM_ERROR;
-		} else if (!_decode_cred(cred, socket, true)) {
+		if (!_decode_cred(cred, socket, true)) {
 			error("MUNGE allows root to decode any credential");
 			rc = SLURM_ERROR;
 		}
 		xfree(socket);
 		auth_p_destroy(cred);
 	}
-	debug("loaded");
+	debug("%s loaded", plugin_name);
 	return rc;
 }
 
-extern int fini(void)
-{
-	return SLURM_SUCCESS;
-}
 
 /*
  * Allocate a credential.  This function should return NULL if it cannot
@@ -190,8 +182,7 @@ auth_credential_t *auth_p_create(char *opts, uid_t r_uid, void *data, int dlen)
 		rc = munge_ctx_set(ctx, MUNGE_OPT_SOCKET, socket);
 		xfree(socket);
 		if (rc != EMUNGE_SUCCESS) {
-			error("Failed to set MUNGE socket: %s",
-			      munge_ctx_strerror(ctx));
+			error("munge_ctx_set failure");
 			munge_ctx_destroy(ctx);
 			return NULL;
 		}
@@ -199,28 +190,19 @@ auth_credential_t *auth_p_create(char *opts, uid_t r_uid, void *data, int dlen)
 
 	rc = munge_ctx_set(ctx, MUNGE_OPT_UID_RESTRICTION, r_uid);
 	if (rc != EMUNGE_SUCCESS) {
-		error("Failed to set uid restriction: %s",
-		      munge_ctx_strerror(ctx));
+		error("munge_ctx_set failure");
 		munge_ctx_destroy(ctx);
 		return NULL;
 	}
 
 	auth_ttl = slurm_get_auth_ttl();
-	if (auth_ttl) {
-		rc = munge_ctx_set(ctx, MUNGE_OPT_TTL, auth_ttl);
-		if (rc != EMUNGE_SUCCESS) {
-			error("Failed to set MUNGE ttl: %s",
-			      munge_ctx_strerror(ctx));
-			munge_ctx_destroy(ctx);
-			return NULL;
-		}
-	}
+	if (auth_ttl)
+		(void) munge_ctx_set(ctx, MUNGE_OPT_TTL, auth_ttl);
 
 	cred = xmalloc(sizeof(*cred));
 	cred->magic = MUNGE_MAGIC;
 	cred->verified = false;
 	cred->m_str    = NULL;
-	cred->m_xstr = false;
 	cred->data = NULL;
 	cred->dlen = 0;
 
@@ -267,23 +249,23 @@ again:
 /*
  * Free a credential that was allocated with auth_p_create().
  */
-extern void auth_p_destroy(auth_credential_t *cred)
+int auth_p_destroy(auth_credential_t *cred)
 {
-	if (!cred)
-		return;
+	if (!cred) {
+		slurm_seterrno(ESLURM_AUTH_BADARG);
+		return SLURM_ERROR;
+	}
 
 	xassert(cred->magic == MUNGE_MAGIC);
 
 	/* Note: Munge cred string not encoded with xmalloc() */
-	if (cred->m_xstr)
-		xfree(cred->m_str);
-	else if (cred->m_str)
+	if (cred->m_str)
 		free(cred->m_str);
-
 	if (cred->data)
 		free(cred->data);
 
 	xfree(cred);
+	return SLURM_SUCCESS;
 }
 
 /*
@@ -319,7 +301,7 @@ int auth_p_verify(auth_credential_t *c, char *opts)
  * Obtain the Linux UID from the credential.
  * auth_p_verify() must be called first.
  */
-extern void auth_p_get_ids(auth_credential_t *cred, uid_t *uid, gid_t *gid)
+uid_t auth_p_get_uid(auth_credential_t *cred)
 {
 	if (!cred || !cred->verified) {
 		/*
@@ -327,16 +309,36 @@ extern void auth_p_get_ids(auth_credential_t *cred, uid_t *uid, gid_t *gid)
 		 * the calling path did not verify the credential first.
 		 */
 		xassert(!cred);
-		*uid = SLURM_AUTH_NOBODY;
-		*gid = SLURM_AUTH_NOBODY;
-		return;
+		slurm_seterrno(ESLURM_AUTH_BADARG);
+		return SLURM_AUTH_NOBODY;
 	}
 
 	xassert(cred->magic == MUNGE_MAGIC);
 
-	*uid = cred->uid;
-	*gid = cred->gid;
+	return cred->uid;
 }
+
+/*
+ * Obtain the Linux GID from the credential.
+ * auth_p_verify() must be called first.
+ */
+gid_t auth_p_get_gid(auth_credential_t *cred)
+{
+	if (!cred || !cred->verified) {
+		/*
+		 * This xassert will trigger on a development build if
+		 * the calling path did not verify the credential first.
+		 */
+		xassert(!cred);
+		slurm_seterrno(ESLURM_AUTH_BADARG);
+		return SLURM_AUTH_NOBODY;
+	}
+
+	xassert(cred->magic == MUNGE_MAGIC);
+
+	return cred->gid;
+}
+
 
 /*
  * Obtain the Host addr from where the credential originated.
@@ -365,14 +367,6 @@ char *auth_p_get_host(auth_credential_t *cred)
 	sin->sin_addr.s_addr = cred->addr.s_addr;
 
 	/*
-	 * If the address is under 127.0.0.0/8 this is some variety of
-	 * localhost that MUNGE packed from the remote site.
-	 * Return NULL since this data will be useless.
-	 */
-	if ((ntohl(sin->sin_addr.s_addr) & 0xff000000) == 0x7f000000)
-		return NULL;
-
-	/*
 	 * For IPv6-native systems, MUNGE always reports the host as 0.0.0.0
 	 * which will never resolve successfully. So don't even bother trying.
 	 */
@@ -391,7 +385,7 @@ char *auth_p_get_host(auth_credential_t *cred)
 		/* at this point, the name lookup failed */
 		hostname = xmalloc(INET_ADDRSTRLEN);
 		slurm_get_ip_str(&addr, hostname, INET_ADDRSTRLEN);
-		if (!(slurm_conf.conf_flags & CONF_FLAG_IPV6_ENABLED))
+		if (!(slurm_conf.conf_flags & CTL_CONF_IPV6_ENABLED))
 			error("%s: Lookup failed for %s", __func__, hostname);
 	}
 
@@ -424,16 +418,6 @@ extern int auth_p_get_data(auth_credential_t *cred, char **data, uint32_t *len)
 		*len = 0;
 	}
 	return SLURM_SUCCESS;
-}
-
-extern void *auth_p_get_identity(auth_credential_t *cred)
-{
-	if (!cred) {
-		slurm_seterrno(ESLURM_AUTH_BADARG);
-		return NULL;
-	}
-
-	return NULL;
 }
 
 /*
@@ -479,9 +463,9 @@ auth_credential_t *auth_p_unpack(buf_t *buf, uint16_t protocol_version)
 		cred = xmalloc(sizeof(*cred));
 		cred->magic = MUNGE_MAGIC;
 		cred->verified = false;
-		cred->m_xstr = true;
+		cred->m_str = NULL;
 
-		safe_unpackstr_xmalloc(&cred->m_str, &size, buf);
+		safe_unpackstr_malloc(&cred->m_str, &size, buf);
 	} else {
 		error("%s: unknown protocol version %u",
 		      __func__, protocol_version);
@@ -551,11 +535,29 @@ again:
 			/*
 			 *  Print any valid credential data
 			 */
-			error("Munge decode failed: %s",
-			      munge_ctx_strerror(ctx));
-			_print_cred(ctx);
-			if (err == EMUNGE_CRED_REWOUND)
-				error("Check for out of sync clocks");
+#ifdef __METASTACK_TIME_SYNC_CHECK
+			uint16_t msg_type = slurm_msg_get_msg_type();
+			if (running_in_slurmctld() && msg_type == RESPONSE_PING_SLURMD ) {
+				debug2("Munge decode failed %s",
+				      munge_ctx_strerror(ctx));
+			} else {
+				error("Munge decode failed: %s",
+				      munge_ctx_strerror(ctx));
+				_print_cred(ctx);
+			}
+#endif
+#ifdef __METASTACK_TIME_SYNC_CHECK
+			if (err == EMUNGE_CRED_EXPIRED) {
+				error("MUNGE_CRED_EXPIRED:Check for out of sync clocks");
+				slurm_seterrno(ESLURM_AUTH_CRED_INVALID_TIME);
+				goto done; 
+			}
+			if (err == EMUNGE_CRED_REWOUND) {
+				error("MUNGE_CRED_EXPIRED:Check for out of sync clocks");
+				slurm_seterrno(ESLURM_AUTH_CRED_INVALID_TIME);
+				goto done;
+			}		
+#endif
 			slurm_seterrno(ESLURM_AUTH_CRED_INVALID);
 			goto done;
 #ifdef MULTIPLE_SLURMD
@@ -571,12 +573,7 @@ again:
 		error("auth_munge: Unable to retrieve addr: %s",
 		      munge_ctx_strerror(ctx));
 
-	if (c->uid == SLURM_AUTH_NOBODY)
-		err = EMUNGE_CRED_INVALID;
-	else if (c->gid == SLURM_AUTH_NOBODY)
-		err = EMUNGE_CRED_INVALID;
-	else
-		c->verified = true;
+	c->verified = true;
 
 done:
 	munge_ctx_destroy(ctx);
@@ -594,22 +591,23 @@ static void _print_cred(munge_ctx_t ctx)
 
 	e = munge_ctx_get(ctx, MUNGE_OPT_ENCODE_TIME, &encoded);
 	if (e != EMUNGE_SUCCESS)
-		debug("Unable to retrieve encode time: %s",
-		      munge_ctx_strerror(ctx));
+		debug("%s: Unable to retrieve encode time: %s",
+		      plugin_type, munge_ctx_strerror(ctx));
 	else
 		info("ENCODED: %s", slurm_ctime2_r(&encoded, buf));
 
 	e = munge_ctx_get(ctx, MUNGE_OPT_DECODE_TIME, &decoded);
 	if (e != EMUNGE_SUCCESS)
-		debug("Unable to retrieve decode time: %s",
-		      munge_ctx_strerror(ctx));
+		debug("%s: Unable to retrieve decode time: %s",
+		      plugin_type, munge_ctx_strerror(ctx));
 	else
 		info("DECODED: %s", slurm_ctime2_r(&decoded, buf));
 }
 
+
 /*
  * auth/munge does not support user aliasing. Only permit this call from the
- * same user (which means no internal state changes are necessary).
+ * same user (which means no internal state changes are necessary.
  */
 int auth_p_thread_config(const char *token, const char *username)
 {

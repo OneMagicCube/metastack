@@ -43,27 +43,13 @@
 
 extern int as_mysql_add_wckeys(mysql_conn_t *mysql_conn, uint32_t uid,
 			    List wckey_list);
-
-extern char *as_mysql_add_wckeys_cond(mysql_conn_t *mysql_conn, uint32_t uid,
-				      slurmdb_add_assoc_cond_t *add_assoc,
-				      slurmdb_user_rec_t *user);
-
 extern List as_mysql_modify_wckeys(mysql_conn_t *mysql_conn,
 				uint32_t uid,
 				slurmdb_wckey_cond_t *wckey_cond,
 				slurmdb_wckey_rec_t *wckey);
 extern List as_mysql_remove_wckeys(mysql_conn_t *mysql_conn,
 				uint32_t uid,
-#ifdef __METASTACK_OPT_USER_DEACTIVATE
-				  bool is_deactivate,
-#endif
 				slurmdb_wckey_cond_t *wckey_cond);
-#ifdef __METASTACK_OPT_USER_DEACTIVATE
-extern List as_mysql_activate_wckeys(mysql_conn_t *mysql_conn,
-				uint32_t uid,
-				slurmdb_wckey_cond_t *wckey_cond,
-				slurmdb_wckey_rec_t *wckey);
-#endif
 extern List as_mysql_get_wckeys(mysql_conn_t *mysql_conn, uid_t uid,
 			     slurmdb_wckey_cond_t *wckey_cond);
 #endif

@@ -2,7 +2,8 @@
  *  x11_util.c - x11 forwarding support functions
  *		 also see src/slurmd/slurmstepd/x11_forwarding.[ch]
  *****************************************************************************
- *  Copyright (C) SchedMD LLC.
+ *  Copyright (C) 2017-2019 SchedMD LLC.
+ *  Written by Tim Wickberg <tim@schedmd.com>
  *
  *  This file is part of Slurm, a resource management program.
  *  For details, see <https://slurm.schedmd.com/>.
@@ -174,15 +175,11 @@ extern char *x11_get_xauth(void)
 	 * '.' and '-' are also allowed in the hostname portion, so match them
 	 * in addition to '/'.
 	 *
-	 * The display number is also optional, in this example the number 10
-	 * after the colon, that is the reason why after the [[:digit:]] part
-	 * there is the '*' indicating 0 or more repetitions.
-	 *
 	 * Warning: the '-' must be either first or last in the [] brackets,
 	 * otherwise it will be interpreted as a range instead of the literal
 	 * character.
 	 */
-	static char *cookie_pattern = "^[[:alnum:]./-]+:[[:digit:]]*"
+	static char *cookie_pattern = "^[[:alnum:]./-]+:[[:digit:]]+"
 				      "[[:space:]]+MIT-MAGIC-COOKIE-1"
 				      "[[:space:]]+([[:xdigit:]]+)$";
 
@@ -198,7 +195,7 @@ extern char *x11_get_xauth(void)
 	 * The output format can be interpreted from dump_entry() in the xauth
 	 * source code (process.c).
 	 */
-	static char *wildcard_pattern = "^#ffff#[[:xdigit:]./-]+#:[[:digit:]]*"
+	static char *wildcard_pattern = "^#ffff#[[:xdigit:]./-]+#:[[:digit:]]+"
 					"[[:space:]]+MIT-MAGIC-COOKIE-1"
 					"[[:space:]]+([[:xdigit:]]+)$";
 
@@ -247,7 +244,7 @@ extern int x11_set_xauth(char *xauthority, char *cookie, uint16_t display)
 	char **xauth_argv;
 	char template[] = "/tmp/xauth-source-XXXXXX";
 	char *contents = NULL;
-	char host[HOST_NAME_MAX];
+	char host[256];
 	int fd;
 	run_command_args_t run_command_args = {
 		.max_wait = 10000,

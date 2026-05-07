@@ -153,18 +153,6 @@ static void _set_tmpdirs(List lresp)
 	list_append(lresp, kvp);
 }
 
-static void _set_euid(list_t *lresp)
-{
-#if (HAVE_PMIX_VER >= 5)
-	pmix_info_t *kvp;
-
-	uid_t uid = pmixp_info_jobuid();
-
-	PMIXP_KVP_CREATE(kvp, PMIX_USERID, &uid, PMIX_UINT32);
-	list_append(lresp, kvp);
-#endif
-}
-
 /*
  * information about relative ranks as assigned by the RM
  */
@@ -187,7 +175,7 @@ static void _set_procdatas(List lresp)
 	/* store information about local processes */
 	for (i = 0; i < pmixp_info_tasks(); i++) {
 		List rankinfo;
-		list_itr_t *it;
+		ListIterator it;
 		int count, j, localid, nodeid;
 		char *nodename;
 		pmix_info_t *info;
@@ -250,13 +238,13 @@ static void _set_procdatas(List lresp)
 		j = 0;
 		while ((tkvp = list_next(it))) {
 			/* Just copy all the fields here. We will free
-			 * original kvp's using FREE_NULL_LIST without free'ing
+			 * original kvp's using list_destroy without free'ing
 			 * their fields so it is safe to do so.
 			 */
 			info[j] = *tkvp;
 			j++;
 		}
-		FREE_NULL_LIST(rankinfo);
+		list_destroy(rankinfo);
 		PMIXP_KVP_ALLOC(kvp, PMIX_PROC_DATA);
 		PMIXP_INFO_ARRAY_CREATE(kvp, info, count);
 		info = NULL;
@@ -339,6 +327,14 @@ static void _set_topology(List lresp)
 	PMIXP_KVP_CREATE(kvp, PMIX_LOCAL_TOPO, p, PMIX_STRING);
 	list_append(lresp, kvp);
 
+#if HWLOC_API_VERSION < 0x00020000
+	PMIXP_KVP_CREATE(kvp, PMIX_HWLOC_XML_V1, p, PMIX_STRING);
+	list_append(lresp, kvp);
+#else
+	PMIXP_KVP_CREATE(kvp, PMIX_HWLOC_XML_V2, p, PMIX_STRING);
+	list_append(lresp, kvp);
+#endif
+
 	/* successful exit - fallthru */
 err_release_topo:
 	hwloc_topology_destroy(topology);
@@ -407,14 +403,14 @@ static int _set_mapsinfo(List lresp)
 	pmix_info_t *kvp;
 	char *regexp, *input, *map = NULL, *pos = NULL;
 	pmixp_namespace_t *nsptr = pmixp_nspaces_local();
-	hostlist_t *hl = nsptr->hl;
+	hostlist_t hl = nsptr->hl;
 	int rc, i, j;
 	int count = hostlist_count(hl);
 	uint32_t *node2tasks = NULL, *cur_task = NULL;
 
-	input = hostlist_deranged_string_xmalloc(hl);
+	input = hostlist_deranged_string_malloc(hl);
 	rc = PMIx_generate_regex(input, &regexp);
-	xfree(input);
+	free(input);
 	if (PMIX_SUCCESS != rc) {
 		return SLURM_ERROR;
 	}
@@ -487,25 +483,16 @@ static void _set_localinfo(List lresp)
 extern int pmixp_libpmix_init(void)
 {
 	int rc;
-#ifdef __METASTACK_BUG_SLURMDSPOOLDIR_SYMBOLIC_LINK
-	bool trusted;
+	mode_t rights = (S_IRUSR | S_IWUSR | S_IXUSR) |
+			(S_IRGRP | S_IWGRP | S_IXGRP);
 
-	trusted = (pmixp_info_flags() & PMIXP_FLAG_TRUSTED_LIB_TMPDIR);
-	if ((rc = pmixp_mkdir(pmixp_info_tmpdir_lib(), trusted))) {
-#else
-	if (0 != (rc = pmixp_mkdir(pmixp_info_tmpdir_lib()))) {
-#endif
+	if (0 != (rc = pmixp_mkdir(pmixp_info_tmpdir_lib(), rights))) {
 		PMIXP_ERROR_STD("Cannot create server lib tmpdir: \"%s\"",
 				pmixp_info_tmpdir_lib());
 		return errno;
 	}
 
-#ifdef __METASTACK_BUG_SLURMDSPOOLDIR_SYMBOLIC_LINK
-	trusted = (pmixp_info_flags() & PMIXP_FLAG_TRUSTED_CLI_TMPDIR);
-	if ((rc = pmixp_mkdir(pmixp_info_tmpdir_cli(), trusted))) {
-#else
-	if (0 != (rc = pmixp_mkdir(pmixp_info_tmpdir_cli()))) {
-#endif
+	if (0 != (rc = pmixp_mkdir(pmixp_info_tmpdir_cli(), rights))) {
 		PMIXP_ERROR_STD("Cannot create client cli tmpdir: \"%s\"",
 				pmixp_info_tmpdir_cli());
 		return errno;
@@ -518,7 +505,13 @@ extern int pmixp_libpmix_init(void)
 	}
 
 	/* TODO: must be deleted in future once info-key approach harden */
-	setenv(PMIXP_PMIXLIB_TMPDIR, _pmixp_info_client_tmpdir_lib(), 1);
+	setenv(PMIXP_PMIXLIB_TMPDIR, pmixp_info_tmpdir_lib(), 1);
+
+	/*
+	if( pmixp_fixrights(pmixp_info_tmpdir_lib(),
+		(uid_t) pmixp_info_jobuid(), rights) ){
+	}
+	*/
 
 	return 0;
 }
@@ -529,14 +522,14 @@ extern int pmixp_libpmix_finalize(void)
 
 	rc = pmixp_lib_finalize();
 
-	rc1 = rmdir_recursive(pmixp_info_tmpdir_lib(), true);
+	rc1 = pmixp_rmdir_recursively(pmixp_info_tmpdir_lib());
 	if (0 != rc1) {
 		PMIXP_ERROR_STD("Failed to remove %s\n",
 				pmixp_info_tmpdir_lib());
 		/* Not considering this as fatal error */
 	}
 
-	rc1 = rmdir_recursive(pmixp_info_tmpdir_cli(), true);
+	rc1 = pmixp_rmdir_recursively(pmixp_info_tmpdir_cli());
 	if (0 != rc1) {
 		PMIXP_ERROR_STD("Failed to remove %s\n",
 				pmixp_info_tmpdir_cli());
@@ -632,7 +625,7 @@ extern int pmixp_libpmix_job_set(void)
 	List lresp;
 	pmix_info_t *info;
 	int ninfo;
-	list_itr_t *it;
+	ListIterator it;
 	pmix_info_t *kvp;
 	int i, rc, ret = SLURM_SUCCESS;
 	uid_t uid = pmixp_info_jobuid();
@@ -656,10 +649,8 @@ extern int pmixp_libpmix_job_set(void)
 
 	_set_topology(lresp);
 
-	_set_euid(lresp);
-
 	if (SLURM_SUCCESS != _set_mapsinfo(lresp)) {
-		FREE_NULL_LIST(lresp);
+		list_destroy(lresp);
 		PMIXP_ERROR("Can't build nodemap");
 		return SLURM_ERROR;
 	}
@@ -674,7 +665,7 @@ extern int pmixp_libpmix_job_set(void)
 		info[i] = *kvp;
 		i++;
 	}
-	FREE_NULL_LIST(lresp);
+	list_destroy(lresp);
 
 	register_caddy[0].active = 1;
 	rc = PMIx_server_register_nspace(pmixp_info_namespace(),
@@ -792,7 +783,6 @@ error:
 
 extern int pmixp_lib_abort(int status, void *cbfunc, void *cbdata)
 {
-	uint16_t flags = 0;
 	pmix_op_cbfunc_t abort_cbfunc = (pmix_op_cbfunc_t)cbfunc;
 
 	/*
@@ -801,11 +791,7 @@ extern int pmixp_lib_abort(int status, void *cbfunc, void *cbdata)
 	 */
 	pmixp_abort_propagate(status);
 
-	if (!status)
-		flags |= KILL_NO_SIG_FAIL;
-
-	slurm_kill_job_step(pmixp_info_jobid(), pmixp_info_stepid(), SIGKILL,
-			    flags);
+	slurm_kill_job_step(pmixp_info_jobid(), pmixp_info_stepid(), SIGKILL);
 
 	if (abort_cbfunc)
 		abort_cbfunc(PMIX_SUCCESS, cbdata);

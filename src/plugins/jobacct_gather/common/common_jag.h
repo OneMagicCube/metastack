@@ -1,7 +1,9 @@
 /*****************************************************************************\
  *  common_jag.h - slurm job accounting gather common plugin functions.
  *****************************************************************************
- *  Copyright (C) SchedMD LLC.
+ *  Copyright (C) 2013 SchedMD LLC
+ *  Written by Danny Auble <da@schedmd.com>, who borrowed heavily
+ *  from the original code in jobacct_gather/linux
  *
  *  This file is part of Slurm, a resource management program.
  *  For details, see <https://slurm.schedmd.com/>.
@@ -40,17 +42,10 @@
 #define __COMMON_JAG_H__
 
 #include "src/common/list.h"
-#ifdef __METASTACK_OPT_INFLUXDB_ENFORCE 
-#include "src/interfaces/acct_gather.h"
-#endif
-#ifdef __METASTACK_NEW_LOAD_ABNORMAL
-#include "src/interfaces/jobacct_gather.h"
-#endif
 
 typedef struct jag_prec {	/* process record */
 	bool	visited;
 	int	act_cpufreq;	/* actual average cpu frequency */
-	bool    completed;       /* the process no longer exists */
 	int	last_cpu;	/* last cpu */
 	pid_t	pid;
 	pid_t	ppid;
@@ -60,15 +55,15 @@ typedef struct jag_prec {	/* process record */
 	acct_gather_data_t *tres_data; /* array of tres data */
 	double  usec; /* user cpu time: To normalize divide by system hertz */
 #ifdef __METASTACK_OPT_INFLUXDB_ENFORCE 
-	char   *command; /* name of the process with the given PID */
+	char   *command;
 	time_t last_time;
 	time_t now_time;
-	bool   ppid_flag; 
-	double cpu_util; /* Process CPU utilization */
-	double last_total_calc; /* Total CPU time of the process */
+	bool   ppid_flag;
+	double cpu_util;
+	double last_total_calc;
 #endif
-#ifdef __METASTACK_NEW_LOAD_ABNORMAL
-	int flag; /* use different numbers to represent different states */
+#ifdef __METASTACK_LOAD_ABNORMAL
+    int flag;/*Use different numbers to represent different states*/
 #endif
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
 	char *cmdline;
@@ -80,16 +75,14 @@ typedef struct jag_callbacks {
 	List (*get_precs) (List task_list, uint64_t cont_id,
 			   struct jag_callbacks *callbacks);
 	void (*get_offspring_data) (List prec_list,
-				    jag_prec_t *ancestor, pid_t pid, jag_prec_t * permanent_ancestor);
+				    jag_prec_t *ancestor, pid_t pid);
 } jag_callbacks_t;
 
 extern void jag_common_init(long in_hertz);
 extern void jag_common_fini(void);
 extern void destroy_jag_prec(void *object);
-
-#ifdef __METASTACK_NEW_LOAD_ABNORMAL
+#ifdef __METASTACK_LOAD_ABNORMAL
 extern void jag_common_poll_data(List task_list, uint64_t cont_id,
 				 jag_callbacks_t *callbacks, bool profile, collection_t *collect, write_t *data);
 #endif
-
 #endif

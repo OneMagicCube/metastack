@@ -1,6 +1,10 @@
 # Makefile for proctrack plugins
 
-SUBDIRS = linuxproc pgid
+if HAVE_NATIVE_CRAY
+CRAY = cray_aries
+endif
+
+SUBDIRS = $(CRAY) linuxproc pgid
 
 if WITH_CGROUP
 SUBDIRS += cgroup

@@ -1,7 +1,8 @@
 /*****************************************************************************\
  *  jwt.c - Slurm REST auth JWT plugin
  *****************************************************************************
- *  Copyright (C) SchedMD LLC.
+ *  Copyright (C) 2020 SchedMD LLC.
+ *  Written by Nathan Rini <nate@schedmd.com>
  *
  *  This file is part of Slurm, a resource management program.
  *  For details, see <https://slurm.schedmd.com/>.
@@ -42,7 +43,7 @@
 
 #include "src/common/data.h"
 #include "src/common/log.h"
-#include "src/interfaces/auth.h"
+#include "src/common/slurm_auth.h"
 #include "src/common/xassert.h"
 #include "src/common/xmalloc.h"
 #include "src/common/xstring.h"
@@ -91,28 +92,32 @@ extern int slurm_rest_auth_p_authenticate(on_http_request_args_t *args,
 					  rest_auth_context_t *ctxt)
 {
 	plugin_data_t *data;
-	const char *key, *user_name, *bearer, *name;
+	const char *key, *user_name;
 
 	key = find_http_header(args->headers, HTTP_HEADER_USER_TOKEN);
-	bearer = find_http_header(args->headers, HTTP_HEADER_AUTH);
 	user_name = find_http_header(args->headers, HTTP_HEADER_USER_NAME);
-	name = conmgr_fd_get_name(args->context->con);
 
-	if (!key && !user_name && !bearer) {
+	if (!key && !user_name) {
 		debug3("%s: [%s] skipping token authentication",
-		       __func__, name);
+		       __func__, args->context->con->name);
 		return ESLURM_AUTH_SKIP;
 	}
 
-	if (!key && !bearer) {
+	if (!key) {
 		error("%s: [%s] missing header user token: %s",
-		      __func__, name, HTTP_HEADER_USER_TOKEN);
-		return ESLURM_AUTH_CRED_INVALID;
-	} else if (key && bearer) {
-		error("%s: [%s] mutually exclusive headers %s and %s found. Rejecting ambiguous authentication request.",
-		      __func__, name, HTTP_HEADER_USER_TOKEN, HTTP_HEADER_AUTH);
+		      __func__, args->context->con->name,
+		      HTTP_HEADER_USER_TOKEN);
 		return ESLURM_AUTH_CRED_INVALID;
 	}
+	if (!user_name) {
+		error("%s: [%s] missing header user name: %s",
+		      __func__, args->context->con->name,
+		      HTTP_HEADER_USER_NAME);
+		return ESLURM_AUTH_CRED_INVALID;
+	}
+
+	info("[%s] attempting user_name %s token authentication pass through",
+	     args->context->con->name, user_name);
 
 	xassert(!ctxt->user_name);
 	xassert(!ctxt->plugin_data);
@@ -121,30 +126,7 @@ extern int slurm_rest_auth_p_authenticate(on_http_request_args_t *args,
 	ctxt->plugin_data = data = xmalloc(sizeof(*data));
 	data->magic = MAGIC;
 	ctxt->user_name = xstrdup(user_name);
-
-	if (key) {
-		data->token = xstrdup(key);
-	} else if (bearer) {
-		if (!xstrncmp(HTTP_HEADER_AUTH_BEARER, bearer,
-			      strlen(HTTP_HEADER_AUTH_BEARER))) {
-			data->token = xstrdup(bearer +
-					      strlen(HTTP_HEADER_AUTH_BEARER));
-		} else {
-			error("%s: [%s] unexpected format for %s header: %s",
-			      __func__, name, HTTP_HEADER_AUTH, bearer);
-			return ESLURM_AUTH_CRED_INVALID;
-		}
-	}
-
-	if (user_name)
-		info("[%s] attempting user_name %s token authentication pass through",
-		     name, user_name);
-	else if (key)
-		info("[%s] attempting token authentication pass through",
-		     name);
-	else
-		info("[%s] attempting bearer token authentication pass through",
-		     name);
+	data->token = xstrdup(key);
 
 	return SLURM_SUCCESS;
 }
@@ -198,13 +180,9 @@ extern void *slurm_rest_auth_p_get_db_conn(rest_auth_context_t *context)
 	return NULL;
 }
 
-extern void slurm_rest_auth_p_init(bool become_user)
+extern void slurm_rest_auth_p_init(void)
 {
 	debug5("%s: REST JWT auth activated", __func__);
-
-	if (become_user)
-		fatal("%s: rest_auth/jwt must not be loaded in become_user mode",
-		      __func__);
 }
 
 extern void slurm_rest_auth_p_fini(void)

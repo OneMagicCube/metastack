@@ -1,7 +1,8 @@
 /*****************************************************************************\
  *  burst_buffer_info.c - get/print the burst buffer state information
  *****************************************************************************
- *  Copyright (C) SchedMD LLC.
+ *  Copyright (C) 2014-2015 SchedMD LLC.
+ *  Written by Morris Jette <jette@schedmd.com>
  *
  *  This file is part of Slurm, a resource management program.
  *  For details, see <https://slurm.schedmd.com/>.
@@ -225,7 +226,7 @@ static void _print_burst_buffer_resv(FILE *out,
 				     burst_buffer_resv_t* burst_buffer_ptr,
 				     int one_liner, bool verbose)
 {
-	char sz_buf[32], time_buf[256];
+	char sz_buf[32], time_buf[64];
 	char *out_buf = NULL, *user_name;
 
 	/****** Line 1 ******/
@@ -348,10 +349,6 @@ extern void slurm_print_burst_buffer_record(FILE *out,
 	xstrcat(out_buf, line_end);
 	xstrfmtcat(out_buf, "Flags=%s",
 		   slurm_bb_flags2str(burst_buffer_ptr->flags));
-
-	/****** Line ******/
-	xstrcat(out_buf, line_end);
-	xstrfmtcat(out_buf, "PollInterval=%u", burst_buffer_ptr->poll_interval);
 
 	/****** Line ******/
 	xstrcat(out_buf, line_end);

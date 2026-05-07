@@ -13,29 +13,22 @@ AC_DEFUN([X_AC_DATABASES],
 [
 	#Check for MySQL
 	ac_have_mysql="no"
-	_x_ac_mysql_bin=""
+	_x_ac_mysql_bin="no"
 	### Check for mysql_config program
 	AC_ARG_WITH(
 		[mysql_config],
 		AS_HELP_STRING(--with-mysql_config=PATH,
 			Specify path of directory where mysql_config binary exists),
-		[AS_IF([test "x$with_mysql_config" != xno && test "x$with_mysql_config" != xyes],
-		       [_x_ac_mysql_bin="$with_mysql_config"])])
+		[_x_ac_mysql_bin="$withval"])
 
-	if test -z "$_x_ac_mysql_bin"; then
+	if test x$_x_ac_mysql_bin = xno; then
 		AC_PATH_PROGS(HAVEMYSQLCONFIG, [mysql_config mariadb_config], no)
 	else
 		AC_PATH_PROGS(HAVEMYSQLCONFIG, [mysql_config mariadb_config], no, $_x_ac_mysql_bin)
 	fi
 
-	if test x$with_mysql_config = xno; then
-		AC_MSG_NOTICE([support for mysql is disabled])
-	elif test x$HAVEMYSQLCONFIG = xno; then
-		if test -z "$with_mysql_config"; then
-			AC_MSG_WARN([*** mysql_config not found. Evidently no MySQL development libs installed on system.])
-		else
-			AC_MSG_ERROR([*** mysql_config not found. Evidently no MySQL development libs installed on system.])
-		fi
+	if test x$HAVEMYSQLCONFIG = xno; then
+		AC_MSG_WARN([*** mysql_config not found. Evidently no MySQL development libs installed on system.])
 	else
 		# check for mysql-5.0.0+
 		mysql_config_major_version=`$HAVEMYSQLCONFIG --version | \
@@ -98,34 +91,27 @@ AC_DEFUN([X_AC_DATABASES],
 	ac_have_kingbase="no"
 	_x_ac_kingbase_bin="no"
 	_x_ac_kingbase_ssl_lib="no"
+
 	### Check for kingbase_config program
 	AC_ARG_WITH(
 		[kingbase_config],
 		AS_HELP_STRING(--with-kingbase_config=PATH,
 			Specify path of directory where kingbase_config binary exists),
-		[AS_IF([test "x$with_kingbase_config" != xno && test "x$with_kingbase_config" != xyes],
-		       [_x_ac_kingbase_bin="$with_kingbase_config"])])
+		[_x_ac_kingbase_bin="$withval"])
 	AC_ARG_WITH(
 		[kingbase_ssl_lib],
 		AS_HELP_STRING(--with-kingbase_ssl_lib=PATH,
 			Specify path of the directory that stores the library files libssl.so.1.1 and libcrypto.so.1.1),
-		[AS_IF([test "x$with_kingbase_ssl_lib" != xno && test "x$with_kingbase_ssl_lib" != xyes],
-		       [_x_ac_kingbase_ssl_lib="$with_kingbase_ssl_lib"])])
+		[_x_ac_kingbase_ssl_lib="$withval"])
 
-	if test -z "$_x_ac_kingbase_bin" ; then
+	if test x$_x_ac_kingbase_bin = xno; then
 		AC_PATH_PROGS(HAVEKINGBASECONFIG, [kingbase], no)
 	else
 		AC_PATH_PROGS(HAVEKINGBASECONFIG, [kingbase], no, $_x_ac_kingbase_bin)
 	fi
 	
-	if test x$with_kingbase_config = xno; then
-		AC_MSG_NOTICE([support for kingbase is disabled])
-	elif test x$HAVEKINGBASECONFIG = xno; then
-		if test -z "$with_kingbase_config"; then
-			AC_MSG_WARN([*** kingbase_config not found. Evidently no Kingbase development libs installed on system.])
-		else
-			AC_MSG_ERROR([*** kingbase_config not found. Evidently no Kingbase development libs installed on system.])
-		fi
+	if test x$HAVEKINGBASECONFIG = xno; then
+		AC_MSG_WARN([*** kingbase_config not found. Evidently no KingBase development libs installed on system.])
 	else
 		# check for KINGBASE (KingbaseES) V008R006C007B0024+
 		kingbase_config_version=`$HAVEKINGBASECONFIG --version`

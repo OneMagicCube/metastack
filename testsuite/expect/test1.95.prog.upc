@@ -1,7 +1,8 @@
 /*****************************************************************************\
  *  test1.95.prog.upc - Basic UPC (Unified Parallel C) test via srun.
  *****************************************************************************
- *  Copyright (C) SchedMD LLC.
+ *  Copyright (C) 2012 SchedMD LLC
+ *  Written by Morris Jette <jette@schedmd.com>
  *
  *  This file is part of Slurm, a resource management program.
  *  For details, see <https://slurm.schedmd.com/>.
