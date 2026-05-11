@@ -2059,12 +2059,15 @@ static int _parse_app_name(void **dest, slurm_parser_enum_t type,
         {"Default", S_P_BOOLEAN},    
         {NULL}    
     };    
-  
+	/* 
+	 * Skip parsing for non-slurmctld processes (sbatch, srun, etc.) to avoid
+	 * unnecessary overhead. The client commands don't need app configuration.
+	 */
 	if (!running_in_slurmctld()) {  
 		*leftover += strlen(*leftover);  
 		return 0;  
 	}  
-  
+	/* Create hash table for parsing AppName-specific options */
     tbl = s_p_hashtbl_create(_app_name_options);    
     if (!s_p_parse_line(tbl, *leftover, leftover)) {    
 		error("AppName=%s has invalid configuration (unrecognized key), "    
@@ -2074,10 +2077,12 @@ static int _parse_app_name(void **dest, slurm_parser_enum_t type,
 		return 0;    
 	}  
   
-	app_record_t *p = _create_conf_app();    
-  
-	if (value == NULL) {    
-		error("AppName line missing name value, ignoring");  
+	/* Allocate and initialize app record structure */
+	app_record_t *p = _create_conf_app();  
+
+	/* AppName value (the key after "AppName=") is mandatory */
+	if (!value || !value[0]) {
+		error("AppName line missing or empty name value, ignoring");
 		_destroy_app_name(p);    
 		s_p_hashtbl_destroy(tbl);    
 		return 0;    
@@ -2086,7 +2091,7 @@ static int _parse_app_name(void **dest, slurm_parser_enum_t type,
   
 	/* Version is optional — NULL means no version restriction */  
 	s_p_get_string(&p->versions, "Version", tbl);  
-  
+	/* Optional metadata fields */
 	s_p_get_string(&p->description, "Description", tbl);  
 	s_p_get_string(&p->watchdog, "Watchdog", tbl);  
     

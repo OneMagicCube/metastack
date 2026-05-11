@@ -46,7 +46,7 @@
 #include "list2.h"
 #include "json_api.h"
 
-char deauft_events[] = "CPUUSA,PidSA,NodeSA"; 
+char deauft_events[] = "CPUUSA,PidSA,NodeSA,GPUUSA"; 
 
 extern int strcat_stepd(const char* jobids, uint32_t* job_id, int* stepd)
 {
@@ -176,6 +176,7 @@ extern char* reassemble_job_ids(const char *input) {
     const char *suffix = "'";
     size_t i = 0;
     char *output = NULL;
+    char *input_copy = NULL;
     /*The initial size is 1, leaving room for the string terminator '\0'.*/
     size_t output_size = 1; 
     size_t input_length = strlen(input);
@@ -196,7 +197,8 @@ extern char* reassemble_job_ids(const char *input) {
     
     /*Start building the output string*/
     strcpy(output, "");
-    char *token = strtok((char*)input, delim);
+    input_copy = xstrdup(input);
+    char *token = strtok(input_copy, delim);
     while (token != NULL) {
         /*Append one " or jobid = 'token'" to the output string each time.
          *Add 7 to make room for " or " and the string terminator '\0'
@@ -217,6 +219,7 @@ extern char* reassemble_job_ids(const char *input) {
     if (strlen(output) > 4) {
         memmove(output, output + 4, strlen(output) - 3);
     }
+    xfree(input_copy);
     
     return output;
 }
@@ -270,7 +273,12 @@ extern int strcat_field(c_string_t* sql, const char *str, int field)
         }
         c_string_append_str(tmp_fields, prefix);
 
-        c_string_append_str(tmp_fields, ((field == STEP && strcasecmp(field_value, "batch") == 0) ? "-5" : field_value));
+        if (field == STEP && strcasecmp(field_value, "batch") == 0)
+            c_string_append_str(tmp_fields, "-5");
+        else if (field == STEP && strcasecmp(field_value, "extern") == 0)
+            c_string_append_str(tmp_fields, "-4");
+        else
+            c_string_append_str(tmp_fields, field_value);
         c_string_append_str(tmp_fields, suffix);
         field_value = strtok(NULL, delimiters);
     }
@@ -371,14 +379,14 @@ extern int query_step_event(label_flags_t* sql_labels, join_sql_t *sql_time_sd, 
                                     "FROM Apptype";
 
     /*event event sql statement assembly*/
-    char sql_event_head[]   =   "SELECT \"cputhreshold\",\"end\",\"jobid\",\"start\",\"step\",\"stepcpu\",\"stepmem\",\"steppages\",\"stepvmem\","
+    char sql_event_head[]   =   "SELECT \"cputhreshold\",\"gresthreshold\",\"end\",\"jobid\",\"start\",\"step\",\"stepcpu\",\"stepmem\",\"steppages\",\"stepvmem\","
                                 "\"stepdcuutil\" as \"stepdcu\",\"stepdcumem\","  
-                                "\"type1\"::tag as tag_type1,\"type2\"::tag as tag_type2,\"type3\"::tag as tag_type3,"
-                                "\"type1\"::field as field_type1,\"type2\"::field as field_type2,\"type3\"::field as field_type3,"
+                                "\"type1\"::tag as tag_type1,\"type2\"::tag as tag_type2,\"type3\"::tag as tag_type3,\"type4\"::tag as tag_type4,"
+                                "\"type1\"::field as field_type1,\"type2\"::field as field_type2,\"type3\"::field as field_type3,\"type4\"::field as field_type4,"
                                 "\"type\",\"username\" "
                                 "FROM ("
                                     "SELECT * "
-                                    "FROM Event";    
+                                    "FROM Event";      
 
     /*job summary sql statement assembly*/
     char sql_job_summary_total_head[] = 
@@ -435,7 +443,7 @@ extern int query_step_event(label_flags_t* sql_labels, join_sql_t *sql_time_sd, 
      * exam SELECT stepcpu,stepmem FROM "Stepd" WHERE "jobid"='603537634' 
      * group by step  ORDER BY time DESC LIMIT 1
      */
-    char sql_brief_head[]   = "select time,stepcpu,stepmem ";
+    char sql_brief_head[]   = "select time,stepcpu,stepmem,stepdcuutil,stepdcumem ";
     char sql_brief_tail[]   = " group by step,jobid ORDER BY time DESC LIMIT 1";
 
     /* end time is concatenated with the default as the current query timestamp */
@@ -578,6 +586,9 @@ extern int query_step_event(label_flags_t* sql_labels, join_sql_t *sql_time_sd, 
             } else if (strcasecmp(event, "NodeSA") == 0) {
                 c_string_append_str(tmp_events, prefix);
                 c_string_append_str(tmp_events, "'node'");
+            } else if (strcasecmp(event, "GPUUSA") == 0) {
+                c_string_append_str(tmp_events, prefix);
+                c_string_append_str(tmp_events, "'gres'");
             } else 
                 splicing = true;
             event = strtok(NULL, delimiters);

@@ -21597,6 +21597,22 @@ extern char **job_common_env_vars(job_record_t *job_ptr, bool is_complete)
 				job_ptr->details->work_dir);
 	}
 
+#ifdef __METASTACK_OPT_APP
+	/*
+	 * Keep app metadata aligned across slurmctld-side script contexts
+	 * (PrologSlurmctld/EpilogSlurmctld) and task runtime environments.
+	 */
+	if (job_ptr->app_name) {
+		setenvf(&my_env, "SLURM_JOB_APP_NAME", "%s", job_ptr->app_name);
+		if (job_ptr->app_version) {
+			setenvf(&my_env, "SLURM_JOB_APP_VERSION", "%s",
+				job_ptr->app_version);
+		}
+		setenvf(&my_env, "SLURM_JOB_APP_SOURCE", "%s",
+			app_source_to_str(job_ptr->app_source));
+	}
+#endif
+
 	return my_env;
 }
 

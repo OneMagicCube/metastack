@@ -115,6 +115,103 @@ label_flags_t sql_labels;
 join_sql_t    sql_option;
 void print_fields_header(list_t *print_fields_list);
 int parse_sacct_line(const char *line, int count, List print_head_list);
+
+static bool _format_list_has_field(const char *field_list,
+                                   const char * const *field_names)
+{
+    char *field_copy = NULL;
+    char *start = NULL;
+    char *end = NULL;
+    bool found = false;
+
+    if (!field_list || !field_names)
+        return false;
+
+    field_copy = xstrdup(field_list);
+    start = field_copy;
+
+    while (start && *start) {
+        char *width = NULL;
+
+        end = strchr(start, ',');
+        if (end)
+            *end = '\0';
+
+        while (isspace((unsigned char)*start))
+            start++;
+
+        width = strchr(start, '%');
+        if (width)
+            *width = '\0';
+
+        for (char *tail = start + strlen(start); tail > start; tail--) {
+            if (!isspace((unsigned char)*(tail - 1)))
+                break;
+            *(tail - 1) = '\0';
+        }
+
+        if (*start && strcasecmp(start, "ALL") != 0) {
+            for (int i = 0; field_names[i]; i++) {
+                if (strcasecmp(start, field_names[i]) == 0) {
+                    found = true;
+                    goto done;
+                }
+            }
+        }
+
+        if (!end)
+            break;
+        start = end + 1;
+    }
+
+done:
+    xfree(field_copy);
+    return found;
+}
+
+static uint64_t _infer_level_from_format(const char *field_list)
+{
+    static const char * const step_fields[] = {
+        "StepID", "StepAVECPU", "StepCPU", "StepMEM", "StepVMEM",
+        "StepPages", "MaxStepCPU", "MinStepCPU", "MaxStepMEM",
+        "MinStepMEM", "MaxStepVMEM", "MinStepVMEM", "StepGPU(DCU)",
+        "StepGPU(DCU)MEM", "StepDCU", "MaxStepGPU(DCU)",
+        "MinStepGPU(DCU)", "MaxStepGPU(DCU)MEM", "MinStepGPU(DCU)MEM",
+        NULL
+    };
+    static const char * const event_fields[] = {
+        "CPUthreshold", "GRESthreshold", "Start", "End", "Type", NULL
+    };
+    static const char * const overall_fields[] = {
+        "Last_start", "Last_end", "CPU_Abnormal_CNT", "PROC_Abnormal_CNT",
+        "NODE_Abnormal_CNT", "GPU_Abnormal_CNT", NULL
+    };
+    static const char * const apptype_fields[] = {
+        "Username", "CpuTime", "Apptype_CLI", "Apptype_STEP", "Apptype",
+        NULL
+    };
+    static const char * const job_summary_fields[] = {
+        "TotalCPU", "TotalMEM", "TotalVMEM", "TotalPages", "MaxCPU",
+        "MinCPU", "MaxMEM", "MinMEM", "MaxVMEM", "MinVMEM",
+        "TotalGPU(DCU)", "TotalGPU(DCU)MEM", "MaxGPU(DCU)",
+        "MinGPU(DCU)", "MaxGPU(DCU)MEM", "MinGPU(DCU)MEM", NULL
+    };
+    uint64_t level = INFLUXDB_NONE;
+
+    if (_format_list_has_field(field_list, step_fields))
+        level |= INFLUXDB_STEPD;
+    if (_format_list_has_field(field_list, event_fields))
+        level |= INFLUXDB_EVENT;
+    if (_format_list_has_field(field_list, overall_fields))
+        level |= INFLUXDB_OVERALL;
+    if (_format_list_has_field(field_list, apptype_fields))
+        level |= INFLUXDB_APPTYPE;
+    if (_format_list_has_field(field_list, job_summary_fields))
+        level |= INFLUXDB_JOB_SUMMARY;
+
+    return level;
+}
+
 extern void destroy_query_key_pair(void *object)
 {
 	spost_record_t *key_query_ptr = (spost_record_t *)object;
@@ -154,6 +251,7 @@ void print_sjinfo_help(void)
 "        CPUUSA - CPU Utilization State Anomaly                            \n"
 "        PidSA - Process State Anomaly                                    \n"
 "        NodeSA - Node State Anomaly                                      \n"
+"        GPUUSA - GPU Utilization State Anomaly                           \n"
 "     -E, --end:                                                           \n"
 "        The end time of the abnormal event.                              \n"
 "     -h, --help:                                                          \n"
@@ -169,9 +267,9 @@ void print_sjinfo_help(void)
 "        '--format' option                                                 \n"
 "        '--format='    JobID,StepID,StepCPU,StepAVECPU,StepMEM,StepVMEM,         \n"
 "                       StepPages,MaxStepCPU,MinStepCPU,MaxStepMEM,            \n"
-"                       MinStepMEM,MaxStepVMEM,MinStepVMEM,CPUthreshold,        \n"
+"                       MinStepMEM,MaxStepVMEM,MinStepVMEM,CPUthreshold,GRESthreshold,\n"
 "                       Start,End,Type,Last_start,Last_end,CPU_Abnormal_CNT,     \n"
-"                       PROC_Abnormal_CNT,NODE_Abnormal_CNT     \n"
+"                       PROC_Abnormal_CNT,NODE_Abnormal_CNT,GPU_Abnormal_CNT     \n"
 "                                                                           \n"
 "        Fields related to resource consumption:                           \n"
 "        JobID:         Job ID                                                 \n"
@@ -206,16 +304,17 @@ void print_sjinfo_help(void)
 "        MinMEM:        Minimum memory usage across all job steps             \n"
 "        MaxVMEM:       Maximum virtual memory usage across all job steps     \n"
 "        MinVMEM:       Minimum virtual memory usage across all job steps     \n"
-"        TotalDCU:      Total DCU usage across all job steps                  \n"
-"        TotalDCUMEM:   Total DCU memory usage across all job steps           \n"
-"        MaxDCU:        Maximum DCU usage across all job steps                \n"
-"        MinDCU:        Minimum DCU usage across all job steps                \n"
-"        MaxDCUMEM:     Maximum DCU memory usage across all job steps         \n"
-"        MinDCUMEM:     Minimum DCU memory usage across all job steps         \n"
+"        TotalGPU(DCU): Total GPU(DCU) usage across all job steps             \n"
+"        TotalGPU(DCU)MEM: Total GPU(DCU) memory usage across all job steps   \n"
+"        MaxGPU(DCU):   Maximum GPU(DCU) usage across all job steps           \n"
+"        MinGPU(DCU):   Minimum GPU(DCU) usage across all job steps           \n"
+"        MaxGPU(DCU)MEM: Maximum GPU(DCU) memory usage across all job steps   \n"
+"        MinGPU(DCU)MEM: Minimum GPU(DCU) memory usage across all job steps   \n"
 "                                                                             \n"
 "                                                                             \n"
 "        Fields related to abnormal events:                                \n"
 "        CPUthreshold:  Set the CPU utilization threshold for a job.         \n"
+"        GRESthreshold: Set the GPU utilization threshold for a job.         \n"
 "        Start:         The start time of the abnormal event.                  \n"
 "        End:           The end time of the exception event.                   \n"
 "        Type:          Type of abnormal event.                                \n"
@@ -226,6 +325,7 @@ void print_sjinfo_help(void)
 "        CPU_Abnormal_CNT:       Total number of CPU abnormal events.                   \n"
 "        PROC_Abnormal_CNT:       Total number of PROCESS abnormal events.                    \n"
 "        NODE_Abnormal_CNT:      Total number of NODE abnormal events.                    \n"
+"        GPU_Abnormal_CNT:       Total number of GPU abnormal events.                    \n"
 "     -O, --overall:                                                           \n"
 "        Displays general information about the abnormal event          \n"
 // "     -r, --running:                                                           \n"
@@ -454,7 +554,7 @@ int parse_command_and_query(int argc, char **argv, slurm_influxdb *data, query_j
                 {"abnormal",    no_argument,        0,      'A'},
                 {"all",         no_argument,        0,      'a'},
                 {"desc",        no_argument,        0,      'd'},        
-                {"display ",    no_argument,        0,      'D'},
+                {"display",     no_argument,        0,      'D'},
                 {"event",       required_argument,  0,      'e'},
                 {"end",         required_argument,  0,      'E'},
                 {"help",        no_argument,        0,      'h'},
@@ -623,6 +723,13 @@ int parse_command_and_query(int argc, char **argv, slurm_influxdb *data, query_j
     if(sql_labels.query_label) {
         rc = query_spost(query_send, sql_labels.jobid_out, sql_option.jobids);
         goto fail;
+    }
+
+    if (params.opt_field_list &&
+        (params.level == INFLUXDB_NONE || params.level == INFLUXDB_EVENT_FLAG)) {
+        uint64_t inferred_level = _infer_level_from_format(params.opt_field_list);
+        if (inferred_level != INFLUXDB_NONE)
+            params.level |= inferred_level;
     }
 
     if(params.level == INFLUXDB_NONE || params.level == INFLUXDB_EVENT_FLAG)

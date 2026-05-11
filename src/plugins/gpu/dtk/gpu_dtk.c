@@ -41,8 +41,8 @@
 #endif
 
 #include <dlfcn.h>
-#include "rocm_smi/rocm_smi.h"
-
+//#include "rocm_smi/rocm_smi.h"
+#include "rocm_smi/rocm_smi_v2.h"
 #include "../common/gpu_common.h"
 
 #ifdef HAVE_NUMA

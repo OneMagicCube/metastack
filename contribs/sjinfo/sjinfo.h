@@ -32,7 +32,9 @@
 #define CPU_ABNORMAL_FLAG           "cpu"
 #define PROCESS_ABNORMAL_FLAG       "process"
 #define NODE_ABNORMAL_FLAG          "node"
+#define GPU_ABNORMAL_FLAG           "gres"
 #define CPU_ABNORMAL_FLAG_DESC      "CPU utilization below threshold"
+#define GPU_ABNORMAL_FLAG_DESC      "GPU(DCU) utilization below threshold"
 #define PROCESS_ABNORMAL_FLAG_DESC  "Operational process anomalies"
 #define NODE_ABNORMAL_FLAG_DESC     "Node communication exception"
 #define FORMAT_STRING_SIZE          34
@@ -82,6 +84,7 @@ typedef struct sacct_entry{
     long long int stepdid;
     long long int reqmem;
     long long int alloc_cpu;
+    long long int alloc_gres;
 
 } sacct_entry_t;
 
@@ -124,18 +127,21 @@ typedef struct {
    double stepdcumemmin;    
    /*event*/
    unsigned long cputhreshold;
+   unsigned long gresthreshold;
    time_t start;
    time_t end;
    int type1;   // Marking cpu frequency anomalies
    int type2;   // identify process anomalies
    int type3;   // identifies node communication anomalies
-   char *type;
+   int type4;   // identifies GPU/DCU utilization anomalies
+   char *type;   //dcu 
    /* overall */
    time_t end_last;
    time_t start_last;
    unsigned long sum_cpu;
    unsigned long sum_pid;
    unsigned long sum_node;
+   unsigned long sum_gpu;
    /* apptype */
    char *apptype_cli;
    char *apptype_step;
@@ -143,6 +149,7 @@ typedef struct {
    unsigned long cputime;
    long long int req_mem;
    long long int alloc_cpu;
+   long long int alloc_gres;
    /* 作业汇总字段 */
    double total_cpu;          
    unsigned long int total_mem; 
@@ -242,6 +249,7 @@ typedef enum {
     PRINT_MAXSTEPDCUMEM,
     PRINT_MINSTEPDCUMEM,
     PRINT_CPUTHRESHOLD,
+    PRINT_GRESTHRESHOLD,
     PRINT_USERNAME,
     PRINT_UID,  
     PRINT_RECORD, 
@@ -254,6 +262,7 @@ typedef enum {
     PRINT_SUMPID,
     PRINT_SUMNODE,
     PRINT_SENDNODE,
+    PRINT_SUMGPU,
     PRINT_TYPE,
     PRINT_APPTYPE_CLI,
     PRINT_APPTYPE_STEP,

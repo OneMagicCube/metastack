@@ -1351,9 +1351,9 @@ extern int acct_gather_profile_p_add_sample_data_stepd(int dataset_id, void* dat
 							d[FIELD_STEPMEM].d, d[FIELD_STEPVMEM].d, d[FIELD_STEPPAGES].u,
 							d[FIELD_EVENTTYPE1START].u, d[FIELD_EVENTTYPE1END].u, 
 #ifdef __METASTACK_NEW_GRES_GATHER_DCU
-								((union data_t*)data)[FIELD_STEPDCU].d,
-								((union data_t*)data)[FIELD_STEPDCUMEM].d,
-								((union data_t*)data)[FIELD_GRESTHRESHOLD].d,
+							((union data_t*)data)[FIELD_STEPDCU].d,
+							((union data_t*)data)[FIELD_STEPDCUMEM].d,
+							((union data_t*)data)[FIELD_GRESTHRESHOLD].d,
 #endif
 #ifdef __METASTACK_NEW_PROFILE_TIME_SYNC
 								((union data_t*)data)[FIELD_SENDTIMESTAPM].u ? ((union data_t*)data)[FIELD_SENDTIMESTAPM].u : (uint64_t)sample_time);

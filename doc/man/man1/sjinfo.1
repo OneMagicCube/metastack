@@ -1,0 +1,278 @@
+.TH sjinfo "1" "Slurm Commands" "May 2026" "Slurm Commands"
+
+.SH "NAME"
+sjinfo \- Display Slurm job resource consumption and abnormal event information
+
+.SH "SYNOPSIS"
+\fBsjinfo\fR [\fIOPTIONS\fR...]
+
+.SH "DESCRIPTION"
+.PP
+\fBsjinfo\fR displays resource consumption information, abnormal event
+information, application type information, job summary information, and
+user-defined messages collected for Slurm jobs.
+.PP
+The command reads job monitoring data from the configured accounting backend.
+Most queries can be restricted by job id, step id, time range, user, event type,
+or output field list.
+
+.SH "OPTIONS"
+
+.TP
+\fB\-a\fR, \fB\-\-all\fR
+Equivalent to specifying \fB\-l\fR, \fB\-A\fR, and \fB\-O\fR simultaneously.
+.IP
+
+.TP
+\fB\-A\fR, \fB\-\-abnormal\fR
+Display information about abnormal events during job execution.
+.IP
+
+.TP
+\fB\-d\fR, \fB\-\-desc\fR
+Output data in reverse order.
+.IP
+
+.TP
+\fB\-D\fR, \fB\-\-display\fR
+Print brief job information. CPU Efficiency and MEM Efficiency are normalized
+values.
+.IP
+
+.TP
+\fB\-e\fR, \fB\-\-event\fR=<\fIfield_list\fR>
+Print the selected abnormal event types. This option must be used with
+\fB\-A\fR or \fB\-O\fR.
+.RS
+.TP
+\fBCPUUSA\fR
+CPU Utilization State Anomaly.
+.TP
+\fBPidSA\fR
+Process State Anomaly.
+.TP
+\fBNodeSA\fR
+Node State Anomaly.
+.TP
+\fBGPUUSA\fR
+GPU Utilization State Anomaly.
+.RE
+.IP
+
+.TP
+\fB\-E\fR, \fB\-\-end\fR=<\fItime\fR>
+Set the end time of the abnormal event query.
+.IP
+
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Display help information and exit.
+.IP
+
+.TP
+\fB\-j\fR, \fB\-\-jobs\fR=<\fIjobid\fR[,\fIjobid\fR...]>
+Specify the job ID or comma-separated job ID list to query.
+.IP
+
+.TP
+\fB\-J\fR, \fB\-\-job\-summary\fR
+Display job step data aggregated to job level.
+.IP
+
+.TP
+\fB\-l\fR, \fB\-\-load\fR
+Display load and resource consumption information during job run time.
+.IP
+
+.TP
+\fB\-o\fR, \fB\-\-format\fR=<\fIfield_list\fR>
+Print the selected comma-separated list of fields.
+.IP
+Supported field names include:
+.RS
+.PP
+\fBJobID\fR, \fBStepID\fR, \fBStepCPU\fR, \fBStepAVECPU\fR,
+\fBStepMEM\fR, \fBStepVMEM\fR, \fBStepPages\fR, \fBMaxStepCPU\fR,
+\fBMinStepCPU\fR, \fBMaxStepMEM\fR, \fBMinStepMEM\fR,
+\fBMaxStepVMEM\fR, \fBMinStepVMEM\fR, \fBStepGPU(DCU)\fR,
+\fBStepGPU(DCU)MEM\fR, \fBMaxStepGPU(DCU)\fR, \fBMinStepGPU(DCU)\fR,
+\fBMaxStepGPU(DCU)MEM\fR, \fBMinStepGPU(DCU)MEM\fR,
+\fBCPUthreshold\fR, \fBGRESthreshold\fR, \fBStart\fR, \fBEnd\fR,
+\fBType\fR, \fBLast_start\fR, \fBLast_end\fR,
+\fBCPU_Abnormal_CNT\fR, \fBPROC_Abnormal_CNT\fR,
+\fBNODE_Abnormal_CNT\fR, \fBGPU_Abnormal_CNT\fR,
+\fBTotalCPU\fR, \fBTotalMEM\fR, \fBTotalVMEM\fR, \fBTotalPages\fR,
+\fBMaxCPU\fR, \fBMinCPU\fR, \fBMaxMEM\fR, \fBMinMEM\fR,
+\fBMaxVMEM\fR, \fBMinVMEM\fR, \fBTotalGPU(DCU)\fR,
+\fBTotalGPU(DCU)MEM\fR, \fBMaxGPU(DCU)\fR, \fBMinGPU(DCU)\fR,
+\fBMaxGPU(DCU)MEM\fR, and \fBMinGPU(DCU)MEM\fR.
+.RE
+.IP
+
+.TP
+\fB\-O\fR, \fB\-\-overall\fR
+Display overall abnormal event information.
+.IP
+
+.TP
+\fB\-s\fR, \fB\-\-steps\fR=<\fIstep\fR[,\fIstep\fR...]>
+Specify job steps to query. The special step names \fBbatch\fR and
+\fBextern\fR are supported.
+.IP
+
+.TP
+\fB\-S\fR, \fB\-\-start\fR=<\fItime\fR>
+Set the start time of the abnormal event query, for example
+\fB2024\-05\-07T08:00:00\fR.
+.IP
+
+.TP
+\fB\-t\fR, \fB\-\-apptype\fR[=<\fIjob|step\fR>]
+Display application type information for the job. Use \fBstep\fR to display
+application type information at the job step level. The default is job level.
+.IP
+
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+Print the sjinfo version and exit.
+.IP
+
+.TP
+\fB\-m\fR
+Convert KB values to MB. The default unit is KB.
+.IP
+
+.TP
+\fB\-g\fR
+Convert KB values to GB. The default unit is KB.
+.IP
+
+.TP
+\fB\-q\fR, \fB\-\-query\fR
+Query user-defined messages. The query output can include job ID, user name,
+step ID, user UID, message content, send node, and post time. If \fBJSNS\fR
+appears in the job step column, the job step was not specified when the message
+was written.
+.IP
+
+.TP
+\fB\-u\fR, \fB\-\-user\fR=<\fIuser\fR>
+Query data for the specified user.
+.IP
+
+.SH "FIELD DESCRIPTIONS"
+
+.SS "Resource Consumption Fields"
+.TP
+\fBJobID\fR
+Job ID.
+.TP
+\fBStepID\fR
+Job step ID.
+.TP
+\fBStepCPU\fR
+CPU utilization within the job step anomaly detection interval.
+.TP
+\fBStepAVECPU\fR
+Average CPU utilization of the job step.
+.TP
+\fBStepMEM\fR
+Real-time memory usage of the job step.
+.TP
+\fBStepVMEM\fR
+Real-time virtual memory usage of the job step.
+.TP
+\fBStepPages\fR
+Job step page fault count during the current job step running cycle.
+.TP
+\fBMaxStepCPU\fR, \fBMinStepCPU\fR
+Maximum and minimum CPU utilization during the current job step running cycle.
+.TP
+\fBMaxStepMEM\fR, \fBMinStepMEM\fR
+Maximum and minimum memory usage during the current job step running cycle.
+.TP
+\fBMaxStepVMEM\fR, \fBMinStepVMEM\fR
+Maximum and minimum virtual memory usage during the current job step running
+cycle.
+.TP
+\fBStepGPU(DCU)\fR, \fBStepGPU(DCU)MEM\fR
+GPU/DCU utilization and GPU/DCU memory usage for the job step.
+
+.SS "Job Summary Fields"
+.TP
+\fBTotalCPU\fR, \fBTotalMEM\fR, \fBTotalVMEM\fR, \fBTotalPages\fR
+Total CPU utilization, memory usage, virtual memory usage, and page faults
+across all job steps.
+.TP
+\fBMaxCPU\fR, \fBMinCPU\fR
+Maximum and minimum CPU utilization across all job steps.
+.TP
+\fBMaxMEM\fR, \fBMinMEM\fR
+Maximum and minimum memory usage across all job steps.
+.TP
+\fBMaxVMEM\fR, \fBMinVMEM\fR
+Maximum and minimum virtual memory usage across all job steps.
+.TP
+\fBTotalGPU(DCU)\fR, \fBTotalGPU(DCU)MEM\fR
+Total GPU/DCU utilization and memory usage across all job steps.
+.TP
+\fBMaxGPU(DCU)\fR, \fBMinGPU(DCU)\fR
+Maximum and minimum GPU/DCU utilization across all job steps.
+.TP
+\fBMaxGPU(DCU)MEM\fR, \fBMinGPU(DCU)MEM\fR
+Maximum and minimum GPU/DCU memory usage across all job steps.
+
+.SS "Abnormal Event Fields"
+.TP
+\fBCPUthreshold\fR
+CPU utilization threshold for the job.
+.TP
+\fBGRESthreshold\fR
+GPU utilization threshold for the job.
+.TP
+\fBStart\fR
+Start time of the abnormal event.
+.TP
+\fBEnd\fR
+End time of the abnormal event.
+.TP
+\fBType\fR
+Type of abnormal event.
+
+.SS "Abnormal Event Overall Fields"
+.TP
+\fBLast_start\fR
+Start time of the most recent anomaly.
+.TP
+\fBLast_end\fR
+End time of the most recent anomaly.
+.TP
+\fBCPU_Abnormal_CNT\fR
+Total number of CPU abnormal events.
+.TP
+\fBPROC_Abnormal_CNT\fR
+Total number of process abnormal events.
+.TP
+\fBNODE_Abnormal_CNT\fR
+Total number of node abnormal events.
+.TP
+\fBGPU_Abnormal_CNT\fR
+Total number of GPU abnormal events.
+
+.SH "EXAMPLES"
+.TP
+\fBsjinfo \-j 135617 \-a\fR
+Display load, abnormal event, and overall abnormal event information for job
+135617.
+.TP
+\fBsjinfo \-j 135617 \-A \-e GPUUSA\fR
+Display GPU abnormal events for job 135617.
+.TP
+\fBsjinfo \-j 135617 \-s extern \-A\fR
+Display abnormal events for the extern step of job 135617.
+.TP
+\fBsjinfo \-j 135617 \-J\fR
+Display job-level aggregated resource consumption information.
+
+.SH "SEE ALSO"
+\fBsacct\fR(1), \fBsstat\fR(1), \fBsrun\fR(1)

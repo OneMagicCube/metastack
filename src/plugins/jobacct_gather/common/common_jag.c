@@ -76,6 +76,10 @@ static int cpunfo_frequency = 0;
 static long conv_units = 0;
 List prec_list = NULL;
 
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+static bool first_dcu_gather = false;
+#endif
+
 static int my_pagesize = 0;
 static int energy_profile = ENERGY_DATA_NODE_ENERGY_UP;
 
@@ -1748,6 +1752,7 @@ extern void jag_common_poll_data(List task_list, uint64_t cont_id,
 			if(jobacct->tres_usage_in_tot[gpuutil_pos] != INFINITE64) {
 				total_job_dcu_util += (double)jobacct->tres_usage_in_tot[gpuutil_pos];
 			}
+
 		}	
 		if (count_list == 0 && (gpumem_pos != -1)) {
 			/* Assign the value to the last structure of the linked list */
@@ -1757,6 +1762,12 @@ extern void jag_common_poll_data(List task_list, uint64_t cont_id,
 			jobacct->dcu_mem_step  	   =  total_job_dcu_mem;
 			jobacct->dcu_mem_step_max  =  MAX(jobacct->dcu_mem_step_max, total_job_dcu_mem);
 			jobacct->dcu_mem_step_min  =  MIN(jobacct->dcu_mem_step_min, total_job_dcu_mem);
+			/* Initialize collection value of DCU/GPU */
+			if(first_dcu_gather == false) {
+				first_dcu_gather = true;
+				jobacct->dcu_step_min  	  = jobacct->dcu_step_real;
+				jobacct->dcu_mem_step_min = jobacct->dcu_mem_step;
+			}
 			debug3("GPUUtil=%f and MemMB=%ld",total_job_dcu_util, total_job_dcu_mem );
 		} else if (gpumem_pos != -1) {
 			/* Ensure that the loop process is 0. */

@@ -44,7 +44,7 @@
 #include "sjinfo.h"
 #include "time_format.h"
 
-#define LINE_WIDTH 103
+#define LINE_WIDTH 120
 char outbuf[FORMAT_STRING_SIZE];
 char *fields_delimiter = NULL;
 int print_fields_parsable_print = 0;
@@ -64,12 +64,12 @@ print_field_t fields[] = {
     {10, "MinStepMEM",      print_fields_str,   PRINT_MINSTEPMEM},
     {12, "MaxStepVMEM",     print_fields_str,   PRINT_MAXSTEPVMEM},
     {12, "MinStepVMEM",     print_fields_str,   PRINT_MINSTEPVMEM},
-    {10, "StepDCU",         print_fields_str,   PRINT_STEPDCU},
-    {10, "StepDCUMEM",      print_fields_str,   PRINT_STEPDCUMEM},
-    {10, "MaxStepDCU",      print_fields_str,   PRINT_MAXSTEPDCU},
-    {10, "MinStepDCU",      print_fields_str,   PRINT_MINSTEPDCU},
-    {13, "MaxStepDCUMEM",   print_fields_str,   PRINT_MAXSTEPDCUMEM},
-    {13, "MinStepDCUMEM",   print_fields_str,   PRINT_MINSTEPDCUMEM},
+    {15, "StepGPU(DCU)",    print_fields_str,   PRINT_STEPDCU},
+    {15, "StepGPU(DCU)MEM", print_fields_str,   PRINT_STEPDCUMEM},
+    {15, "MaxStepGPU(DCU)", print_fields_str,   PRINT_MAXSTEPDCU},
+    {15, "MinStepGPU(DCU)", print_fields_str,   PRINT_MINSTEPDCU},
+    {18, "MaxStepGPU(DCU)MEM",   print_fields_str,   PRINT_MAXSTEPDCUMEM},
+    {18, "MinStepGPU(DCU)MEM",   print_fields_str,   PRINT_MINSTEPDCUMEM},
     {0,  NULL,              NULL,               0}
 };
 
@@ -79,10 +79,11 @@ print_field_t field_event[] = {
     {12, "StepCPU",         print_fields_str,   PRINT_STEPCPU},
     {12, "StepMEM",         print_fields_str,   PRINT_STEPMEM},      
     {12, "StepVMEM",        print_fields_str,   PRINT_STEPVMEM},
-    {12, "StepDCU",         print_fields_str,   PRINT_STEPDCU},
-    {12, "StepDCUMEM",      print_fields_str,   PRINT_STEPDCUMEM},
+    {17, "StepGPU(DCU)",    print_fields_str,   PRINT_STEPDCU},
+    {17, "StepGPU(DCU)MEM", print_fields_str,   PRINT_STEPDCUMEM},
     {12, "StepPages",       print_fields_str,   PRINT_STEPPAGES},
     {12, "CPUthreshold",    print_fields_str,   PRINT_CPUTHRESHOLD},
+    {13, "GRESthreshold",   print_fields_str,   PRINT_GRESTHRESHOLD},
     {22, "Start",           print_fields_str,   PRINT_START}, 
     {22, "End",             print_fields_str,   PRINT_END},
     {31, "Type",            print_fields_str,   PRINT_TYPE}, 
@@ -97,6 +98,7 @@ print_field_t field_overall[] = {
     {16, "CPU_Abnormal_CNT",     print_fields_str,   PRINT_SUMCPU},
     {17, "PROC_Abnormal_CNT",     print_fields_str,   PRINT_SUMPID},
     {17, "NODE_Abnormal_CNT",    print_fields_str,   PRINT_SUMNODE},
+    {17, "GPU_Abnormal_CNT",     print_fields_str,   PRINT_SUMGPU},
     {0,  NULL,          NULL,               0}
 };
 
@@ -130,12 +132,12 @@ print_field_t fields_job_summary[] = {
     {12, "MinMEM",          print_fields_str,   PRINT_MINMEM},
     {12, "MaxVMEM",         print_fields_str,   PRINT_MAXVMEM},
     {12, "MinVMEM",         print_fields_str,   PRINT_MINVMEM},
-    {12, "TotalDCU",        print_fields_str,   PRINT_TOTALDCU},
-    {12, "TotalDCUMEM",     print_fields_str,   PRINT_TOTALDCUMEM},
-    {12, "MaxDCU",          print_fields_str,   PRINT_MAXDCU},
-    {12, "MinDCU",          print_fields_str,   PRINT_MINDCU},
-    {12, "MaxDCUMEM",       print_fields_str,   PRINT_MAXDCUMEM},
-    {12, "MinDCUMEM",       print_fields_str,   PRINT_MINDCUMEM},
+    {17, "TotalGPU(DCU)",   print_fields_str,   PRINT_TOTALDCU},
+    {17, "TotalGPU(DCU)MEM", print_fields_str,  PRINT_TOTALDCUMEM},
+    {17, "MaxGPU(DCU)",     print_fields_str,   PRINT_MAXDCU},
+    {17, "MinGPU(DCU)",     print_fields_str,   PRINT_MINDCU},
+    {17, "MaxGPU(DCU)MEM",  print_fields_str,   PRINT_MAXDCUMEM},
+    {17, "MinGPU(DCU)MEM",  print_fields_str,   PRINT_MINDCUMEM},
     {0,  NULL,              NULL,               0}
 };
 
@@ -736,6 +738,13 @@ void print_options(list_t *print_list, list_t *value_list, list_itr_t *print_itr
                         (curr_inx == field_count));     
                         break; 
 
+                    case PRINT_GRESTHRESHOLD:
+                        sprintf(tmp_char, "%lu%%", sjinfo_print->gresthreshold);
+                        field->print_routine(field,
+                        tmp_char,
+                        (curr_inx == field_count));     
+                        break; 
+
                     case PRINT_START:
                         timeinfo = localtime((const time_t *)&sjinfo_print->start);
                         if(timeinfo){
@@ -777,6 +786,12 @@ void print_options(list_t *print_list, list_t *value_list, list_itr_t *print_itr
                                 strcat(tmp_char, ",");
                             strcat(tmp_char, NODE_ABNORMAL_FLAG_DESC);
                         }
+                        if(sjinfo_print->type4 || xstrcmp(sjinfo_print->type, GPU_ABNORMAL_FLAG) == 0) {
+                            if(tmp_char != NULL && tmp_char[0] != '\0')
+                                strcat(tmp_char, ",");
+                            strcat(tmp_char, GPU_ABNORMAL_FLAG_DESC);
+                        }
+
                         field->print_routine(field,
                         tmp_char,
                         (curr_inx == field_count));     
@@ -784,6 +799,12 @@ void print_options(list_t *print_list, list_t *value_list, list_itr_t *print_itr
 
                     case PRINT_SUMCPU:
                         sprintf(tmp_char, "%lu", sjinfo_print->sum_cpu);
+                        field->print_routine(field,
+                        tmp_char,
+                        (curr_inx == field_count));
+                        break;
+                    case PRINT_SUMGPU:
+                        sprintf(tmp_char, "%lu", sjinfo_print->sum_gpu);
                         field->print_routine(field,
                         tmp_char,
                         (curr_inx == field_count));
@@ -896,17 +917,24 @@ foundfield:
 
 extern void print_star_line(const char *content) {
     size_t content_len = strlen(content);
-    size_t max_content_len = LINE_WIDTH - 2;
+    size_t max_content_len = LINE_WIDTH - 4;
     size_t copy_len = (content_len < max_content_len) ? content_len : max_content_len;
-    //int pad = LINE_WIDTH - 2 - content_len;
 
     char line[LINE_WIDTH + 1];
     memset(line, ' ', LINE_WIDTH);
-    line[0] = ' ';
-    line[LINE_WIDTH - 1] = ' ';
+    line[0] = '*';
+    line[LINE_WIDTH - 1] = '*';
     line[LINE_WIDTH] = '\0';
 
-    memcpy(line + 1, content, copy_len); // 左对齐内容
+    memcpy(line + 2, content, copy_len);
+    printf("%s\n", line);
+}
+
+static void print_star_border(void)
+{
+    char line[LINE_WIDTH + 1];
+    memset(line, '*', LINE_WIDTH);
+    line[LINE_WIDTH] = '\0';
     printf("%s\n", line);
 }
 
@@ -914,65 +942,67 @@ extern void print_efficiency(interface_sjinfo_t *sjinfo_print, const char *time_
 
     char info_buf[LINE_WIDTH] = {'\0'};
     char stepid_buf[32] = {'\0'};
-    char m[6] = " MB   ";
-    char g[6] = " GB   ";
-    char t[6] = " TB   ";
-    char p[6] = " PB   ";
-    char cpu_unit_buf[6] = "CORES";
-    char at[3] = "at";
-    char stepid_mem[64] = {'\0'};
-    char stepid_cpu[64] = {'\0'};
+    char value_buf[32] = {'\0'};
+    char alloc_buf[32] = {'\0'};
     char jobstep_buf[32] = {'\0'};
-    char stepid_mem_aligned[27] = {'\0'};
-    char stepid_cpu_aligned[27] = {'\0'};
-     
-    /*test*/
-    // sjinfo_print->alloc_cpu =10000;
-    // sjinfo_print->stepmem =123113LL*1024;
-    // sjinfo_print->req_mem = 14313213;
-    //sjinfo_print->jobid = 1;
+    double cpu_eff = 0.0;
+    double mem_eff = 0.0;
+    double gpu_eff = 0.0;
+    double stepdcumem_mb = 0.0;
+
     if (sjinfo_print->stepid == -5) {
         snprintf(stepid_buf, sizeof(stepid_buf), "batch");
+    } else if (sjinfo_print->stepid == -4) {
+        snprintf(stepid_buf, sizeof(stepid_buf), "extern");
     } else {
         snprintf(stepid_buf, sizeof(stepid_buf), "%d", sjinfo_print->stepid);
     }
    
     snprintf(jobstep_buf, sizeof(jobstep_buf), "%ld.%.*s", sjinfo_print->jobid, 8, stepid_buf);
-    /* mem字符串转化 */
 
-    // int count = num_digits(sjinfo_print->req_mem);
-
-    // if(count == -1)
-    //     return;
-    double result = (double)(sjinfo_print->stepmem * 100.0/1024/sjinfo_print->req_mem); 
-    if (sjinfo_print->req_mem > 1024*1024 && sjinfo_print->req_mem <= 1024*1024*1024) {
-        snprintf(stepid_mem, sizeof(stepid_mem), "%6.2f of %10lld %6s", result, sjinfo_print->req_mem/1024, g);
-    } else if (sjinfo_print->req_mem > 1024*1024*1024 && sjinfo_print->req_mem <= (long int)(1024L*1024L*1024L*1024L)) {
-        snprintf(stepid_mem, sizeof(stepid_mem), "%6.2f of %10lld %6s", result, sjinfo_print->req_mem/1024/1024, t);
-    } else if (sjinfo_print->req_mem > (long int)(1024L*1024L*1024L*1024L)) {
-        snprintf(stepid_mem, sizeof(stepid_mem), "%6.2f of %10lld %6s", result, sjinfo_print->req_mem/1024/1024/1024, p);
-    } else {
-        snprintf(stepid_mem, sizeof(stepid_mem), "%6.2f of %10lld %6s", result, sjinfo_print->req_mem, m);
+    if (sjinfo_print->alloc_cpu > 0)
+        cpu_eff = sjinfo_print->stepcpu / sjinfo_print->alloc_cpu;
+    mem_eff = sjinfo_print->stepmem * 100.0 / 1024 / sjinfo_print->req_mem;
+    if (sjinfo_print->alloc_gres > 0) {
+        gpu_eff = sjinfo_print->stepdcu / sjinfo_print->alloc_gres;
+        stepdcumem_mb = sjinfo_print->stepdcumem / 1024.0;
     }
 
-    /* 对 stepid_mem 对齐以避免 warning */
-    snprintf(stepid_mem_aligned, sizeof(stepid_mem_aligned), "%26.26s", stepid_mem);
-
-    /* cpu字段字符串转化 */
-    snprintf(stepid_cpu, sizeof(stepid_cpu), "%6.2f of %10lld %6s", (double)(sjinfo_print->stepcpu),sjinfo_print->alloc_cpu,cpu_unit_buf);
-    snprintf(stepid_cpu_aligned, sizeof(stepid_cpu_aligned), "%26.26s", stepid_cpu);
-
-    /* CPU Efficiency 行 */
+    snprintf(value_buf, sizeof(value_buf), "%.2f", cpu_eff);
+    snprintf(alloc_buf, sizeof(alloc_buf), "%lld", sjinfo_print->alloc_cpu);
     snprintf(info_buf, sizeof(info_buf),
-             "    %-20.20s %-18.18s %26.26s %3.3s %-20.20s",
-             jobstep_buf, "CPU Efficiency(%)", stepid_cpu_aligned,at,time_str);
+             "%-20.20s %-28.28s %10.10s %-6.6s %10.10s %-9.9s %-20.20s",
+             jobstep_buf, "CPU Efficiency", value_buf, "%",
+             alloc_buf, "CORES", time_str);
     print_star_line(info_buf);
 
-    /* MEM Efficiency 行 */
+    snprintf(value_buf, sizeof(value_buf), "%.2f", mem_eff);
+    snprintf(alloc_buf, sizeof(alloc_buf), "%lld", sjinfo_print->req_mem);
     snprintf(info_buf, sizeof(info_buf),
-             "    %-20.20s %-18.18s %26.26s %3.3s %-20.20s",
-             jobstep_buf, "MEM Efficiency(%)", stepid_mem_aligned,at,time_str);
+             "%-20.20s %-28.28s %10.10s %-6.6s %10.10s %-9.9s %-20.20s",
+             jobstep_buf, "MEM Efficiency", value_buf, "%",
+             alloc_buf, "MB", time_str);
     print_star_line(info_buf);
+
+    if (sjinfo_print->alloc_gres > 0) {
+        snprintf(value_buf, sizeof(value_buf), "%.2f", gpu_eff);
+        snprintf(alloc_buf, sizeof(alloc_buf), "%lld", sjinfo_print->alloc_gres);
+        snprintf(info_buf, sizeof(info_buf),
+                 "%-20.20s %-28.28s %10.10s %-6.6s %10.10s %-9.9s %-20.20s",
+                 jobstep_buf, "GPU(DCU) Efficiency",
+                 value_buf, "%", alloc_buf, "GPU(DCU)", time_str);
+        print_star_line(info_buf);
+
+        if (stepdcumem_mb == (uint64_t)stepdcumem_mb)
+            snprintf(value_buf, sizeof(value_buf), "%.0f", stepdcumem_mb);
+        else
+            snprintf(value_buf, sizeof(value_buf), "%.2f", stepdcumem_mb);
+        snprintf(info_buf, sizeof(info_buf),
+                 "%-20.20s %-28.28s %10.10s %-6.6s %10.10s %-9.9s %-20.20s",
+                 jobstep_buf, "GPU(DCU)MEM Usage",
+                 value_buf, "MB", "-", "-", time_str);
+        print_star_line(info_buf);
+    }
 }
 
 extern void job_brief(query_job_record_t *query_send, sjinfo_parameters_t *params)
@@ -980,8 +1010,12 @@ extern void job_brief(query_job_record_t *query_send, sjinfo_parameters_t *param
     list_itr_t *print_display_itr = NULL;
     interface_sjinfo_t  * sjinfo_print = NULL;
     char beijing_buf[64] = {'\0'};
-    printf("******************************************************************************************************* \n");
-    printf("*                                Display brief information of job steps                               *\n");
+    print_star_border();
+    print_star_line("Display brief information of job steps");
+    print_star_line("Note: Total available resources are parsed from sacct ReqTRES");
+    print_star_border();
+    print_star_line("JobStep              Metric                            Value Unit       ReqTRES ReqUnit   Time");
+    print_star_border();
     print_display_itr = list_iterator_create(query_send->print_display_list);
     while ((sjinfo_print = list_next(print_display_itr))) {
         int rc =  parse_utc_time_to_local(sjinfo_print->time, beijing_buf, sizeof(beijing_buf));
@@ -992,7 +1026,7 @@ extern void job_brief(query_job_record_t *query_send, sjinfo_parameters_t *param
         }
     }
     list_iterator_destroy(print_display_itr);
-    printf("******************************************************************************************************* \n");
+    print_star_border();
     printf("\n");
     print_options(query_send->print_fields_list, query_send->print_value_list, query_send->print_fields_itr, params);
     printf("\n");
@@ -1001,29 +1035,35 @@ extern void job_brief(query_job_record_t *query_send, sjinfo_parameters_t *param
 extern void print_field(query_job_record_t *query_send, sjinfo_parameters_t *params)
 {
 
-    char *opt_step_list           = xmalloc(200);
-    char *opt_event_list          = xmalloc(160);
-    char *opt_overall_list        = xmalloc(160);
-    char *opt_apptype_list        = xmalloc(160);
-    char *opt_apptype_job_list    = xmalloc(160);
-    char *opt_job_summary_list    = xmalloc(200);
+    char *opt_step_list           = NULL;
+    char *opt_event_list          = NULL;
+    char *opt_overall_list        = NULL;
+    char *opt_apptype_list        = NULL;
+    char *opt_apptype_job_list    = NULL;
+    char *opt_job_summary_list    = NULL;
     // char *opt_display             = xmalloc(160);
     char base_step_field[]        = "JobID,StepID,StepCPU,"
                 "StepAVECPU,StepMEM,StepVMEM,StepPages,MaxStepCPU,"
                 "MinStepCPU,MaxStepMEM,MinStepMEM,MaxStepVMEM,MinStepVMEM,"
-                "StepDCU,StepDCUMEM,MaxStepDCU,MinStepDCU,MaxStepDCUMEM,MinStepDCUMEM,";
+                "StepGPU(DCU),MaxStepGPU(DCU),MinStepGPU(DCU),MaxStepGPU(DCU)MEM,MinStepGPU(DCU)MEM,";
     char base_event_field[]       = "JobID,StepID,StepCPU,"
-                "StepMEM,StepVMEM,StepPages,StepDCU,StepDCUMEM,CPUthreshold,Start,End,Type,";
+                "StepMEM,StepVMEM,StepPages,StepGPU(DCU),StepGPU(DCU)MEM,CPUthreshold,GRESthreshold,Start,End,Type,";
     char base_overall_field[]     = "JobID,StepID,Last_start,"
-                "Last_end,CPU_Abnormal_CNT,PROC_Abnormal_CNT,NODE_Abnormal_CNT";
+                "Last_end,CPU_Abnormal_CNT,PROC_Abnormal_CNT,NODE_Abnormal_CNT,GPU_Abnormal_CNT";
     char base_apptype_field[]     = "JobID,StepID,Apptype_CLI,Apptype_STEP,UserName";
     char base_apptype_job_field[] = "JobID,Apptype,UserName";
     char base_display_field[]     = "JobID,StepID,"
                 "StepAVECPU,MaxStepCPU,"
-                "MinStepCPU,MaxStepMEM,MinStepMEM,";
+                "MinStepCPU,MaxStepMEM,MinStepMEM,StepGPU(DCU),StepGPU(DCU)MEM,";
     char base_job_summary_field[] = "JobID,TotalCPU,TotalMEM,TotalVMEM,TotalPages,"
                                    "MaxCPU,MinCPU,MaxMEM,MinMEM,MaxVMEM,MinVMEM,"
-                                   "TotalDCU,TotalDCUMEM,MaxDCU,MinDCU,MaxDCUMEM,MinDCUMEM";
+                                   "TotalGPU(DCU),TotalGPU(DCU)MEM,MaxGPU(DCU),MinGPU(DCU),MaxGPU(DCU)MEM,MinGPU(DCU)MEM";
+    opt_step_list           = xmalloc(sizeof(base_step_field));
+    opt_event_list          = xmalloc(sizeof(base_event_field));
+    opt_overall_list        = xmalloc(sizeof(base_overall_field));
+    opt_apptype_list        = xmalloc(sizeof(base_apptype_field));
+    opt_apptype_job_list    = xmalloc(sizeof(base_apptype_job_field));
+    opt_job_summary_list    = xmalloc(sizeof(base_job_summary_field));
     if(!params->opt_field_list) {
         if(params->level & INFLUXDB_DISPLAY) {
             strcpy(opt_step_list, base_display_field);

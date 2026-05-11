@@ -350,8 +350,9 @@ env_vars_t env_vars[] = {
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
   { "SBATCH_JOB_APPTYPE", LONG_OPT_APPTYPE},
 #endif
-#ifdef __METASTACK_OPT_APP  
-  { "SBATCH_APP", LONG_OPT_APP },  
+#ifdef __METASTACK_OPT_APP
+  { "SBATCH_APP", LONG_OPT_APP },
+  { "SBATCH_APP_SOURCE", LONG_OPT_APP_SOURCE },
 #endif
   { NULL }
 };
@@ -815,6 +816,12 @@ static bool _opt_verify(void)
 	int hl_cnt = 0;
 
 	validate_options_salloc_sbatch_srun(&opt);
+#ifdef __METASTACK_OPT_APP
+	if (opt.app_source_set && (!opt.app || !opt.app[0])) {
+		error("--app-source option requires --app specification");
+		verified = false;
+	}
+#endif
 
 	if (opt.quiet && opt.verbose) {
 		error ("don't specify both --verbose (-v) and --quiet (-Q)");

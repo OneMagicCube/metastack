@@ -2489,11 +2489,11 @@ extern jobacctinfo_t *jobacctinfo_create(jobacct_id_t *jobacct_id)
 #ifdef __METASTACK_NEW_GRES_GATHER_DCU
 	//jobacct->dcu_step_ave = 0.0;
 	jobacct->dcu_step_max = 0.0;
-	jobacct->dcu_step_min = INFINITE64;
+	jobacct->dcu_step_min = 0.0;
 	jobacct->dcu_step_real = 0.0;
 
 	jobacct->dcu_mem_step_max = 0;
-	jobacct->dcu_mem_step_min = INFINITE64;
+	jobacct->dcu_mem_step_min = 0;
 	jobacct->dcu_mem_step = 0;
 	jobacct->gres_threshold = 100;
 	jobacct->alloc_gres = 0;

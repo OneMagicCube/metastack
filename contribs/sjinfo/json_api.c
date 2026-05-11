@@ -56,6 +56,26 @@ void free_interface_sjinfo(interface_sjinfo_t* iinfo) {
     xfree(iinfo);
 }
 
+static unsigned long _json_unsigned_long_value(json_t *value)
+{
+    if (json_is_integer(value))
+        return (unsigned long)json_integer_value(value);
+    if (json_is_real(value))
+        return (unsigned long)json_real_value(value);
+    return 0;
+}
+
+static void _free_spost_record(spost_record_t *record)
+{
+    if (!record)
+        return;
+    xfree(record->nodename);
+    xfree(record->username);
+    xfree(record->data);
+    xfree(record->uid);
+    xfree(record);
+}
+
 extern void destroy_brief_key_pair(void *object)
 {
 	sacct_entry_t *key_brief_ptr = (sacct_entry_t *)object;
@@ -64,21 +84,86 @@ extern void destroy_brief_key_pair(void *object)
 		xfree(key_brief_ptr);
 	}
 }
+
+static long long _parse_tres_value(const char *tres, const char *name)
+{
+    long long parsed_value = 0;
+    char *tres_copy = NULL;
+    char *token = NULL;
+    size_t name_len = 0;
+
+    if (!tres || !name)
+        return 0;
+
+    name_len = strlen(name);
+    tres_copy = xstrdup(tres);
+    token = strtok(tres_copy, ",");
+    while (token) {
+        if (strncmp(token, name, name_len) == 0 && token[name_len] == '=') {
+            parsed_value = atoll(token + name_len + 1);
+            break;
+        }
+        token = strtok(NULL, ",");
+    }
+
+    xfree(tres_copy);
+    return parsed_value;
+}
+
+static long long _parse_tres_gres(const char *tres)
+{
+    long long alloc_gres = 0;
+    char *tres_copy = NULL;
+    char *token = NULL;
+
+    if (!tres)
+        return 0;
+
+    tres_copy = xstrdup(tres);
+    token = strtok(tres_copy, ",");
+    while (token) {
+        if (strncmp(token, "gres/gpu", 8) == 0 ||
+            strncmp(token, "gres/dcu", 8) == 0) {
+            char *value = strchr(token, '=');
+            if (value)
+                alloc_gres += atoll(value + 1);
+        }
+        token = strtok(NULL, ",");
+    }
+
+    xfree(tres_copy);
+    return alloc_gres;
+}
+
 // 解析单行字符串到结构体
 static int parse_sacct_line(const char *line, int count, List print_head_list) {
     int result = -1;
     sacct_entry_t *sacct_field = NULL;
     sacct_field = xmalloc(sizeof(sacct_entry_t));
+    sacct_field->alloc_gres = 0;
     if(count == 1) {
         long long int field1 = 0; 
         long long int field2 = 0;
-        long long int field3 = 0;      
-        result = sscanf(line, "%lld %lld %lld", &field1, &field2, &field3);
-        if (result == 3) {
+        long long int field3 = 0;
+        char field4[1024] = {'\0'};
+        char field5[1024] = {'\0'};
+        result = sscanf(line, "%lld %lld %lld %1023s %1023s", &field1, &field2, &field3, field4, field5);
+        if (result >= 3) {
             sacct_field->jobid     = field1;
             sacct_field->alloc_cpu = field2;
             sacct_field->stepdid   = -1; //作业默认为-1
             sacct_field->reqmem    = field3; 
+            if (result == 5) {
+                long long int req_cpu = _parse_tres_value(field5, "cpu");
+                long long int req_mem = _parse_tres_value(field5, "mem");
+                if (req_cpu > 0)
+                    sacct_field->alloc_cpu = req_cpu;
+                if (req_mem > 0)
+                    sacct_field->reqmem = req_mem;
+                sacct_field->alloc_gres = _parse_tres_gres(field5);
+            } else if (result == 4) {
+                sacct_field->alloc_gres = _parse_tres_gres(field4);
+            }
             list_append(print_head_list, sacct_field); 
         } else {
             xfree(sacct_field);
@@ -89,15 +174,19 @@ static int parse_sacct_line(const char *line, int count, List print_head_list) {
         sacct_field->stepdid   = -2; //数字作业步默认为-2
         long long int field1   = 0; 
         char field2[50]        = {'\0'};
-        long long int field3   = 0;    
-        result = sscanf(line, "%lld %49s %lld", &field1, field2, &field3);
+        long long int field3   = 0;
+        char field4[1024]      = {'\0'};
+        char field5[1024]      = {'\0'};
+        result = sscanf(line, "%lld %49s %lld %1023s %1023s", &field1, field2, &field3, field4, field5);
         /*成功读取3个变量*/
-        if (result == 3) {
+        if (result >= 3) {
             
             sacct_field->jobid = field1;
            
             if (strstr(field2, "batch")) {
                 sacct_field->stepdid = -5; //batch作业对应的数字作业步为-5
+            } else if (strstr(field2, "extern")) {
+                sacct_field->stepdid = -4; //extern作业对应的数字作业步为-4
             } else {
                 if (field2[0] == '.') {
                     int value = atoi(field2 + 1);  // 提取整数
@@ -109,6 +198,8 @@ static int parse_sacct_line(const char *line, int count, List print_head_list) {
                 }
             }
             sacct_field->alloc_cpu = field3;
+            if (result >= 4)
+                sacct_field->alloc_gres = _parse_tres_gres(field4);
             list_append(print_head_list, sacct_field);           
         } else {
             xfree(sacct_field);
@@ -137,7 +228,7 @@ static int sacct_get(List print_head_list, long int job_tran)
     char cmd[2048] = {'\0'};
     char line[4096] = {'\0'};  // 用更大的buffer存结果行（比如4096字节）
 
-    sprintf(cmd, "sacct -j %ld -o  jobid%%24,AllocC%%24,reqmem%%36 --unit=m --noheader|grep -v extern", job_tran);
+    sprintf(cmd, "sacct -j %ld -o  jobid%%24,AllocC%%24,reqmem%%36,AllocTRES%%256,ReqTRES%%256 --unit=m --noheader", job_tran);
     // 执行命令并打开管道
     fp = popen(cmd, "r");
     if (fp == NULL) {
@@ -178,7 +269,8 @@ extern void parse_json(char *response, query_job_record_t* query_send) {
     json_error_t error;
     size_t r = 0;
     List print_head_list = NULL;
-    long long int reqmem = 0;     
+    long long int reqmem = 0;
+    sacct_entry_t *reqtres_entry = NULL;
 
     if (!response || !query_send || !query_send->pw || !query_send->pw->pw_name || !query_send->params) {
         return;
@@ -193,9 +285,9 @@ extern void parse_json(char *response, query_job_record_t* query_send) {
         print_head_list = list_create(destroy_brief_key_pair);
         sacct_get(print_head_list, query_send->jobid_tran);
         long long int defaut_step = -1; //sacct 查询出的 jobid那一栏，作业步赋值是-1
-        sacct_entry_t *sacct_field_tmp = list_find_first(print_head_list, _find_sacct_by_stepid, &defaut_step);
-        if(sacct_field_tmp)
-            reqmem = sacct_field_tmp->reqmem;
+        reqtres_entry = list_find_first(print_head_list, _find_sacct_by_stepid, &defaut_step);
+        if(reqtres_entry)
+            reqmem = reqtres_entry->reqmem;
         else
             reqmem = NOT_FIND;
      }
@@ -226,6 +318,7 @@ extern void parse_json(char *response, query_job_record_t* query_send) {
             iinfo_overall->sum_cpu = 0;
             iinfo_overall->sum_pid = 0;
             iinfo_overall->sum_node = 0;
+            iinfo_overall->sum_gpu = 0;
             strcpy(iinfo_overall->username, query_send->pw->pw_name);
             
             if(query_send->flag == UNIT_STEP) {
@@ -342,7 +435,19 @@ extern void parse_json(char *response, query_job_record_t* query_send) {
                             iinfo->stepcpu = json_real_value(value);
                         } else if (xstrcmp(tmp_name, "stepmem") == 0) {
                             iinfo->stepmem = json_integer_value(value);
-                        } 
+                        } else if (xstrcmp(tmp_name, "stepdcuutil") == 0) {
+                            if (json_is_integer(value)) {
+                                iinfo->stepdcu = (double)json_integer_value(value);
+                            } else {
+                                iinfo->stepdcu = json_real_value(value);
+                            }
+                        } else if (xstrcmp(tmp_name, "stepdcumem") == 0) {
+                            if (json_is_integer(value)) {
+                                iinfo->stepdcumem = (double)json_integer_value(value);
+                            } else {
+                                iinfo->stepdcumem = json_real_value(value);
+                            }
+                        }
                     }
                     long long int tmp = iinfo->stepid;
                     sacct_entry_t *sacct_field_tmp = list_find_first(print_head_list, _find_sacct_by_stepid, &tmp);
@@ -351,7 +456,13 @@ extern void parse_json(char *response, query_job_record_t* query_send) {
                         free_interface_sjinfo(iinfo);
                         continue; 
                     }
-                    iinfo->alloc_cpu = sacct_field_tmp->alloc_cpu;
+                    if(reqtres_entry) {
+                        iinfo->alloc_cpu = reqtres_entry->alloc_cpu;
+                        iinfo->alloc_gres = reqtres_entry->alloc_gres;
+                    } else {
+                        iinfo->alloc_cpu = sacct_field_tmp->alloc_cpu;
+                        iinfo->alloc_gres = sacct_field_tmp->alloc_gres;
+                    }
                     list_append(query_send->print_display_list, iinfo);
                     ++i;
                 }
@@ -455,7 +566,9 @@ extern void parse_json(char *response, query_job_record_t* query_send) {
                         } else if (xstrcmp(tmp_name, "steppages") == 0) {
                             iinfo->steppages = (long long)json_integer_value(value);
                         } else if (xstrcmp(tmp_name, "cputhreshold") == 0) {
-                            iinfo->cputhreshold = (long long)json_integer_value(value);
+                            iinfo->cputhreshold = _json_unsigned_long_value(value);
+                        } else if (xstrcmp(tmp_name, "gresthreshold") == 0) {
+                            iinfo->gresthreshold = _json_unsigned_long_value(value);
                         } else if (xstrcmp(tmp_name, "start") == 0) {
                             iinfo->start = (time_t)json_integer_value(value);
                             iinfo_overall->start_last = MAX(iinfo->start, iinfo_overall->start_last);
@@ -486,12 +599,18 @@ extern void parse_json(char *response, query_job_record_t* query_send) {
                             const char *type3 = json_string_value(value);
                             if (type3)
                                 iinfo->type3 = atoi(type3);
+                        } else if (xstrcmp(tmp_name, "tag_type4") == 0) {
+                            const char *type4 = json_string_value(value);
+                            if (type4)
+                                iinfo->type4 = atoi(type4);
                         } else if (xstrcmp(tmp_name, "field_type1") == 0) {
                             iinfo->type1 = json_integer_value(value);
                         } else if (xstrcmp(tmp_name, "field_type2") == 0) {
                             iinfo->type2 = json_integer_value(value);
                         } else if (xstrcmp(tmp_name, "field_type3") == 0) {
                             iinfo->type3 = json_integer_value(value);
+                        } else if (xstrcmp(tmp_name, "field_type4") == 0) {
+                            iinfo->type4 = json_integer_value(value); 
                         } else if (xstrcmp(tmp_name, "type") == 0) {
                             const char *type = json_string_value(value);
                             if (type)
@@ -499,7 +618,13 @@ extern void parse_json(char *response, query_job_record_t* query_send) {
                         }
 
                     }
-                    if ((iinfo->type1 || iinfo->type2 || iinfo->type3 || iinfo->type != NULL) && 
+                    if (iinfo->type != NULL) {
+                        iinfo->type1 = (xstrcmp(iinfo->type, CPU_ABNORMAL_FLAG) == 0);
+                        iinfo->type2 = (xstrcmp(iinfo->type, PROCESS_ABNORMAL_FLAG) == 0);
+                        iinfo->type3 = (xstrcmp(iinfo->type, NODE_ABNORMAL_FLAG) == 0);
+                        iinfo->type4 = (xstrcmp(iinfo->type, GPU_ABNORMAL_FLAG) == 0);
+                    }
+                    if ((iinfo->type1 || iinfo->type2 || iinfo->type3 || iinfo->type4) && 
                         ((query_send->params->level & INFLUXDB_EVENT) || query_send->params->level & INFLUXDB_OVERALL)) {
                         if (iinfo->type1) 
                             iinfo_overall->sum_cpu++;
@@ -507,13 +632,8 @@ extern void parse_json(char *response, query_job_record_t* query_send) {
                             iinfo_overall->sum_pid++;
                         if (iinfo->type3) 
                             iinfo_overall->sum_node++;
-                        if(xstrcmp(iinfo->type, CPU_ABNORMAL_FLAG) == 0) {
-                            iinfo_overall->sum_cpu++;
-                        } else if (xstrcmp(iinfo->type, PROCESS_ABNORMAL_FLAG) == 0) {
-                            iinfo_overall->sum_pid++;
-                        } else if (xstrcmp(iinfo->type, NODE_ABNORMAL_FLAG) == 0) {
-                            iinfo_overall->sum_node++;
-                        }
+                        if (iinfo->type4)
+                            iinfo_overall->sum_gpu++;
                         list_append(query_send->print_events_value_list, iinfo);
                     } else {
                         free_interface_sjinfo(iinfo);
@@ -841,8 +961,10 @@ void parse_json_tag(const char *response, list_t *print_query_value_list) {
 
                 } 
 
-                if( record->jobid> 0 )                                                             
+                if( record->jobid> 0 )
                     list_append(print_query_value_list, record);
+                else
+                    _free_spost_record(record);
             }
 
         }

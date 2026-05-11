@@ -844,8 +844,9 @@ env_vars_t env_vars[] = {
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
   { "SLURM_JOB_APPTYPE", LONG_OPT_APPTYPE },
 #endif
-#ifdef __METASTACK_OPT_APP  
-  { "SLURM_APP", LONG_OPT_APP },  
+#ifdef __METASTACK_OPT_APP
+  { "SLURM_APP", LONG_OPT_APP },
+  { "SLURM_APP_SOURCE", LONG_OPT_APP_SOURCE },
 #endif
   { NULL }
 };
@@ -1136,7 +1137,12 @@ static bool _opt_verify(void)
 	}
 
 	validate_options_salloc_sbatch_srun(&opt);
-
+#ifdef __METASTACK_OPT_APP
+	if (opt.app_source_set && (!opt.app || !opt.app[0])) {
+		error("--app-source option requires --app specification");
+		exit(error_exit);
+	}
+#endif
 	/*
 	 * If they are requesting block without 'nopack' and the system
 	 * is setup to pack nodes set it here.

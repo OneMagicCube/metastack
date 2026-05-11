@@ -39,7 +39,16 @@
 #include <math.h>
 
 #include "../common/gpu_common.h"
-
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+#ifndef NVML_NO_UNVERSIONED_FUNC_DEFS
+extern nvmlReturn_t nvmlDeviceGetComputeRunningProcesses_v2(
+	nvmlDevice_t device, unsigned int *infoCount,
+	nvmlProcessInfo_v2_t *infos);
+extern nvmlReturn_t nvmlDeviceGetGraphicsRunningProcesses_v2(
+	nvmlDevice_t device, unsigned int *infoCount,
+	nvmlProcessInfo_v2_t *infos);
+#endif
+#endif
 #if defined (__APPLE__)
 extern slurmd_conf_t *conf __attribute__((weak_import));
 #else
@@ -106,6 +115,9 @@ const uint32_t	plugin_version		= SLURM_VERSION_NUMBER;
 static int gpumem_pos = -1;
 static int gpuutil_pos = -1;
 static pid_t init_pid = 0;
+
+typedef nvmlReturn_t (*nvml_get_processes_t)(nvmlDevice_t, unsigned int *,
+					     nvmlProcessInfo_v2_t *);
 
 /*
  * Converts a cpu_set returned from the NVML API into a Slurm bitstr_t
@@ -1548,19 +1560,22 @@ static List _get_system_gpu_list_nvml(node_config_load_t *node_config)
 
 static char *_get_nvml_func_str(void *fname)
 {
-	if (fname == nvmlDeviceGetComputeRunningProcesses)
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+	if (fname == nvmlDeviceGetComputeRunningProcesses_v2)
 		return "Compute";
+#endif
 	return "Graphics";
 }
-
-static int _get_nvml_process_info(nvmlReturn_t (*get_proc)(nvmlDevice_t,
-							   unsigned int *,
-							   nvmlProcessInfo_t *),
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+static int _get_nvml_process_info(nvml_get_processes_t get_proc,
 				  nvmlDevice_t device, pid_t pid,
 				  acct_gather_data_t *data)
+#endif
 {
 	nvmlReturn_t rc;
-	nvmlProcessInfo_t *proc_info;
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+	nvmlProcessInfo_v2_t *proc_info;
+#endif
 	unsigned int proc_cnt = 0;
 
 	/*
@@ -1593,9 +1608,26 @@ static int _get_nvml_process_info(nvmlReturn_t (*get_proc)(nvmlDevice_t,
 			return SLURM_ERROR;
 		}
 		for (int i = 0; i < proc_cnt; i++) {
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+			if (proc_info[i].usedGpuMemory == NVML_VALUE_NOT_AVAILABLE) {
+				log_flag(JAG, " GPUUtil %s query pid %d proc[%d/%u] pid %u has MemMB=N/A",
+					 _get_nvml_func_str(get_proc), pid, i,
+					 proc_cnt, proc_info[i].pid);
+			} else {
+				log_flag(JAG, "GPUUtil %s query pid %d proc[%d/%u] pid %u has MemMB=%llu",
+					 _get_nvml_func_str(get_proc), pid, i,
+					 proc_cnt, proc_info[i].pid,
+					 (unsigned long long)
+					 (proc_info[i].usedGpuMemory / 1048576));
+			}
+#endif
 			if (proc_info[i].pid != pid)
 				continue;
-			/* Store MB usedGpuMemory is in bytes */
+#ifdef __METASTACK_NEW_GRES_GATHER_DCU
+			if (proc_info[i].usedGpuMemory == NVML_VALUE_NOT_AVAILABLE)
+				continue;
+			/* usedGpuMemory is in bytes. */
+#endif
 			data[gpumem_pos].size_read += proc_info[i].usedGpuMemory;
 			break;
 		}
@@ -1609,11 +1641,11 @@ static int _get_nvml_process_info(nvmlReturn_t (*get_proc)(nvmlDevice_t,
 
 static int _get_gpumem(nvmlDevice_t device, pid_t pid, acct_gather_data_t *data)
 {
-	if (_get_nvml_process_info(nvmlDeviceGetComputeRunningProcesses, device,
+	if (_get_nvml_process_info(nvmlDeviceGetComputeRunningProcesses_v2, device,
 				   pid, data) != SLURM_SUCCESS)
 		return SLURM_ERROR;
 
-	if (_get_nvml_process_info(nvmlDeviceGetGraphicsRunningProcesses,
+	if (_get_nvml_process_info(nvmlDeviceGetGraphicsRunningProcesses_v2,
 				   device, pid, data) != SLURM_SUCCESS)
 		return SLURM_ERROR;
 

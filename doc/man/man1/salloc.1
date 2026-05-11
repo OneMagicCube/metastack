@@ -139,12 +139,22 @@ The value range is from 0 to 100.
 .IP
 
 .TP
+\fBavegpuutil=\fI<threshold>\fR
+The minimum threshold of low average GPU or DCU utilization within the
+designated detection time (already normalized). An anomaly event
+occurs if all GPU or DCU utilization samples collected within the
+specified detection time consistently remain below the set avegpuutil.
+The value range is from 0 to 100.
+.IP
+
+.TP
 \fBcollect_step=\fI<number>\fR
 Enable or disable threshold-based judgment for setting job steps. 
 Currently supports batch and numeric job step detection, but not 
-extern. 0 represents turning off anomaly detection for all job steps,  
+extern. 0 represents turning off anomaly detection for all job steps, 
 1 enables only numeric job steps, 2 enables only batch job steps, 
-and 3 enables both batch and numeric job steps simultaneously.
+3 enables both batch and numeric job steps simultaneously, 
+and 4 enables all job steps.
 .IP
 .RE
 .IP

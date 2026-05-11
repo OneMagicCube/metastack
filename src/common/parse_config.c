@@ -1386,6 +1386,112 @@ static void _handle_include(char *include_file, char *conf_file)
 	}
 }
 
+#ifdef __METASTACK_OPT_APP  
+#define APP_ONLY_PEEK_LINES 3
+/*  
+ * _is_app_only_file - Quick peek at an included file to check whether  
+ * it contains only AppName configuration lines (plus comments and blanks).  
+ *  
+ * Reads up to APP_ONLY_PEEK_LINES non-empty, non-comment lines. If ALL  
+ * of them start with "AppName" (case-insensitive), returns true. This  
+ * allows the caller to skip the entire file for non-slurmctld processes,  
+ * avoiding all per-line I/O, hash computation, and string processing.  
+ *  
+ * Uses a small 256-byte buffer for prefix checking only. Lines longer  
+ * than the buffer (e.g. AppName with 100+ comma-separated versions) are  
+ * handled by consuming the remainder of the line via fgetc() after a  
+ * successful prefix match, ensuring the next fgets() starts at a fresh  
+ * line boundary.  
+ *  
+ * Cost: one fopen + a few short fgets/fgetc calls.  
+ * Returns false on any I/O error, if the file is empty, or if any  
+ * non-empty non-comment line does not start with "AppName".  
+ */  
+static bool _is_app_only_file(const char *path)  
+{  
+	FILE *f;  
+	char buf[256];  
+	char *p;  
+	int checked = 0;
+	bool saw_app_line = false;
+
+	if (!path)  
+		return false;  
+
+	f = fopen(path, "r");  
+	if (!f)  
+		return false;  
+
+	while (fgets(buf, sizeof(buf), f)) {  
+		bool line_complete = (strchr(buf, '\n') != NULL);
+
+		/* Skip leading whitespace */  
+		p = buf;  
+		while (isspace((int)*p))  
+			p++;  
+
+		/* Skip blank lines and comments */  
+		if (*p == '\0' || *p == '#' || *p == '\n') {
+			if (!line_complete) {
+				int c = '\n';
+
+				/*
+				 * If fgets() filled the buffer with only whitespace,
+				 * we cannot classify the line yet. Scan the remainder
+				 * to determine whether this is truly blank/comment or
+				 * a real directive (e.g. many spaces then NodeName=).
+				 */
+				if (*p == '\0') {
+					while ((c = fgetc(f)) != EOF && c != '\n' &&
+					       isspace(c))
+						;
+
+					if (c != EOF && c != '\n' && c != '#') {
+						fclose(f);
+						return false;
+					}
+				}
+
+				while (c != EOF && c != '\n')
+					c = fgetc(f);
+			}
+			continue;  
+		}
+
+		/* Check for "AppName" prefix (case-insensitive) */  
+		if (xstrncasecmp(p, "AppName", 7) != 0 ||  
+		    (p[7] != '=' && !isspace((int)p[7]))) {  
+			fclose(f);  
+			return false;  
+		}  
+
+		saw_app_line = true;
+
+		/* If the line is longer than buf, consume the rest so that  
+		 * the next fgets() starts at a fresh line. Without this,  
+		 * fgets() would return the middle of the same long line  
+		 * (e.g. "1.0.30,1.0.31,...") which would fail the AppName  
+		 * prefix check and incorrectly return false. */  
+		if (!line_complete) {  
+			int c;  
+			while ((c = fgetc(f)) != EOF && c != '\n')  
+				;  
+		}  
+
+		if (++checked >= APP_ONLY_PEEK_LINES)
+			break;
+	}  
+
+	if (ferror(f)) {
+		fclose(f);
+		return false;
+	}
+
+	fclose(f);  
+	return saw_app_line;
+}  
+#endif
+
 /*
  * Returns 1 if the line contained an include directive and the included
  * file was parsed without error.  Returns -1 if the line was an include
@@ -1433,7 +1539,23 @@ static int _parse_include_directive(s_p_hashtbl_t *hashtbl, uint32_t *hash_val,
 			      temp.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO));
 		if (!last_ancestor)
 			last_ancestor = xbasename(slurm_conf_path);
-
+#ifdef __METASTACK_OPT_APP  
+		/*  
+		 * File-level skip: if this is a non-slurmctld process  
+		 * and the included file contains only AppName lines,  
+		 * skip the entire file to avoid per-line I/O overhead.  
+		 * This reduces client command latency from O(n*line_len)  
+		 * to O(1) for large app config files.  
+		 */  
+		if (!running_in_slurmctld() &&  
+		    _is_app_only_file(path_name)) {  
+			debug2("%s: skipping app-only include file %s "  
+			       "(non-slurmctld process)", __func__, path_name);  
+			xfree(path_name);  
+			xfree(file_name);  
+			return 1;  
+		}  
+#endif 
 		if (xstrstr(file_name, "*")) {
 			if ((!xstrcasecmp(last_ancestor,"slurm.conf")) ||
 			    (!(slurm_conf.debug_flags & DEBUG_FLAG_GLOB_SILENCE))) {

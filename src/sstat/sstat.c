@@ -346,13 +346,13 @@ void print_for_brief(jobacctinfo_t *total_jobacct,uint32_t job_id, uint32_t step
 				sizeof(vmem_outbuf_tmp_min), UNIT_NONE, UNIT_MEGA,
 				params.convert_flags);
 		convert_num_unit(total_jobacct->dcu_mem_step_max, outbuf_dcu_max,
-				sizeof(outbuf_dcu_max), UNIT_NONE, UNIT_MEGA,
+				sizeof(outbuf_dcu_max), UNIT_MEGA, params.units,
 				params.convert_flags);
 		convert_num_unit(total_jobacct->dcu_mem_step_min, outbuf_dcu_min,
-				sizeof(outbuf_dcu_min), UNIT_NONE, UNIT_MEGA,
+				sizeof(outbuf_dcu_min), UNIT_MEGA, params.units,
 				params.convert_flags);
 		convert_num_unit(total_jobacct->dcu_mem_step, outbuf_dcu_real,
-				sizeof(outbuf_dcu_real), UNIT_NONE, UNIT_MEGA,
+				sizeof(outbuf_dcu_real), UNIT_MEGA, params.units,
 				params.convert_flags);
 	}
 	if (total_jobacct->vmem_step_max >= 0) {

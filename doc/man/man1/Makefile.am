@@ -13,6 +13,7 @@ man1_MANS = \
 	scrontab.1 \
 	sdiag.1	\
 	sinfo.1   \
+	sjinfo.1 \
 	slurm.1 \
 	sprio.1 \
 	squeue.1 \
@@ -45,6 +46,7 @@ html_DATA = \
 	scrontab.html \
 	sdiag.html \
 	sinfo.html \
+	sjinfo.html \
 	sprio.html \
 	squeue.html \
 	sreport.html \
