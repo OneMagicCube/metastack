@@ -11980,6 +11980,9 @@ static void _pack_job_desc_msg(job_desc_msg_t *job_desc_ptr, buf_t *buffer,
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
 		packstr(job_desc_ptr->apptype, buffer);
 #endif
+#ifdef __METASTACK_NEW_APP_TEMPLATE
+		packstr(job_desc_ptr->app, buffer);
+#endif
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
 		pack32(job_desc_ptr->style_step, buffer);
 #endif
@@ -12404,6 +12407,9 @@ static void _pack_job_desc_msg(job_desc_msg_t *job_desc_ptr, buf_t *buffer,
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
 		packstr(job_desc_ptr->apptype, buffer);
 #endif
+#ifdef __METASTACK_NEW_APP_TEMPLATE
+		packstr(job_desc_ptr->app, buffer);
+#endif
 	} else if (protocol_version >= SLURM_MIN_PROTOCOL_VERSION) {
 		pack32(job_desc_ptr->site_factor, buffer);
 		packstr(job_desc_ptr->batch_features, buffer);
@@ -12750,6 +12756,9 @@ _unpack_job_desc_msg(job_desc_msg_t ** job_desc_buffer_ptr, buf_t *buffer,
 #endif
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
 		safe_unpackstr(&job_desc_ptr->apptype, buffer);
+#endif
+#ifdef __METASTACK_NEW_APP_TEMPLATE
+		safe_unpackstr(&job_desc_ptr->app, buffer);
 #endif
 #ifdef __METASTACK_NEW_CUSTOM_EXCEPTION
 		safe_unpack32(&job_desc_ptr->style_step, buffer);	
@@ -13301,6 +13310,9 @@ _unpack_job_desc_msg(job_desc_msg_t ** job_desc_buffer_ptr, buf_t *buffer,
 #endif
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
 		safe_unpackstr(&job_desc_ptr->apptype, buffer);
+#endif
+#ifdef __METASTACK_NEW_APP_TEMPLATE
+		safe_unpackstr(&job_desc_ptr->app, buffer);
 #endif
 	} else if (protocol_version >= SLURM_MIN_PROTOCOL_VERSION) {
 		dynamic_plugin_data_t *select_jobinfo;

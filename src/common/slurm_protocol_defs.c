@@ -1682,6 +1682,9 @@ extern void slurm_free_job_desc_msg(job_desc_msg_t *msg)
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
 		xfree(msg->apptype);
 #endif
+#ifdef __METASTACK_NEW_APP_TEMPLATE
+		xfree(msg->app);
+#endif
 		xfree(msg);
 	}
 }

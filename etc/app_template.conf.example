@@ -1,0 +1,79 @@
+# app_template.conf - Application Template Configuration
+#
+# This file defines application templates that can be used with the --app
+# parameter in sbatch, srun, and salloc. When a user specifies --app=<name>,
+# the system automatically applies the template's default settings.
+#
+# File location: Place this file in the same directory as slurm.conf
+# (typically /etc/slurm/app_template.conf)
+#
+# Format:
+#   [appname]          - Section header (case-insensitive match)
+#   key = value        - Configuration key-value pair
+#
+# Supported keys:
+#   env          - Comma-separated KEY=VALUE pairs for environment variables.
+#                  These are always merged into the job environment.
+#   partition    - Default partition name.
+#   gres         - Default generic resource specification.
+#   ntasks       - Default number of tasks.
+#   cpus_per_task - Default number of CPUs per task.
+#   mem_per_cpu  - Default memory per CPU in MB.
+#   time_limit   - Default time limit in minutes.
+#
+# Note: User-specified command-line options always take priority over
+# template defaults. Environment variables from templates are always
+# applied (merged) regardless of user settings.
+#
+# Example usage:
+#   sbatch --app=pytorch train.sh
+#   srun --app=tensorflow python model.py
+#   salloc --app=vasp
+
+# PyTorch distributed training template
+[pytorch]
+env = NCCL_DEBUG=INFO,NCCL_IB_DISABLE=0,OMP_NUM_THREADS=4
+partition = gpu
+gres = gpu:4
+ntasks = 4
+cpus_per_task = 8
+mem_per_cpu = 4096
+time_limit = 1440
+
+# TensorFlow template
+[tensorflow]
+env = TF_FORCE_GPU_ALLOW_GROWTH=true,OMP_NUM_THREADS=4
+partition = gpu
+gres = gpu:2
+ntasks = 1
+cpus_per_task = 16
+mem_per_cpu = 8192
+time_limit = 720
+
+# VASP (Vienna Ab initio Simulation Package) template
+[vasp]
+env = OMP_NUM_THREADS=1,I_MPI_ADJUST_ALLTOALL=1
+partition = cpu
+ntasks = 64
+cpus_per_task = 1
+mem_per_cpu = 2048
+time_limit = 2880
+
+# GROMACS molecular dynamics template
+[gromacs]
+env = OMP_NUM_THREADS=4,GMX_GPU_DD_COMMS=true,GMX_GPU_PME_PP_COMMS=true
+partition = gpu
+gres = gpu:2
+ntasks = 2
+cpus_per_task = 8
+mem_per_cpu = 4096
+time_limit = 1440
+
+# FDS (Fire Dynamics Simulator) template
+[fds]
+env = OMP_NUM_THREADS=1
+partition = cpu
+ntasks = 16
+cpus_per_task = 1
+mem_per_cpu = 2048
+time_limit = 4320

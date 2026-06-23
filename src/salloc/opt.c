@@ -74,6 +74,10 @@
 #include "src/salloc/salloc.h"
 #include "src/salloc/opt.h"
 
+#ifdef __METASTACK_NEW_APP_TEMPLATE
+#include "src/common/app_template.h"
+#endif
+
 static void _help(void);
 static void _usage(void);
 static void _autocomplete(const char *query);
@@ -201,6 +205,11 @@ extern int initialize_and_process_args(int argc, char **argv, int *argc_off,
 	_opt_args(argc, argv, het_job_inx);
 	if (argc_off)
 		*argc_off = optind;
+
+#ifdef __METASTACK_NEW_APP_TEMPLATE
+	if (opt.app)
+		app_template_apply(&opt);
+#endif
 
 	if (opt.verbose)
 		slurm_print_set_options(&opt);
@@ -340,6 +349,9 @@ env_vars_t env_vars[] = {
 #endif
 #ifdef __METASTACK_NEW_APPTYPE_RECOGNITION
   { "SALLOC_JOB_APPTYPE", LONG_OPT_APPTYPE},
+#endif
+#ifdef __METASTACK_NEW_APP_TEMPLATE
+  { "SALLOC_APP", LONG_OPT_APP},
 #endif
   { NULL }
 };
