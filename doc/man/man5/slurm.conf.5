@@ -1973,6 +1973,19 @@ possibly with other processes left running.
 \fBDisableGPUAcct\fR
 Do not do accounting of GPU usage and skip any gpu driver library call. This
 parameter can help to improve performance if the GPU driver response is slow.
+.IP
+.
+.TP
+\fBNoImmediatePoll\fR
+Skip the immediate data poll triggered when adding or removing tasks in the
+extern step (e.g. during pam_slurm_adopt SSH sessions).
+This can significantly improve performance in high\-frequency SSH scenarios on
+nodes with a large number of processes, by avoiding synchronous process tree
+traversal while holding the task list lock.
+The periodic polling performed by the watch_tasks thread (controlled by
+\fBJobAcctGatherFrequency\fR) is not affected.
+.RE
+.IP
 .RE
 .IP
 
